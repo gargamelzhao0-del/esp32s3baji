@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "note": "Recipes, not exported frame sequences. Motion is a display effect, not hidden reasoning telemetry.",
+  "recipes": {
+    "idle": {
+      "pose": "idle",
+      "loop": true,
+      "translate_y_px": 2,
+      "period_ms": 2600
+    },
+    "working": {
+      "pose": "thinking",
+      "loop": true,
+      "translate_y_px": 1,
+      "period_ms": 1800,
+      "overlay": "activity_dots"
+    },
+    "tool": {
+      "pose_from_activity": true,
+      "loop": true,
+      "translate_y_px": 1,
+      "period_ms": 1600,
+      "overlay": "tool_icon"
+    },
+    "waiting": {
+      "pose": "asking",
+      "loop": true,
+      "translate_y_px": 0,
+      "overlay": "slow_amber_ring"
+    },
+    "ended": {
+      "pose": "idle",
+      "loop": false,
+      "overlay": "turn_ended",
+      "duration_ms": 1600
+    },
+    "verified_success": {
+      "pose": "happy",
+      "loop": false,
+      "duration_ms": 1600
+    },
+    "error": {
+      "pose": "oops",
+      "loop": false,
+      "overlay": "error_badge"
+    },
+    "limited": {
+      "pose": "tired",
+      "loop": false,
+      "overlay": "quota_limit"
+    },
+    "offline": {
+      "keep_last_pose": true,
+      "loop": false,
+      "overlay": "offline",
+      "pause_motion": true
+    },
+    "pet": {
+      "keep_last_pose": true,
+      "loop": false,
+      "overlay": "small_heart",
+      "duration_ms": 900,
+      "cooldown_ms": 3000
+    },
+    "sleeping": {
+      "pose": "sleeping",
+      "loop": false,
+      "display_after_ms": 120000
+    }
+  }
+}

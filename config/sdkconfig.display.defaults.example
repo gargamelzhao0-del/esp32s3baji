@@ -1,0 +1,7 @@
+# Candidate settings, merge AFTER verifying the vendor BSP example and lockfile.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_USE_MALLOC=y
+# LVGL settings must match the resolved LVGL 9 / esp_lvgl_adapter versions.
+# Do not add a second LVGL tick/timer task when the adapter already owns one.

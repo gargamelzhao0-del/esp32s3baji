@@ -1,0 +1,8 @@
+# Keep source files consistent across Windows and other development hosts.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png -text
+*.webp -text
+
+# This upstream source record is verified against its original byte hash.
+assets/ai-girls/sources/crosspet/LICENSE.md -text

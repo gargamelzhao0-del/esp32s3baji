@@ -1,0 +1,714 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:baji:protocol:v1",
+  "title": "BAJI USB protocol v1 — preparation contract",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/hello"
+    },
+    {
+      "$ref": "#/$defs/snapshot"
+    },
+    {
+      "$ref": "#/$defs/intent"
+    },
+    {
+      "$ref": "#/$defs/ack"
+    }
+  ],
+  "$defs": {
+    "percent": {
+      "type": "object",
+      "properties": {
+        "used_pct": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quality": {
+          "enum": [
+            "reported",
+            "estimated",
+            "unknown"
+          ]
+        },
+        "age_ms": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ttl_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600000
+        }
+      },
+      "required": [
+        "used_pct",
+        "quality",
+        "age_ms",
+        "ttl_ms"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "used_pct": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "quality": {
+                "const": "unknown"
+              },
+              "age_ms": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "quality": {
+                "enum": [
+                  "reported",
+                  "estimated"
+                ]
+              },
+              "age_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              }
+            }
+          }
+        }
+      ]
+    },
+    "quota": {
+      "type": "object",
+      "properties": {
+        "used_pct": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "quality": {
+          "enum": [
+            "reported",
+            "estimated",
+            "unknown"
+          ]
+        },
+        "age_ms": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ttl_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600000
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "window_s": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 31536000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reset_in_s": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 31536000
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "used_pct",
+        "quality",
+        "age_ms",
+        "ttl_ms",
+        "id",
+        "label",
+        "window_s",
+        "reset_in_s"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "used_pct": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "quality": {
+                "const": "unknown"
+              },
+              "age_ms": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "quality": {
+                "enum": [
+                  "reported",
+                  "estimated"
+                ]
+              },
+              "age_ms": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              }
+            }
+          }
+        }
+      ]
+    },
+    "session": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "client": {
+          "enum": [
+            "codex",
+            "claude_code",
+            "gemini_cli",
+            "opencode",
+            "cursor",
+            "unknown"
+          ]
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "character_id": {
+          "enum": [
+            "gpt",
+            "claude",
+            "deepseek",
+            "gemini",
+            "neutral"
+          ]
+        },
+        "variant": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 24
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phase": {
+          "enum": [
+            "idle",
+            "working",
+            "tool",
+            "waiting",
+            "ended",
+            "error",
+            "limited"
+          ]
+        },
+        "activity": {
+          "enum": [
+            "none",
+            "thinking",
+            "reading",
+            "writing",
+            "running",
+            "searching",
+            "compact"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "unknown",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "active_tools": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "active_subagents": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "turn_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 48
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "turn_id",
+        "client",
+        "provider",
+        "model_id",
+        "character_id",
+        "variant",
+        "phase",
+        "activity",
+        "outcome",
+        "active_tools",
+        "active_subagents"
+      ],
+      "additionalProperties": false
+    },
+    "snapshot": {
+      "type": "object",
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "type": {
+          "const": "snapshot"
+        },
+        "boot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "bridge_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "selected_by": {
+          "enum": [
+            "pinned",
+            "foreground_session",
+            "recent_activity",
+            "none"
+          ]
+        },
+        "session": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/session"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sessions": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 48
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 24
+              },
+              "phase": {
+                "enum": [
+                  "idle",
+                  "working",
+                  "tool",
+                  "waiting",
+                  "ended",
+                  "error",
+                  "limited"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "phase"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "quota": {
+              "type": "array",
+              "maxItems": 4,
+              "items": {
+                "$ref": "#/$defs/quota"
+              }
+            },
+            "context": {
+              "$ref": "#/$defs/percent"
+            },
+            "tokens": {
+              "type": "object",
+              "properties": {
+                "input": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "output": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "cached": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "scope": {
+                  "enum": [
+                    "turn",
+                    "session"
+                  ]
+                },
+                "quality": {
+                  "enum": [
+                    "reported",
+                    "estimated",
+                    "unknown"
+                  ]
+                }
+              },
+              "required": [
+                "input",
+                "output",
+                "cached",
+                "scope",
+                "quality"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "quota",
+            "context",
+            "tokens"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "v",
+        "type",
+        "boot_id",
+        "bridge_id",
+        "seq",
+        "selected_by",
+        "session",
+        "sessions",
+        "metrics"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "session": {
+                "type": "null"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "selected_by": {
+                "const": "none"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "selected_by": {
+                "enum": [
+                  "pinned",
+                  "foreground_session",
+                  "recent_activity"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "hello": {
+      "type": "object",
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "type": {
+          "const": "hello"
+        },
+        "boot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "firmware": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "asset_pack": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "max_frame_bytes": {
+          "const": 4096
+        },
+        "capabilities": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "touch",
+              "battery",
+              "sd",
+              "settings",
+              "session_switch"
+            ]
+          }
+        }
+      },
+      "required": [
+        "v",
+        "type",
+        "boot_id",
+        "firmware",
+        "asset_pack",
+        "max_frame_bytes",
+        "capabilities"
+      ],
+      "additionalProperties": false
+    },
+    "intent": {
+      "type": "object",
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "type": {
+          "const": "intent"
+        },
+        "boot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "bridge_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "action": {
+          "enum": [
+            "next_session",
+            "pin_toggle",
+            "clear_pin",
+            "open_host"
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 48
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "v",
+        "type",
+        "boot_id",
+        "bridge_id",
+        "request_id",
+        "action",
+        "session_id"
+      ],
+      "additionalProperties": false
+    },
+    "ack": {
+      "type": "object",
+      "properties": {
+        "v": {
+          "const": 1
+        },
+        "type": {
+          "const": "ack"
+        },
+        "boot_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "bridge_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 48
+        },
+        "result": {
+          "enum": [
+            "ok",
+            "not_supported",
+            "rejected"
+          ]
+        }
+      },
+      "required": [
+        "v",
+        "type",
+        "boot_id",
+        "bridge_id",
+        "request_id",
+        "result"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

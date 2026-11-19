@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 电子吧唧 · 圆屏交互原型</title>
+<link rel="stylesheet" href="gpt-pet/pocket.css">
+<style>
+:root{color-scheme:dark;--accent:#96ddcb;--muted:#8a9b9c;--panel:#141b1d;--line:#283335}
+*{box-sizing:border-box}body{margin:0;background:#0c1113;color:#e5eeee;font-family:"Segoe UI","Microsoft YaHei UI",sans-serif;line-height:1.6}
+header{max-width:1160px;margin:0 auto;padding:35px 32px 24px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:20px}
+.wordmark{font-size:13px;letter-spacing:3px;color:var(--accent)}h1{font-size:30px;font-weight:600;margin:8px 0}p{margin:0;color:#a2b2b4;font-size:14px}
+.tag{font-size:12px;border:1px solid #354344;border-radius:30px;padding:7px 12px;white-space:nowrap;color:#b2c1c2}
+main{max-width:1160px;margin:auto;display:grid;grid-template-columns:1.15fr 1fr;gap:50px;padding:30px 32px}
+.stage{display:flex;flex-direction:column;align-items:center;gap:20px;min-width:0}.stage-label{align-self:stretch;display:flex;justify-content:space-between;font-size:11px;letter-spacing:2px;color:#738787}
+.device{width:min(100%,500px);aspect-ratio:1;border-radius:50%;padding:16px;background:linear-gradient(140deg,#465052,#151d20 30%,#070c0e 70%,#384446);box-shadow:0 22px 70px #0009,inset 0 0 0 1px #62707150}
+.viewport{width:100%;aspect-ratio:1;border-radius:50%;overflow:hidden;position:relative;background:#000;box-shadow:0 0 0 2px #020505}
+.screen{width:466px;height:466px;position:absolute;top:0;left:0;transform-origin:0 0;transform:scale(var(--scale,1));background:#030807;border-radius:50%;overflow:hidden;touch-action:none;user-select:none;--theme:#96ddcb;--glow:#14382c}
+.screen[data-theme=claude_code]{--theme:#ecad89;--glow:#462718}
+.screen[data-theme=neutral]{--theme:#a4b4ce;--glow:#1c2d45}
+.halo{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 49%,var(--glow),transparent 64%);opacity:.82}
+.ring{position:absolute;inset:0;width:466px;height:466px;pointer-events:none;opacity:.8}
+.ring-base{stroke:var(--theme);stroke-opacity:.16;fill:none;stroke-width:2}
+.ring-active{stroke:var(--theme);fill:none;stroke-width:3;stroke-linecap:round;stroke-dasharray:110 1278;transform-origin:center;transform:rotate(-100deg)}
+.screen.busy .ring-active{animation:orbit 7s linear infinite}.screen.waiting .ring-active{stroke:#edbf74;stroke-dasharray:7 12;animation:pulse 2.4s ease-in-out infinite}.screen.offline .ring-active{stroke:#6c767b;stroke-dasharray:3 16;animation:none}.screen.error .ring-active{stroke:#ef8c8d}
+.brand{position:absolute;top:40px;left:110px;width:246px;text-align:center;font-size:20px;letter-spacing:2px;font-weight:600;color:var(--theme)}
+.model{position:absolute;top:70px;left:90px;width:286px;text-align:center;font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#e4e8e6}
+.character{position:absolute;left:88px;top:99px;width:290px;height:253px;object-fit:contain;filter:drop-shadow(0 7px 15px #0009);pointer-events:none;transform-origin:50% 100%;animation:breathe 2.6s ease-in-out infinite}
+[hidden]{display:none!important}
+.screen.has-gpt .brand{top:24px}.screen.has-gpt .model{top:50px;font-size:18px}
+.gpt-canvas{position:absolute;left:63px;top:61px;width:340px;height:300px;cursor:grab;touch-action:none;outline-offset:-18px}
+.gpt-canvas:active{cursor:grabbing}.gpt-canvas:focus-visible{outline:2px dotted var(--theme);border-radius:40%}
+.pet-panel{width:min(100%,460px);border-top:1px solid var(--line);padding-top:15px}
+.pet-response{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:24px;margin-bottom:11px;color:#dce9e4;font-size:14px}
+.bond{flex:none;font-size:12px;color:#c6b2d7}.pet-actions{display:flex;gap:8px}
+.pet-actions button{flex:1;min-height:42px;background:#1d2929;color:#daebe5;border-color:#3b514c}
+.pet-actions button:hover{background:#293a34}.pet-actions button:disabled{opacity:.5;cursor:default}
+.pet-actions .pet-mark{color:#cfc0dd;margin-right:6px}.gesture-note{min-height:2.5em}
+.pet-games{margin-bottom:8px}.pet-games button{background:#252832;border-color:#484554;color:#ede3ee;min-height:44px}
+.pet-games button:hover,.pet-games button[aria-pressed=true]{background:#353242;border-color:#ae99ba}
+.pet-games .pet-mark{color:#ebcf9b}.pet-response>span:first-child{min-width:0}
+.screen.offline .character{filter:saturate(.3) brightness(.65);animation:none}.screen.reduced *{animation:none!important;transition:none!important}
+.pill{position:absolute;top:354px;left:113px;width:240px;height:32px;display:flex;justify-content:center;align-items:center;gap:8px;font-size:21px;background:#10201de6;border:1px solid #728e823c;border-radius:18px;color:#d8e9e1}
+.pill i{width:6px;height:6px;background:var(--theme);border-radius:50%}.screen.waiting .pill{color:#ffd89d;background:#382a17;border-color:#765c32}.screen.offline .pill{background:#1b2327;color:#abb5b9}
+.meters{position:absolute;left:111px;top:391px;width:244px;display:grid;grid-template-columns:1fr 1fr;text-align:center}.meter span{display:block;font-size:18px;color:#8fa4a0;line-height:1.15}.meter b{font-weight:500;font-size:21px;line-height:1.25}.meter+ .meter{border-left:1px solid #ffffff18}
+.connection{position:absolute;top:441px;width:100%;text-align:center;font-size:11px;letter-spacing:1px;color:#7f9390}
+.heart{position:absolute;top:138px;left:320px;font-size:28px;color:#f5a7ad;opacity:0;pointer-events:none}.heart.pop{animation:heart .9s ease-out}
+.page{display:none;position:absolute;inset:0}.page.active{display:block}
+.page-title{position:absolute;top:42px;width:100%;text-align:center;color:var(--theme);font-size:20px;font-weight:600}
+.detail-body{position:absolute;left:69px;top:90px;width:328px;display:grid;gap:12px}
+.card{border:1px solid #ffffff18;background:#15201dcc;border-radius:15px;padding:12px 16px;font-size:18px}
+.card-line{display:flex;justify-content:space-between;gap:12px;align-items:center}.card-line strong{font-size:24px;font-weight:500}.card small{display:block;color:#8fa5a0;font-size:14px;margin-top:3px}
+.bar{height:4px;background:#ffffff12;border-radius:3px;margin-top:8px;overflow:hidden}.bar>i{display:block;height:100%;background:var(--theme);width:32%;transition:width .2s}
+.bottom-back{position:absolute;left:153px;top:404px;width:160px;height:44px;border-radius:24px}.screen button{min-height:44px}
+button,select,input{font:inherit}button{cursor:pointer;background:#202c2e;color:#e0eaea;border:1px solid #34484a;border-radius:10px;padding:9px 14px;font-size:13px}button:hover{border-color:#87afa7}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #a7e8da;outline-offset:3px}button.active{background:#b0e4d6;color:#102620;border-color:#b0e4d6}
+.tabs{display:flex;justify-content:center;gap:8px}.tabs button{padding:7px 14px;border-radius:24px;font-size:12px}
+.gesture-note{text-align:center;font-size:12px;line-height:1.9;color:#8ca09f;max-width:440px;white-space:pre-line}
+.controls{min-width:0}.section-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.section-top h2{font-size:17px;font-weight:500;margin:0}
+.control-card{border:1px solid var(--line);background:#121a1c;border-radius:18px;padding:20px;margin-bottom:14px}
+label.caption{display:block;font-size:12px;color:#91a6a6;margin-bottom:9px}
+.switches{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}.switches:last-child{margin-bottom:0}
+select{width:100%;color:#d6e3e1;background:#202b2c;border:1px solid #354648;border-radius:10px;padding:10px}
+.states{display:flex;flex-wrap:wrap;gap:7px}.states button{padding:8px 11px;font-size:12px}.row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:13px;font-size:13px;color:#a4b5b5}.row input[type=range]{width:58%;accent-color:#9adac7}
+.checks{display:flex;gap:20px;flex-wrap:wrap;font-size:12px;color:#a3b7b5;margin-top:14px}.checks input{accent-color:#9adac7}.live-note{font-size:12px;color:#9bafaa;border-left:2px solid #597e72;padding-left:12px;margin:17px 0 0}
+.session-row{display:flex;justify-content:space-between;align-items:center;gap:8px}.session-row button{font-size:12px;padding:7px 10px}.session-row .name{font-size:17px}.session-row small{max-width:185px}.screen input[type=range]{accent-color:#9adac7;max-width:155px}
+.toast{position:absolute;left:98px;top:315px;width:270px;background:#e4efe6;color:#193027;border-radius:16px;padding:9px;text-align:center;font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:6}.toast.show{opacity:1}
+footer{max-width:1160px;padding:5px 32px 28px;margin:auto;font-size:11px;color:#657b7d}a{color:#97c5b9}
+@keyframes orbit{to{transform:rotate(260deg)}}@keyframes pulse{50%{opacity:.35}}@keyframes breathe{50%{transform:translateY(-2px)}}@keyframes heart{0%{opacity:0;transform:translateY(15px) scale(.6)}30%{opacity:1}100%{opacity:0;transform:translateY(-23px) scale(1.2)}}
+@media(max-width:850px){header{padding:22px 20px}header>.tag{display:none}main{grid-template-columns:1fr;padding:22px 20px;gap:28px}.stage{max-width:500px;margin:auto;width:100%}.controls{width:100%;max-width:530px;margin:auto}h1{font-size:26px}footer{padding:10px 20px 25px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header><div><h1>AI 电子吧唧</h1><p>Waveshare 1.75″ 圆屏 · 466 × 466</p></div><span class="tag" id="source-tag">Agent 和用量为演示数据</span></header>
+<main>
+<section class="stage" aria-label="设备预览">
+<div class="device"><div class="viewport" id="viewport">
+<div class="screen" id="screen" data-theme="codex">
+<div class="halo"></div><svg class="ring" viewBox="0 0 466 466" aria-hidden="true"><circle class="ring-base" cx="233" cy="233" r="221"/><circle class="ring-active" cx="233" cy="233" r="221"/></svg>
+<section class="page active" data-page="0">
+<div class="brand" id="brand">CODEX</div><div class="model" id="model">GPT · 演示型号</div>
+<img class="character" id="character" alt="GPT 白龙娘" src="../assets/ai-girls/state-poses/gpt/idle.webp">
+<canvas id="neutral-art" width="96" height="96" aria-label="等待识别角色" role="img" hidden></canvas>
+<canvas id="gpt-canvas" class="gpt-canvas" width="612" height="540" role="button" tabindex="0" aria-label="GPT 白龙娘。按空格摸摸头。" aria-describedby="gesture-note" hidden></canvas>
+<div id="desk-tools" hidden>
+<button id="work-button" class="charm charm-work" aria-describedby="work-cue"><canvas width="70" height="60" aria-hidden="true"></canvas><span>摇铃</span></button>
+<button id="pocket-open" class="charm charm-pocket" aria-haspopup="dialog" aria-controls="pet-pocket" aria-expanded="false"><canvas width="70" height="60" data-art="pocket" aria-hidden="true"></canvas><span>口袋</span></button>
+<div id="work-cue" role="status" hidden></div></div>
+<div class="heart" id="heart">♥</div><div class="pill" id="pill"><i></i><span id="status">待命</span></div>
+<div class="meters"><div class="meter"><span>额度剩余</span><b id="remaining">68%</b></div><div class="meter"><span>上下文</span><b id="context">42%</b></div></div>
+<div class="connection" id="connection">USB · 最近活动</div>
+<div id="pet-pocket" role="dialog" aria-labelledby="pocket-title" hidden>
+<div class="pocket-sheet"><div class="pocket-head"><h2 id="pocket-title">白龙的口袋</h2><button id="pocket-sound" aria-pressed="false" aria-label="互动音效">♪ 音效关</button><button id="pocket-close" aria-label="合上口袋">×</button></div>
+<div class="pocket-tabs" role="tablist" aria-label="口袋分类">
+<button role="tab" id="tab-desk" aria-controls="pane-desk" data-pocket-tab="desk">陪她工作</button><button role="tab" id="tab-toys" aria-controls="pane-toys" data-pocket-tab="toys">一起玩</button><button role="tab" id="tab-wear" aria-controls="pane-wear" data-pocket-tab="wear">小衣橱</button><button role="tab" id="tab-story" aria-controls="pane-story" data-pocket-tab="story">小剧场</button></div>
+<div role="tabpanel" aria-labelledby="tab-desk" id="pane-desk" class="pocket-desk"><canvas id="desk-drawing" width="100" height="100" aria-hidden="true"></canvas><div><small id="desk-state"></small><button id="desk-start"></button></div></div>
+<div role="tabpanel" aria-labelledby="tab-toys" id="pane-toys" class="pocket-toys" hidden>
+<button data-toy="pat">摸摸头</button><button data-toy="feed">喂星糖</button><button data-toy="play">抛星星</button><button data-toy="five">和她击掌</button><button data-toy="fly">引萤火虫</button></div>
+<div role="tabpanel" aria-labelledby="tab-wear" id="pane-wear" class="pocket-wear" hidden>
+<button data-wear="plain"><canvas width="72" height="66" data-art="plain"></canvas>原装</button><button data-wear="bow"><canvas width="72" height="66" data-art="bow"></canvas>樱花结</button><button data-wear="moon"><canvas width="72" height="66" data-art="moon"></canvas>月牙夹</button><button data-wear="leaf"><canvas width="72" height="66" data-art="leaf"></canvas>嫩叶夹</button></div>
+<div role="tabpanel" aria-labelledby="tab-story" id="pane-story" class="pocket-story" hidden>
+<button data-story="desk"><canvas width="68" height="62" data-art="running"></canvas><span>搬桌开工</span></button><button data-story="cheer"><canvas width="68" height="62" data-art="succeeded"></canvas><span>一起欢呼</span></button><button id="story-mood" data-story="tease"><canvas width="68" height="62" data-art="candy"></canvas><span>逗逗尾巴</span></button></div>
+</div></div>
+</section>
+<section class="page" data-page="1"><div class="page-title">使用详情</div><div class="detail-body">
+<div class="card"><div class="card-line"><span id="quota-window-label">演示窗口 · 已用</span><strong id="used-detail">32%</strong></div><div class="bar"><i id="quota-bar"></i></div><small id="quota-note">演示数据 · 约 1 小时后重置</small></div>
+<div class="card"><div class="card-line"><span>上下文占用</span><strong id="context-detail">42%</strong></div><small>与订阅额度分别统计</small></div>
+<div class="card"><div class="card-line"><span id="token-label">会话 Token</span><span id="token-value">—</span></div><small id="token-note">没有来源就显示未知</small></div>
+</div><button class="bottom-back" data-goto="0">回到角色</button></section>
+<section class="page" data-page="2"><div class="page-title">正在关注</div><div class="detail-body">
+<div class="card session-row"><div><div class="name" id="session-name">Codex · 会话 A</div><small id="session-mode">选择依据：最近活动</small></div><button id="pin-button">固定</button></div>
+<div class="card"><div class="card-line"><span>当前模型</span><span id="session-model">GPT</span></div><small id="session-status">工作中 · 演示会话</small></div>
+<div class="card"><button id="locate-button" style="width:100%">定位电脑端会话</button><small>此原型只演示反馈，不控制电脑</small></div>
+</div><button class="bottom-back" data-goto="0">回到角色</button></section>
+<section class="page" data-page="3"><div class="page-title">徽章设置</div><div class="detail-body">
+<div class="card"><label class="card-line" for="brightness"><span>亮度</span><span id="brightness-value">35%</span></label><input type="range" min="10" max="70" value="35" id="brightness" style="width:100%;max-width:none"><small>原型只模拟设置，不读取硬件</small></div>
+<div class="card"><label class="card-line"><span>减少动效</span><input type="checkbox" id="reduce-motion"></label><small>保留状态文字与姿态切换</small></div>
+<div class="card"><div class="card-line"><span>供电方式</span><span>USB · 演示</span></div><small>电池读数 — · 等待实机验证</small></div>
+</div><button class="bottom-back" data-goto="0">保存并返回</button></section>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div></div></div>
+<nav class="tabs" aria-label="预览页面"><button data-goto="0" class="active">角色</button><button data-goto="1">用量</button><button data-goto="2">会话</button><button data-goto="3">设置</button></nav>
+<section id="pet-panel" class="pet-panel" aria-label="和白龙娘互动">
+<div class="pet-response"><span id="pet-response" role="status" aria-live="polite">白龙娘正在醒来。</span><span class="bond" id="pet-bond">初识</span></div>
+<div class="pet-actions pet-games"><button data-game="five" aria-pressed="false"><span class="pet-mark" aria-hidden="true">◌</span><span class="game-label">和她击掌</span></button><button data-game="fly" aria-pressed="false"><span class="pet-mark" aria-hidden="true">✧</span><span class="game-label">引萤火虫</span></button></div>
+<div class="pet-actions"><button data-care="pat"><span class="pet-mark" aria-hidden="true">♡</span>摸摸头</button><button data-care="feed"><span class="pet-mark" aria-hidden="true">✧</span>喂星糖</button><button data-care="play"><span class="pet-mark" aria-hidden="true">☆</span>抛星星</button></div>
+</section>
+<p class="gesture-note" id="gesture-note"></p>
+</section>
+<aside class="controls">
+<div class="section-top"><h2 id="scene-title">场景控制</h2><button id="play-button">播放工作流程 ↗</button></div>
+<section id="agent-history" class="control-card agent-history" hidden aria-label="Agent 工作记录">
+<div class="card-line"><strong id="live-stage"></strong><small id="live-counts"></small></div>
+<p id="live-model"></p><ol id="live-trace" aria-label="最近的状态变化"></ol></section>
+<div class="control-card"><label class="caption">电脑上的客户端 → 界面主题</label><div class="switches" id="client-buttons"><button class="active" data-client="codex">Codex</button><button data-client="claude_code">Claude Code</button><button data-client="neutral">默认</button></div>
+<label class="caption" for="model-select">实际使用的模型 → 角色形象</label><select id="model-select"><option value="gpt">GPT · 白龙娘</option><option value="claude-opus">Claude Opus · 持书少女</option><option value="claude-sonnet">Claude Sonnet · 持书少女</option><option value="deepseek">DeepSeek · 鲸鱼娘</option><option value="gemini">Gemini · 星猫娘</option></select>
+<p class="live-note" id="mapping-note">Codex 主题 + GPT 角色。模型与客户端分别决定外观。</p></div>
+<div class="control-card"><label class="caption">Agent 状态 → 姿态与提示</label><div class="states" id="state-buttons"><button data-state="idle">待命</button><button class="active" data-state="working">工作中</button><button data-state="reading">阅读</button><button data-state="writing">写入</button><button data-state="running">执行工具</button><button data-state="searching">搜索</button><button data-state="waiting">等待确认</button><button data-state="ended">本轮结束</button><button data-state="error">异常</button><button data-state="limited">受限</button></div>
+<div class="checks"><label><input type="checkbox" id="offline"> 模拟断开连接</label><label><input type="checkbox" id="parallel"> 两位助手协作</label></div></div>
+<details class="control-card link-guide"><summary>联动电脑上的 Agent</summary><p id="link-info">本地桥接器把工作状态送到圆屏。启动桥接器后即可切换到联动预览。</p><a id="live-entry" href="http://127.0.0.1:8765/">打开联动预览</a> · <a href="gpt-pet/README.md#agent-联动">接入说明</a></details>
+<div class="control-card"><label class="caption">演示指标 · 订阅额度与上下文独立</label><label class="row" for="quota-range"><span id="quota-range-label">额度已用 32%</span><input id="quota-range" type="range" min="0" max="100" value="32"></label><label class="row" for="context-range"><span id="context-range-label">上下文 42%</span><input id="context-range" type="range" min="0" max="100" value="42"></label>
+<div class="checks"><label><input id="unknown" type="checkbox"> 无额度数据</label><label><input id="expired" type="checkbox"> 指标已过期</label></div></div>
+</aside>
+</main>
+<footer>白龙娘设定来自 ZipZipPipe，角色立绘来自 CrossPet。动画改编沿用 CC BY-NC-SA 4.0。<a href="gpt-pet/README.md">动画与署名</a> · <a href="../assets/ai-girls/sources/crosspet/LICENSE.md">原始许可</a></footer>
+<script src="gpt-pet/portrait.js"></script>
+<script src="gpt-pet/face.js"></script>
+<script src="gpt-pet/props.js"></script>
+<script src="gpt-pet/desk-art.js"></script>
+<script src="gpt-pet/stage-art.js"></script>
+<script src="gpt-pet/stage.js"></script>
+<script src="gpt-pet/rig.js"></script>
+<script src="gpt-pet/play.js"></script>
+<script src="gpt-pet/work.js"></script>
+<script src="gpt-pet/companion.js"></script>
+<script src="gpt-pet/chimes.js"></script>
+<script src="gpt-pet/pocket.js"></script>
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const demo={client:"codex",model:"gpt",state:"idle",page:0,offline:false,unknown:false,expired:false,used:32,context:42,pinned:false,reduced:false};
+const definitions={
+idle:{label:"待命",pose:"idle"},working:{label:"工作中",pose:"thinking"},
+reading:{label:"阅读中",pose:"reading"},writing:{label:"写入中",pose:"writing"},
+running:{label:"执行工具",pose:"running"},searching:{label:"搜索中",pose:"searching"},
+waiting:{label:"等待你确认",pose:"asking"},ended:{label:"本轮已结束",pose:"idle"},
+error:{label:"发生异常",pose:"oops"},limited:{label:"已达限制",pose:"tired"},
+compact:{label:"整理上下文",pose:"compact"},succeeded:{label:"已确认完成",pose:"happy"},cancelled:{label:"本轮已取消",pose:"idle"}
+};
+for(const key of ["compact","succeeded","cancelled"]){
+ const button=document.createElement("button");button.dataset.state=key;button.textContent=definitions[key].label;$("state-buttons").append(button);
+}
+const modelLabels={"gpt":"GPT","claude":"Claude","claude-opus":"Claude · Opus","claude-sonnet":"Claude · Sonnet","deepseek":"DeepSeek","gemini":"Gemini",neutral:"型号未知"};
+const clientLabels={codex:"Codex",claude_code:"Claude Code",gemini_cli:"Gemini CLI",cursor:"Cursor",opencode:"OpenCode",unknown:"Agent",neutral:"默认"};
+const linked=["http:","https:"].includes(location.protocol)&&new URLSearchParams(location.search).get("agent")==="1";
+let feed=null;
+if(linked){demo.model="neutral";demo.client="unknown";demo.unknown=true;demo.used=0;demo.context=0;}
+DragonArt.icon($("neutral-art").getContext("2d"),"pocket",48,48,1.45);
+let toastTimer,petTimer,sequenceTimer,petAt=-Infinity;
+const motionPreference=matchMedia("(prefers-reduced-motion: reduce)");
+const bondKey="ai-baji.gpt.bond.v1";
+function readBond(){
+ try {const n=Number(localStorage.getItem(bondKey));return Number.isFinite(n)?Math.max(0,Math.min(16,Math.floor(n))):0;}
+ catch {return 0;}
+}
+function showBond(value){
+ const level=value>=12?"默契":value>=6?"亲近":value>=2?"熟悉":"初识";
+ $("pet-bond").textContent="♡ "+level;
+ $("pet-bond").setAttribute("aria-label","和白龙娘的关系："+level);
+}
+const startingBond=readBond();
+showBond(startingBond);
+let petReady=false, petFailed=false;
+const chimes=new DragonChimes();
+const dragon=new GptCompanion($("gpt-canvas"),{
+ bond:startingBond,accessory:DragonPocket.readWear(),
+ onNote:text=>{$("pet-response").textContent=text;},
+ onPlay:round=>petControls(round),
+ onStory:()=>{pocket.sync();petControls(dragon.game.round);},
+ onWork:()=>{pocket.sync();petControls(dragon.game.round);},onTone:id=>chimes.play(id),
+ onBond:value=>{
+   showBond(value);
+   try {localStorage.setItem(bondKey,String(value));} catch { /* Session still retains the relationship. */ }
+ }
+});
+const pocket=new DragonPocket(dragon,()=>(demo.offline?"连接已断开":definitions[demo.state].label)+
+ (linked&&!demo.offline&&feed?.tools>0?" · "+feed.tools+" 个工具":"")+(dragon.helpers>0?" · "+dragon.helpers+" 位助手":""));
+function soundButton(){
+ $("pocket-sound").hidden=!chimes.Context;$("pocket-sound").setAttribute("aria-pressed",String(chimes.enabled));
+ $("pocket-sound").textContent=chimes.enabled?"♪ 音效开":"♪ 音效关";
+}
+$("pocket-sound").addEventListener("click",()=>{chimes.toggle();soundButton();});soundButton();
+dragon.ready.then(()=>{petReady=true;render();}).catch(()=>{
+ petFailed=true;$("pet-response").textContent="白龙娘的动画未能载入。";render();
+});
+function modelFamily(){return demo.model.startsWith("claude-")?"claude":demo.model}
+function posePath(){
+ let pose=definitions[demo.state].pose, family=modelFamily();
+ if(family==="claude"&&["reading","happy","sleeping"].includes(pose))pose+="-2";
+ return "../assets/ai-girls/state-poses/"+family+"/"+pose+".webp";
+}
+function toast(text){$("toast").textContent=text;$("toast").classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>$("toast").classList.remove("show"),1700)}
+function petControls(round){
+ const kind=round?.kind,work=dragon.work.round;
+ const gpt=demo.model==="gpt"&&demo.page===0;
+ const reduced=demo.reduced||motionPreference.matches;
+ for(const button of document.querySelectorAll("[data-game]")){
+   const five=button.dataset.game==="five", selected=kind===button.dataset.game;
+   button.setAttribute("aria-pressed",String(selected));
+   button.querySelector(".game-label").textContent=five?(selected?"结束击掌":"和她击掌"):(selected?"送走萤火虫":"引萤火虫");
+ }
+ const touch=matchMedia("(pointer: coarse)").matches;
+ let hint="点手心击掌，连点三次尾巴逗她；口袋里的「小剧场」可以看她搬桌开工。\n从袖口向上抛星，沿圆屏边缘滑动翻页。";
+ if(work){
+   hint=work.phase==="done"?dragon.work.item.done:(work.id==="reading"?"按住书的右角往左翻，轻点书角也可以。":dragon.work.cue()+"。");
+   if(!touch&&work.phase==="offer")hint+=" 空格可参与，Esc 可收起。";
+ } else if(round?.phase==="offer"){
+   if(kind==="five")hint=touch?"轻点亮圈里的手心。":"碰亮圈里的手心，或按空格击掌。Esc 可结束。";
+   else {
+     hint=reduced?"轻点手心，让萤火虫落下。":"把萤火虫引到她的手旁，慢下来，停一下。";
+     if(!touch)hint+=" 方向键可引路，空格可引到手心，Esc 可结束。";
+   }
+ } else if(round?.phase==="withdraw"){
+   hint=kind==="five"?"再点一次手心，可以重新邀她击掌。":"想再玩时，可以长按手心引来萤火虫。";
+ } else if(round){
+   hint=reduced?"可以选择下一项互动。":"让她安静几秒，看看她还记不记得刚才用的是哪只手。";
+ } else if(dragon.stage.sulking){
+   hint="她正鼓着脸。喂颗星糖哄哄她，或给她一小会儿。";
+ }
+ $("gesture-note").textContent=gpt?hint:"从圆屏边缘滑动翻页，长按空白处打开设置。";
+ $("gpt-canvas").setAttribute("aria-label",work?dragon.work.item.name:kind==="five"?"和白龙娘击掌":kind==="fly"?"引导萤火虫":"GPT 白龙娘。按空格摸摸头。");
+}
+function render(){
+ const screen=$("screen"), def=definitions[demo.state];
+ const isGpt=demo.model==="gpt", reduced=demo.reduced||motionPreference.matches;
+ screen.dataset.theme=["codex","claude_code"].includes(demo.client)?demo.client:"neutral";
+ screen.className="screen"+(["working","reading","writing","running","searching"].includes(demo.state)?" busy":"")+(demo.state==="waiting"?" waiting":"")+(demo.offline?" offline":"")+(demo.state==="error"?" error":"")+(reduced?" reduced":"")+(isGpt?" has-gpt":"");
+ if(demo.offline)screen.classList.remove("busy");
+ $("brand").textContent=demo.client==="neutral"?"AI BAJI":clientLabels[demo.client].toUpperCase();
+ const modelText=linked?(feed?.model||"型号未知"):modelLabels[demo.model];
+ $("model").textContent=linked?modelText:modelText+" · 演示";$("model").title=modelText;
+ const neutral=demo.model==="neutral";
+ const path=isGpt?"../assets/ai-girls/state-poses/gpt/idle.webp":neutral?null:posePath();
+ if(path&&$("character").getAttribute("src")!==path)$("character").src=path;
+ $("character").hidden=neutral||isGpt&&petReady;$("neutral-art").hidden=!neutral;
+ $("gpt-canvas").hidden=!isGpt||!petReady;
+ $("pet-panel").hidden=!isGpt||demo.page!==0;
+ $("desk-tools").hidden=!isGpt||!petReady;
+ if(!isGpt||demo.page!==0||document.hidden)pocket.close();
+ document.querySelectorAll("[data-care],[data-game]").forEach(button=>{button.disabled=!petReady||petFailed;});
+ $("reduce-motion").checked=reduced;
+ $("reduce-motion").disabled=motionPreference.matches;
+ const occupied=["working","reading","writing","running","searching","compact"].includes(demo.state)&&!demo.offline;
+ const helpers=occupied?(linked?(feed?.helpers||0):(demo.parallel?2:0)):0;
+ const helpersChanged=dragon.helpers!==helpers;dragon.helpers=helpers;
+ dragon.setScene({state:demo.state,offline:demo.offline,reduced,scope:demo.scope,active:isGpt&&demo.page===0&&!document.hidden});
+ if(helpersChanged&&reduced&&dragon.rig)dragon.advance(0,true);
+ pocket.sync();
+ if(start && (start.scene!==dragon.scene || start.page!==demo.page || start.model!==demo.model || document.hidden))cancelGesture();
+ petControls(dragon.game.round);
+ $("character").alt=modelLabels[demo.model]+"："+def.label+"姿态";
+ const link=linked?(feed?.link||"connecting"):null;
+ $("status").textContent=link==="connecting"?"等候 Agent":demo.offline?"连接已断开":linked&&!feed?.has_session?"等待会话":def.label;
+ const quotaValid=!demo.offline&&!demo.unknown&&!demo.expired;
+ const contextValid=!demo.offline&&!demo.expired&&(!linked||!!feed?.context);
+ const pct=(value,sample)=>(sample?.quality==="estimated"?"约 ":"")+Number(value.toFixed(1))+"%";
+ $("remaining").textContent=quotaValid?pct(100-demo.used,feed?.quota):"—";
+ $("context").textContent=contextValid?pct(demo.context,feed?.context):"—";
+ $("used-detail").textContent=quotaValid?pct(demo.used,feed?.quota):"—";
+ $("context-detail").textContent=contextValid?pct(demo.context,feed?.context):"—";
+ $("quota-bar").style.width=quotaValid?demo.used+"%":"0%";
+ $("quota-note").textContent=demo.offline?"连接已断开 · 等待重新同步":demo.expired?"数据过期 · 等待新数据":demo.unknown?"暂无额度数据":"演示数据 · 约 1 小时后重置";
+ $("connection").textContent=demo.offline?"离线 · 上次记录":"USB · "+(demo.pinned?"已固定":"最近活动");
+ $("session-name").textContent=clientLabels[demo.client]+" · 会话 A";
+ $("session-mode").textContent="选择依据："+(demo.pinned?"手动固定":"最近活动");
+ $("session-model").textContent=modelText;
+ $("session-status").textContent=def.label+" · 演示会话";
+ $("pin-button").textContent=demo.pinned?"取消固定":"固定";
+ $("pin-button").classList.toggle("active",demo.pinned);
+ $("mapping-note").textContent=clientLabels[demo.client]+" 主题 + "+modelLabels[demo.model]+" 角色。模型与客户端分别决定外观。";
+ if(linked){
+   const mode=feed?.replay?"事件回放":"本地联动";
+   document.body.classList.add("linked");$("agent-history").hidden=false;$("scene-title").textContent="Agent 动态";
+   $("source-tag").textContent=mode;$("link-info").textContent=mode+"通过本机桥接器读取工作状态。";
+   $("live-entry").textContent="回到手动演示";$("live-entry").href=location.pathname;
+   const connection={connecting:"等候事件",online:"跟随中",finished:feed?.replay?"回放结束":"输入已结束",offline:"连接已断开"};
+   $("connection").textContent=mode+" · "+connection[link];
+   $("session-name").textContent=clientLabels[demo.client]+" · "+mode;
+   const selection={pinned:"手动固定",foreground_session:"前台会话",recent_activity:"最近活动",none:"来源未指定"};
+   $("session-mode").textContent=feed?.source==="codex"?"指定的命令行任务":(selection[feed?.selection]||"等候来源");
+   $("session-status").textContent=$("status").textContent;
+   $("live-stage").textContent=$("status").textContent;$("live-model").textContent=clientLabels[demo.client]+" · "+modelText;
+   $("live-counts").textContent=link==="online"&&feed?.source?(feed.tools+" 个工具 · "+feed.helpers+" 位助手"):connection[link];
+   const trace=$("live-trace"), entry=mode+"/"+demo.scope+"/"+demo.state+"/"+link;
+   if(trace.dataset.last!==entry){
+     const row=document.createElement("li");row.textContent=link==="online"||link==="finished"?def.label+" · "+connection[link]:connection[link];
+     trace.prepend(row);while(trace.children.length>4)trace.lastElementChild.remove();trace.dataset.last=entry;
+   }
+   $("quota-note").textContent=quotaValid?"来源提供的当前额度窗口":"暂未收到有效额度";
+   $("quota-window-label").textContent="额度窗口 · 已用";
+   $("token-label").textContent=feed?.tokens?.scope==="turn"?"本轮 Token":"会话 Token";
+   const tokens=demo.offline?null:feed?.tokens;
+   $("token-value").textContent=tokens?(tokens.input+tokens.output).toLocaleString():"—";
+   $("token-note").textContent=tokens?"输入 "+tokens.input.toLocaleString()+" · 输出 "+tokens.output.toLocaleString():"来源暂无有效计数";
+   $("mapping-note").textContent=clientLabels[demo.client]+" · "+modelText;
+   $("pin-button").disabled=$("locate-button").disabled=true;
+   document.querySelectorAll("[data-state],[data-client],#play-button,#model-select,#offline,#quota-range,#context-range,#unknown,#expired").forEach(b=>b.disabled=true);
+   $("model-select").value=[...$("model-select").options].some(o=>o.value===demo.model)?demo.model:"";
+ }
+ document.querySelectorAll("[data-client]").forEach(b=>b.classList.toggle("active",b.dataset.client===demo.client));
+ document.querySelectorAll("[data-state]").forEach(b=>b.classList.toggle("active",b.dataset.state===demo.state));
+ document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",Number(p.dataset.page)===demo.page));
+ document.querySelectorAll(".tabs [data-goto]").forEach(b=>b.classList.toggle("active",Number(b.dataset.goto)===demo.page));
+ $("quota-range-label").textContent="额度已用 "+(linked?$("used-detail").textContent:demo.used+"%");$("context-range-label").textContent="上下文 "+(linked?$("context-detail").textContent:demo.context+"%");
+}
+function showPage(page){demo.page=page;render()}
+function pet(){
+ if(demo.model==="gpt"){if(petReady)dragon.care("pat");return}
+ if(demo.offline){toast("当前离线 · 等待电脑同步");return}
+ if(performance.now()-petAt<3000)return;petAt=performance.now();
+ if(demo.state==="waiting"||demo.state==="error"){toast(demo.state==="waiting"?"等待电脑端确认 · 提示保持可见":"异常提示保持可见");return}
+ $("heart").classList.remove("pop");void $("heart").offsetWidth;$("heart").classList.add("pop");
+ clearTimeout(petTimer);petTimer=setTimeout(()=>$("heart").classList.remove("pop"),1000);
+}
+document.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click",()=>showPage(Number(b.dataset.goto))));
+document.querySelectorAll("[data-client]").forEach(b=>b.addEventListener("click",()=>{demo.client=b.dataset.client;render()}));
+document.querySelectorAll("[data-state]").forEach(b=>b.addEventListener("click",()=>{if(sequenceTimer)stopPlayback();demo.state=b.dataset.state;render()}));
+$("model-select").addEventListener("change",e=>{demo.model=e.target.value;render()});
+for(const key of ["offline","parallel","unknown","expired"])$(key).addEventListener("change",e=>{demo[key]=e.target.checked;render()});
+for(const [id,key] of [["quota-range","used"],["context-range","context"]])$(id).addEventListener("input",e=>{demo[key]=Number(e.target.value);render()});
+$("pin-button").addEventListener("click",()=>{if(demo.offline){toast("离线时无法更改电脑端会话");return}demo.pinned=!demo.pinned;render();toast(demo.pinned?"演示：会话已固定":"演示：恢复自动选择")});
+$("locate-button").addEventListener("click",()=>toast(demo.offline?"离线时无法定位":"演示：请求定位电脑端会话"));
+$("reduce-motion").addEventListener("change",e=>{demo.reduced=e.target.checked;render()});
+motionPreference.addEventListener("change",render);
+document.addEventListener("visibilitychange",render);
+document.querySelectorAll("[data-care]").forEach(button=>{
+ button.addEventListener("click",()=>dragon.care(button.dataset.care));
+});
+document.querySelectorAll("[data-game]").forEach(button=>button.addEventListener("click",()=>{
+ if(dragon.game.round?.kind===button.dataset.game){dragon.game.end();return;}
+ dragon.game.start(button.dataset.game);
+ $("gpt-canvas").focus({preventScroll:true});
+}));
+$("gpt-canvas").addEventListener("keydown",event=>{
+ const activate=event.key==="Enter"||event.key===" ";
+ if(event.repeat && activate){event.preventDefault();return;}
+ if(dragon.work.key(event.key)||dragon.game.key(event.key)){event.preventDefault();return;}
+ if(activate){event.preventDefault();dragon.care("pat");}
+});
+$("gpt-canvas").addEventListener("click",event=>{
+ if(event.detail===0 && !dragon.work.key("Enter") && !dragon.game.key("Enter"))dragon.care("pat");
+});
+$("brightness").addEventListener("input",e=>{$("brightness-value").textContent=e.target.value+"%";$("screen").style.filter="brightness("+(0.6+Number(e.target.value)/100)+")"});
+function stopPlayback(){clearInterval(sequenceTimer);sequenceTimer=null;$("play-button").textContent="播放工作流程 ↗"}
+$("play-button").addEventListener("click",()=>{
+ if(sequenceTimer){stopPlayback();return}
+ const sequence=["working","reading","writing","running","searching","waiting","compact","ended"];let i=0;
+ demo.offline=false;$("offline").checked=false;showPage(0);demo.state=sequence[i++];render();
+ $("play-button").textContent="停止播放";
+ sequenceTimer=setInterval(()=>{if(i>=sequence.length){stopPlayback();return}demo.state=sequence[i++];render()},5000);
+});
+let start=null,holdTimer=null;
+function livePet(){return petReady&&demo.model==="gpt"&&demo.page===0;}
+function clearGesture(){clearTimeout(holdTimer);start=null;}
+function cancelGesture(){
+ if(start?.work===dragon.work.round)dragon.work.cancelDrag();
+ const round=start?.round;
+ if(round && round===dragon.game.round && round.kind==="fly" && round.phase==="offer"){
+   round.guided=false;round.dwell=0;round.aimX=round.x;round.aimY=round.y;
+ }
+ clearGesture();dragon.heldStar=null;dragon.releaseAttention();
+}
+function inPlayArea(p){return p && p.worldX>=69 && p.worldX<=747 && p.worldY>=32 && p.worldY<=680;}
+function patOnce(gesture){
+ if(!gesture.handled){gesture.handled=true;dragon.care("pat",gesture.point.x);}
+}
+$("screen").addEventListener("pointerdown",e=>{
+ if(start||!e.isPrimary||e.button!==0||e.target.closest("button,input,a,#pet-pocket"))return;
+ const scale=$("viewport").clientWidth/466;
+ const point=livePet()?dragon.pointAt(e.clientX,e.clientY,e.pointerType):null;
+ const round=inPlayArea(point)?dragon.game.round:null;
+ start={id:e.pointerId,x:e.clientX,y:e.clientY,scale,point,round,scene:dragon.scene,page:demo.page,model:demo.model,
+        rubbing:point?.region==="head",handled:false};
+ $("screen").setPointerCapture(e.pointerId);
+ const bird=point?dragon.craneAtPoint(point):-1;
+ if(bird>=0){start.bird=bird;return;}
+ if(inPlayArea(point)&&(dragon.work.round||dragon.work.direct(point))){
+   if(!dragon.work.round)dragon.work.start();
+   start.work=dragon.work.round;dragon.work.down(point);return;
+ }
+ if(round){
+   if(!dragon.scene.reduced)dragon.game.aim(point.worldX,point.worldY);
+   return;
+ }
+ if(point)dragon.attend(point);
+ const gesture=start;
+ holdTimer=setTimeout(()=>{
+   if(start!==gesture)return;
+   if(gesture.rubbing){patOnce(gesture);return;}
+   if(["left","right"].includes(point?.part)){
+     gesture.summoned=true;dragon.game.start("fly",point.part==="left"?-1:1);
+     gesture.round=dragon.game.round;return;
+   }
+   if(point?.part||point?.region==="body")return;
+   gesture.handled=true;showPage(3);
+ },gesture.rubbing?320:700);
+});
+$("screen").addEventListener("pointermove",e=>{
+ if(!e.isPrimary||(start&&e.pointerId!==start.id))return;
+ const point=livePet()?dragon.pointAt(e.clientX,e.clientY,e.pointerType):null;
+ if(!pocket.panel.hidden)return;
+ if(start?.bird!==undefined)return;
+ if(start?.work){if(start.work===dragon.work.round)dragon.work.move(point);return;}
+ if(start?.round && start.round!==dragon.game.round)return;
+ if(dragon.game.round && (!start||start.round)){
+   if(start?.summoned && !start.guiding){
+     start.guiding=Math.hypot(e.clientX-start.x,e.clientY-start.y)>6*start.scale;
+     if(!start.guiding)return;
+   }
+   if(inPlayArea(point)&&!dragon.scene.reduced)dragon.game.aim(point.worldX,point.worldY);
+   return;
+ }
+ if(point)dragon.attend(point);
+ if(!start)return;
+ const distance=Math.hypot(e.clientX-start.x,e.clientY-start.y)/start.scale;
+ const dy=(e.clientY-start.y)/start.scale, dx=(e.clientX-start.x)/start.scale;
+ if(start.rubbing&&distance>6&&point){clearTimeout(holdTimer);patOnce(start);dragon.stroke(point);}
+ else if(point&&start.point?.region==="body"&&!start.handled&&
+         (start.throwing||(dy< -13&&-dy>Math.abs(dx)*0.55))){
+   clearTimeout(holdTimer);start.throwing=true;dragon.holdStar(point);
+ }
+ else if(distance>12)clearTimeout(holdTimer);
+});
+$("screen").addEventListener("pointerleave",()=>{if(!start)dragon.releaseAttention();});
+$("screen").addEventListener("pointercancel",e=>{if(start?.id===e.pointerId)cancelGesture();});
+$("screen").addEventListener("lostpointercapture",e=>{if(start?.id===e.pointerId)cancelGesture();});
+$("screen").addEventListener("pointerup",e=>{
+ if(!start||e.pointerId!==start.id)return;
+ const gesture=start;
+ const dx=(e.clientX-start.x)/start.scale,dy=(e.clientY-start.y)/start.scale;
+ clearGesture();
+ if(e.pointerType==="touch")dragon.releaseAttention();
+ if(gesture.work){
+   if(gesture.work===dragon.work.round)dragon.work.release(dragon.pointAt(e.clientX,e.clientY,e.pointerType),Math.hypot(dx,dy));
+   return;
+ }
+ if(gesture.handled)return;
+ if(gesture.bird!==undefined){if(Math.hypot(dx,dy)<=14)dragon.greetCrane(gesture.bird);return;}
+ if(gesture.round){
+   if(gesture.summoned && !gesture.guiding)return;
+   if(gesture.round===dragon.game.round && (gesture.round.kind==="fly" || Math.hypot(dx,dy)<=14)){
+     const point=dragon.pointAt(e.clientX,e.clientY,e.pointerType);
+     if(inPlayArea(point))dragon.game.press(point);
+   }
+   return;
+ }
+ if(gesture.throwing&&livePet()){dragon.releaseStar(dx,dy);return;}
+ const part=gesture.point?.part;
+ if(livePet() && Math.hypot(dx,dy)<=12 && part){
+   if(part==="left"||part==="right")dragon.game.start("five",part==="left"?-1:1);
+   else if(part==="wingL"||part==="wingR")dragon.care("wing",part==="wingL"?-1:1);
+   else dragon.care(part);
+   return;
+ }
+ if(gesture.rubbing&&livePet()){patOnce(gesture);return;}
+ if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)*1.3){showPage((demo.page+(dx<0?1:2))%3);return}
+ if(Math.abs(dy)>40&&Math.abs(dy)>Math.abs(dx)*1.3){showPage(dy<0?1:0);return}
+ if(Math.hypot(dx,dy)>12||demo.page!==0)return;
+ const rect=$("screen").getBoundingClientRect(), y=(e.clientY-rect.top)/(rect.width/466);
+ const x=(e.clientX-rect.left)/(rect.width/466);
+ if(demo.state==="waiting"&&y>=350&&y<=396&&x>110&&x<356){toast(demo.offline?"离线时无法定位":linked?"请回到电脑上的 Agent 确认":"演示：定位电脑端进行确认");return}
+ if(livePet()&&gesture.point?.region==="body"){dragon.care("pat",gesture.point.x);return;}
+ if(demo.model!=="gpt"&&y>=99&&y<=355)pet();
+});
+new ResizeObserver(()=>{$("screen").style.setProperty("--scale",$("viewport").clientWidth/466)}).observe($("viewport"));
+window.bajiDemo={set(patch){Object.assign(demo,patch);render()},get(){return {...demo}},showPage,pet,stopPlayback};
+// URL presets support design review without connecting to any agent or account.
+const params=new URLSearchParams(location.search);
+if(params.get("scene")==="claude"){demo.client="claude_code";demo.model="claude-opus";demo.state="waiting";$("model-select").value=demo.model}
+if(params.get("scene")==="cross-provider"){demo.client="claude_code";demo.model="deepseek";demo.state="reading";$("model-select").value=demo.model}
+if(params.get("scene")==="offline"){demo.offline=true;$("offline").checked=true}
+if(params.get("scene")==="unknown"){demo.unknown=true;$("unknown").checked=true}
+if(params.has("page")&&/^[0-3]$/.test(params.get("page")))demo.page=Number(params.get("page"));
+render();
+if(linked){
+ let fingerprint="";
+ async function pollAgent(){
+   try{
+     const response=await fetch("/agent/state",{cache:"no-store",signal:AbortSignal.timeout(3000)});
+     if(!response.ok)throw new Error("bridge");
+     const data=await response.json();
+     if(data.version!==1||!Object.hasOwn(definitions,data.state))throw new Error("state");
+     const signature=JSON.stringify(data);
+     if(signature!==fingerprint){
+       feed=data;fingerprint=signature;
+       const variant=String(data.variant||data.model||"").toLowerCase();
+       demo.model=data.family==="claude"&&/opus|sonnet/.test(variant)?"claude-"+(variant.includes("opus")?"opus":"sonnet"):data.family;
+       demo.client=data.client;demo.state=data.state;demo.scope=data.stream+"/"+data.scope;
+       demo.offline=data.link==="offline";demo.unknown=!data.quota;demo.expired=false;
+       demo.used=data.quota?.value??0;demo.context=data.context?.value??0;demo.pinned=data.selection==="pinned";
+       render();
+     }
+   }catch{
+     if(feed?.link!=="offline"){feed={...feed,link:"offline",quota:null,context:null,tokens:null};demo.offline=true;demo.unknown=true;fingerprint="";render();}
+   }finally{setTimeout(pollAgent,document.hidden?2000:450);}
+ }
+ pollAgent();
+}
+</script>
+</body></html>

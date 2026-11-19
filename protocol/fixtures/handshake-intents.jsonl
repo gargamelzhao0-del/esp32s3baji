@@ -1,0 +1,3 @@
+{"v":1,"type":"hello","boot_id":"demo-device-1","firmware":"prep-0.1","asset_pack":"crosspet-source-v1","max_frame_bytes":4096,"capabilities":["touch","session_switch"]}
+{"v":1,"type":"intent","boot_id":"demo-device-1","bridge_id":"demo-bridge-1","request_id":"demo-request-1","action":"pin_toggle","session_id":"demo-codex-1"}
+{"v":1,"type":"ack","boot_id":"demo-device-1","bridge_id":"demo-bridge-1","request_id":"demo-request-1","result":"ok"}

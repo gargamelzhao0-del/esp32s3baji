@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "mode": "offline",
+  "transport": {
+    "kind": "usb_serial_jtag",
+    "port": null,
+    "baudrate": 115200,
+    "snapshot_interval_ms": 2000,
+    "frame_limit_bytes": 4096
+  },
+  "selection": {
+    "mode": "auto",
+    "pinned_session_id": null,
+    "foreground_debounce_ms": 600,
+    "min_dwell_ms": 3000
+  },
+  "freshness": {
+    "link_timeout_ms": 8000,
+    "quota_ttl_ms": 90000,
+    "context_ttl_ms": 30000
+  },
+  "privacy": {
+    "send_prompts": false,
+    "send_tool_content": false,
+    "send_project_paths": false,
+    "retain_raw_hooks": false
+  },
+  "adapters": {
+    "codex": {
+      "enabled": false,
+      "source": "hooks",
+      "capability_probe_required": true
+    },
+    "claude_code": {
+      "enabled": false,
+      "source": "hooks_and_statusline",
+      "capability_probe_required": true
+    }
+  },
+  "assets": {
+    "source_root": "assets/ai-girls",
+    "manifest": "assets/character-pack.source.json"
+  },
+  "rules": [
+    {
+      "client": "codex",
+      "theme": "codex"
+    },
+    {
+      "client": "claude_code",
+      "theme": "claude"
+    }
+  ],
+  "models": [
+    {
+      "pattern": "^(openai/)?gpt-",
+      "character": "gpt"
+    },
+    {
+      "pattern": "^(anthropic/)?claude-",
+      "character": "claude"
+    },
+    {
+      "pattern": "^(deepseek/)?deepseek",
+      "character": "deepseek"
+    },
+    {
+      "pattern": "^(google/)?gemini",
+      "character": "gemini"
+    }
+  ],
+  "fallback": {
+    "theme": "neutral",
+    "character": "neutral",
+    "model_label": "模型未知"
+  }
+}

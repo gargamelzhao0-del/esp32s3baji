@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "id": "crosspet-source-v1",
+  "firmware_ready": false,
+  "source_root": "ai-girls",
+  "source_root_relative_to": "this_manifest_directory",
+  "source_commit": "8954eb8f7f69fcfb8d35e9deceeb78e10c804402",
+  "source_url": "https://github.com/lokicorvus/crosspet/tree/8954eb8f7f69fcfb8d35e9deceeb78e10c804402",
+  "art_license": "CC-BY-NC-SA-4.0",
+  "attribution_file": "ai-girls/sources/crosspet/LICENSE.md",
+  "target": {
+    "canvas": [
+      320,
+      320
+    ],
+    "format": "RGB565_LE_PLUS_A8_PLANES",
+    "anchor": [
+      160,
+      308
+    ],
+    "animation_fps": 10,
+    "max_cached_frames": 2
+  },
+  "characters": {
+    "gpt": {
+      "label": "GPT · 白龙娘",
+      "poses": {
+        "idle": "state-poses/gpt/idle.webp",
+        "thinking": "state-poses/gpt/thinking.webp",
+        "reading": "state-poses/gpt/reading.webp",
+        "writing": "state-poses/gpt/writing.webp",
+        "running": "state-poses/gpt/running.webp",
+        "searching": "state-poses/gpt/searching.webp",
+        "asking": "state-poses/gpt/asking.webp",
+        "happy": "state-poses/gpt/happy.webp",
+        "oops": "state-poses/gpt/oops.webp",
+        "tired": "state-poses/gpt/tired.webp",
+        "compact": "state-poses/gpt/compact.webp",
+        "sleeping": "state-poses/gpt/sleeping.webp"
+      }
+    },
+    "claude": {
+      "label": "Claude · 橘发持书",
+      "poses": {
+        "idle": "state-poses/claude/idle.webp",
+        "thinking": "state-poses/claude/thinking.webp",
+        "reading": "state-poses/claude/reading-2.webp",
+        "writing": "state-poses/claude/writing.webp",
+        "running": "state-poses/claude/running.webp",
+        "searching": "state-poses/claude/searching.webp",
+        "asking": "state-poses/claude/asking.webp",
+        "happy": "state-poses/claude/happy-2.webp",
+        "oops": "state-poses/claude/oops.webp",
+        "tired": "state-poses/claude/tired.webp",
+        "compact": "state-poses/claude/compact.webp",
+        "sleeping": "state-poses/claude/sleeping-2.webp"
+      }
+    },
+    "deepseek": {
+      "label": "DeepSeek · 鲸鱼娘",
+      "poses": {
+        "idle": "state-poses/deepseek/idle.webp",
+        "thinking": "state-poses/deepseek/thinking.webp",
+        "reading": "state-poses/deepseek/reading.webp",
+        "writing": "state-poses/deepseek/writing.webp",
+        "running": "state-poses/deepseek/running.webp",
+        "searching": "state-poses/deepseek/searching.webp",
+        "asking": "state-poses/deepseek/asking.webp",
+        "happy": "state-poses/deepseek/happy.webp",
+        "oops": "state-poses/deepseek/oops.webp",
+        "tired": "state-poses/deepseek/tired.webp",
+        "compact": "state-poses/deepseek/compact.webp",
+        "sleeping": "state-poses/deepseek/sleeping.webp"
+      }
+    },
+    "gemini": {
+      "label": "Gemini · 星猫娘",
+      "poses": {
+        "idle": "state-poses/gemini/idle.webp",
+        "thinking": "state-poses/gemini/thinking.webp",
+        "reading": "state-poses/gemini/reading.webp",
+        "writing": "state-poses/gemini/writing.webp",
+        "running": "state-poses/gemini/running.webp",
+        "searching": "state-poses/gemini/searching.webp",
+        "asking": "state-poses/gemini/asking.webp",
+        "happy": "state-poses/gemini/happy.webp",
+        "oops": "state-poses/gemini/oops.webp",
+        "tired": "state-poses/gemini/tired.webp",
+        "compact": "state-poses/gemini/compact.webp",
+        "sleeping": "state-poses/gemini/sleeping.webp"
+      }
+    }
+  }
+}
