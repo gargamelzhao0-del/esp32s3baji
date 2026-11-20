@@ -92,13 +92,13 @@ footer{max-width:1160px;padding:5px 32px 28px;margin:auto;font-size:11px;color:#
 <div class="pocket-sheet"><div class="pocket-head"><h2 id="pocket-title">白龙的口袋</h2><button id="pocket-sound" aria-pressed="false" aria-label="互动音效">♪ 音效关</button><button id="pocket-close" aria-label="合上口袋">×</button></div>
 <div class="pocket-tabs" role="tablist" aria-label="口袋分类">
 <button role="tab" id="tab-desk" aria-controls="pane-desk" data-pocket-tab="desk">陪她工作</button><button role="tab" id="tab-toys" aria-controls="pane-toys" data-pocket-tab="toys">一起玩</button><button role="tab" id="tab-wear" aria-controls="pane-wear" data-pocket-tab="wear">小衣橱</button><button role="tab" id="tab-story" aria-controls="pane-story" data-pocket-tab="story">小剧场</button></div>
-<div role="tabpanel" aria-labelledby="tab-desk" id="pane-desk" class="pocket-desk"><canvas id="desk-drawing" width="100" height="100" aria-hidden="true"></canvas><div><small id="desk-state"></small><button id="desk-start"></button></div></div>
+<div role="tabpanel" aria-labelledby="tab-desk" id="pane-desk" class="pocket-desk"><canvas id="desk-drawing" width="100" height="100" aria-hidden="true"></canvas><div><small id="desk-state"></small><button id="desk-start"></button><button id="show-monitor" hidden>看看小屏幕 ›</button></div></div>
 <div role="tabpanel" aria-labelledby="tab-toys" id="pane-toys" class="pocket-toys" hidden>
 <button data-toy="pat">摸摸头</button><button data-toy="feed">喂星糖</button><button data-toy="play">抛星星</button><button data-toy="five">和她击掌</button><button data-toy="fly">引萤火虫</button></div>
 <div role="tabpanel" aria-labelledby="tab-wear" id="pane-wear" class="pocket-wear" hidden>
 <button data-wear="plain"><canvas width="72" height="66" data-art="plain"></canvas>原装</button><button data-wear="bow"><canvas width="72" height="66" data-art="bow"></canvas>樱花结</button><button data-wear="moon"><canvas width="72" height="66" data-art="moon"></canvas>月牙夹</button><button data-wear="leaf"><canvas width="72" height="66" data-art="leaf"></canvas>嫩叶夹</button></div>
 <div role="tabpanel" aria-labelledby="tab-story" id="pane-story" class="pocket-story" hidden>
-<button data-story="desk"><canvas width="68" height="62" data-art="running"></canvas><span>搬桌开工</span></button><button data-story="cheer"><canvas width="68" height="62" data-art="succeeded"></canvas><span>一起欢呼</span></button><button id="story-mood" data-story="tease"><canvas width="68" height="62" data-art="candy"></canvas><span>逗逗尾巴</span></button></div>
+<button data-story="desk"><canvas width="68" height="62" data-art="cart"></canvas><span>搬桌开工</span></button><button data-story="cheer"><canvas width="68" height="62" data-art="succeeded"></canvas><span>一起欢呼</span></button><button id="story-mood" data-story="tease"><canvas width="68" height="62" data-art="tail"></canvas><span>逗逗尾巴</span></button></div>
 </div></div>
 </section>
 <section class="page" data-page="1"><div class="page-title">使用详情</div><div class="detail-body">
@@ -229,7 +229,7 @@ function petControls(round){
    button.querySelector(".game-label").textContent=five?(selected?"结束击掌":"和她击掌"):(selected?"送走萤火虫":"引萤火虫");
  }
  const touch=matchMedia("(pointer: coarse)").matches;
- let hint="点手心击掌，连点三次尾巴逗她；口袋里的「小剧场」可以看她搬桌开工。\n从袖口向上抛星，沿圆屏边缘滑动翻页。";
+ let hint="点手心击掌，连点三次尾巴逗她。口袋里的「小剧场」可以看她搬桌开工。\n从袖口向上抛星，沿圆屏边缘滑动翻页。";
  if(work){
    hint=work.phase==="done"?dragon.work.item.done:(work.id==="reading"?"按住书的右角往左翻，轻点书角也可以。":dragon.work.cue()+"。");
    if(!touch&&work.phase==="offer")hint+=" 空格可参与，Esc 可收起。";
@@ -245,9 +245,11 @@ function petControls(round){
    hint=reduced?"可以选择下一项互动。":"让她安静几秒，看看她还记不记得刚才用的是哪只手。";
  } else if(dragon.stage.sulking){
    hint="她正鼓着脸。喂颗星糖哄哄她，或给她一小会儿。";
+ } else if(dragon.stage.canPresent){
+   hint="轻碰桌上的小显示器，她会转给你看。左侧小物件可以陪她工作。";
  }
  $("gesture-note").textContent=gpt?hint:"从圆屏边缘滑动翻页，长按空白处打开设置。";
- $("gpt-canvas").setAttribute("aria-label",work?dragon.work.item.name:kind==="five"?"和白龙娘击掌":kind==="fly"?"引导萤火虫":"GPT 白龙娘。按空格摸摸头。");
+ $("gpt-canvas").setAttribute("aria-label",work?dragon.work.item.name:kind==="five"?"和白龙娘击掌":kind==="fly"?"引导萤火虫":dragon.stage.sulking?"白龙娘正鼓着脸，可以用喂星糖和好。":"GPT 白龙娘。按空格摸摸头。");
 }
 function render(){
  const screen=$("screen"), def=definitions[demo.state];
@@ -411,6 +413,7 @@ $("screen").addEventListener("pointerdown",e=>{
    if(!dragon.scene.reduced)dragon.game.aim(point.worldX,point.worldY);
    return;
  }
+ if(dragon.stage.onMonitor(point)){start.monitor=true;return;}
  if(point)dragon.attend(point);
  const gesture=start;
  holdTimer=setTimeout(()=>{
@@ -428,7 +431,7 @@ $("screen").addEventListener("pointermove",e=>{
  if(!e.isPrimary||(start&&e.pointerId!==start.id))return;
  const point=livePet()?dragon.pointAt(e.clientX,e.clientY,e.pointerType):null;
  if(!pocket.panel.hidden)return;
- if(start?.bird!==undefined)return;
+ if(start?.bird!==undefined||start?.monitor)return;
  if(start?.work){if(start.work===dragon.work.round)dragon.work.move(point);return;}
  if(start?.round && start.round!==dragon.game.round)return;
  if(dragon.game.round && (!start||start.round)){
@@ -464,6 +467,7 @@ $("screen").addEventListener("pointerup",e=>{
    return;
  }
  if(gesture.handled)return;
+ if(gesture.monitor){if(Math.hypot(dx,dy)<=14)dragon.stage.showMonitor();return;}
  if(gesture.bird!==undefined){if(Math.hypot(dx,dy)<=14)dragon.greetCrane(gesture.bird);return;}
  if(gesture.round){
    if(gesture.summoned && !gesture.guiding)return;

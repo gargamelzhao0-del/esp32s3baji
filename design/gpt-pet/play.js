@@ -19,7 +19,7 @@
         start(kind, side) {
             const pet = this.pet;
             if (!pet.rig || !pet.scene.active || !["five", "fly"].includes(kind)) return;
-            if(pet.stage?.sulking){pet.note("她把手藏起来了，还在等那颗和好糖。");return;}
+            if(pet.stage?.sulking){pet.stage.refuse();return;}
             pet.stage?.interrupt();
             pet.work?.clear();
             this.clear();
@@ -106,8 +106,11 @@
             } else {
                 this.pet.reward();
                 const previous=this.pet.lastPlay;
-                r.duet=phase==="met"&&previous?.kind==="five"&&previous.side!==r.side&&this.pet.time-previous.at<12;
-                this.pet.lastPlay={kind:r.kind, side:r.side, at:this.pet.time, recalled:false};
+                const reduced=this.pet.scene.reduced;
+                const touchedAt=reduced?Date.now()/1000:this.pet.time;
+                r.duet=phase==="met"&&previous?.kind==="five"&&previous.side!==r.side&&
+                       previous.reduced===reduced&&touchedAt-previous.touchedAt<12;
+                this.pet.lastPlay={kind:r.kind, side:r.side, at:this.pet.time, touchedAt,reduced,recalled:false};
                 this.pet.note(phase === "met" ? "啪！她踮起脚，朝你眨了一只眼。" : "萤火虫停稳了。她捧着那点光，悄悄放轻了呼吸。");
             }
             this.pet.onPlay(r);

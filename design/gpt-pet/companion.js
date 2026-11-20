@@ -331,7 +331,7 @@
             if(!durations[kind] || !this.scene.active || !this.rig) return;
             if(this.stage.sulking){
                 if(kind==="feed")this.stage.perform("mend");
-                else this.note("她把小爪收得更紧，偷偷瞄了一眼星糖。");
+                else this.stage.refuse();
                 return;
             }
             if(kind==="tail" && this.stage.tailTap())return;
@@ -482,6 +482,10 @@
             this.pose.blink=this.scene.reduced?0:this.blink;
             this.pose.time=this.time;
             this.pose.stage=stage;
+            const theatre=stage.desk>.02||!!stage.kind;
+            if(theatre!==this.inTheatre){
+                this.inTheatre=theatre;this.canvas.classList.toggle("in-theatre",theatre);
+            }
             this.pose.action=this.action?.kind||"";
             this.pose.actionTime=this.action ? this.time-this.action.at : 0;
             this.pose.cast=this.action?.cast;

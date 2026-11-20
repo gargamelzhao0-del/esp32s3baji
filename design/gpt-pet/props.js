@@ -250,7 +250,7 @@
         window.DragonStageArt.furniture(ctx,s,p.time,true);
         const guidedPage=p.work?.id==="reading";
         const bookTime=guidedPage ? .85*(p.still && p.work.phase==="done" ? .60 : p.work.progress) : p.time;
-        const gear=s.kind?0:s.workMix;
+        const gear=s.kind?0:s.workMix*(1-s.present*.96);
         prop(ctx,p.book*gear,cx,cy+3,book,bookTime);
         prop(ctx,p.pad*gear,cx,cy+17,notepad,p.time);
         prop(ctx,p.pad*gear,a.right.x-15,a.right.y+7,quill,p.time);

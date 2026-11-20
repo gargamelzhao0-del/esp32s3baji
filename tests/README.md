@@ -1,5 +1,7 @@
 # 状态核心测试
 
+角色动画的回归可在开发目录运行 `node --test tests/gpt-pet-play.test.cjs tests/gpt-pet-work.test.cjs tests/gpt-pet-stage.test.cjs`。用例覆盖脚步接触、连续工具事件、开工中断、指屏、击掌庆祝、闹别扭和减少动效。[角色表演测试](gpt-pet-stage.test.cjs)
+
 `core_state_test.c` 是不依赖 FreeRTOS / LVGL 的 C 断言用例，覆盖重复帧不延长在线状态、跳号快照恢复、指标过期、零与未知、非法状态、本轮结束不自动成功、成功动效不被周期快照重复触发及重新建连。
 
 需要 **宿主机 C 编译器**，不能使用默认生成 Xtensa / RISC-V ELF 的交叉编译器生成 .exe 后在 Windows 直接执行。本轮已进行核心的 ESP32-S3 工程编译，未执行此断言程序。

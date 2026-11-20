@@ -9,7 +9,7 @@
 ## 先看这三个入口
 
 1. [产品与范围](docs/00-product-and-scope.md)：首版做什么，每条需求如何认定完成。
-2. 打开白龙娘的口袋换发饰，选“阅读”陪她翻书，选“执行工具”和她合奏三拍。[打开圆屏交互原型](design/badge-prototype.html) · [观看工作互动](design/gpt-pet/agent-pocket-preview.webp) · [接入 Agent 事件](design/gpt-pet/README.md#agent-联动)
+2. 选“工作中”看白龙娘搬桌开机，坐定后点她的小屏幕。在“口袋 → 小剧场”可以一起欢呼、逗尾巴和喂糖和好。[打开圆屏交互原型](design/badge-prototype.html) · [20 秒动作预览](design/gpt-pet/desk-story-preview.webp) · [动作设计与技术调研](docs/10-character-acting.md) · [接入 Agent 事件](design/gpt-pet/README.md#agent-联动)
 3. [开发顺序与验收](docs/07-roadmap-and-acceptance.md)：G0–G5，下一步从板卡独立诊断开始。
 
 [Codex 画面预览](design/prototype-desktop.png) · [Claude 画面预览](design/prototype-claude.png) · [用量详情](design/prototype-details.png) · [手机宽度预览](design/prototype-mobile.png)

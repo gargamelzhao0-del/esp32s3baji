@@ -28,6 +28,7 @@
             u:x, v:y, x:0, y:0, left, wing,
             head: 1 - smooth(314, 395, y),
             upper: 1 - smooth(370, 626, y),
+            aboveFeet:1-smooth(525,623,y),
             leftPaw: oval(x,y,179,428,68,84),
             rightPaw: oval(x,y,373,428,64,83),
             footL: oval(x,y,232,609,48,89),
@@ -67,9 +68,9 @@
         dx+=s.turn*(n.head*(17+(x-274)*.14)+23*n.face);
         dx+=(n.left?-1:1)*n.cheek*p.pout*12;
         dy+=n.cheek*p.pout*4.5;
-        const floor=695, plant=1-smooth(525,623,y);
+        const floor=695;
         out.x=397+(world.x+x+dx-397)*s.scale+s.x+n.footL*s.footLX+n.footR*s.footRX;
-        out.y=floor+(world.y+y+dy-floor)*s.scale-s.air+(s.bodyY+30*s.seat)*plant+
+        out.y=floor+(world.y+y+dy-floor)*s.scale-s.air+(s.bodyY+30*s.seat)*n.aboveFeet+
               n.footL*s.footLY+n.footR*s.footRY;
         out.x+=s.tilt*(floor-out.y);
     }
@@ -215,7 +216,7 @@
             this.pin("right",s.handle,desk.y,s.grip,sx,sy);
             this.pin("right",s.handle+desk.buttonX,desk.y+desk.buttonY-5+4*s.press,s.switchReach,sx,sy);
             if(!s.kind && s.boot>0 && s.desk>.99 && !s.switchReach && p.keyContact>.003){
-                const phase=p.still?0:Math.sin(p.time*10.2);
+                const phase=s.keyStroke;
                 const accents=p.work?.id==="running"?p.work:null;
                 for(const [hand,sign,keyX] of [["left",-1,desk.keyLeft],["right",1,desk.keyRight]]){
                     const hit=accents?.lastSide===sign?Math.min(1,accents.beatGlow/.25):0;
@@ -223,6 +224,7 @@
                              p.keyContact,sx,sy);
                 }
             }
+            if(s.present>0)this.pin("right",s.handle+desk.screenX-65,desk.y+desk.screenY-26,s.present,sx,sy);
             const dst=this.frame.data;
             dst.fill(0);
             const {points,triangles}=this.mesh;

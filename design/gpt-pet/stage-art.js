@@ -24,18 +24,30 @@
         c.save();c.translate(x,y);c.rotate(-roll*33);
         oval(c,0,0,5.7,5.7,"#cabca7");path(c,"M-3 0 L3 0",null,"#857a83",2);c.restore();
     }
-    function monitor(c,s,t){
-        c.save();c.translate(235,-19);c.scale(.89,.89);
-        path(c,"M-9 -26 L8 -26 L10 -6 L30 -3 Q35 2 27 4 L-29 4 Q-38 2 -30 -2 L-9 -7 Z","#afa7aa",rim);
-        // A hinged display rotates from a thin edge to the full painted face.
-        c.save();c.transform(1,0,.18*(1-s.open),.18+.82*s.open,0,-13);
-        box(c,-68,-102,132,102,12,"#c69b97",rim,4);
-        box(c,-72,-106,132,102,12,"#f3ddbc",rim,4);
-        box(c,-63,-96,112,78,7,s.boot>.05?"#294544":"#445052","#847f78",3);
-        c.save();c.globalAlpha*=s.boot;
-        const x=-52,y=-76;
-        if(s.paused){
-            box(c,-19,-73,7,26,2,"#f1c996");box(c,-4,-73,7,26,2,"#f1c996");
+    function display(c,s,t){
+        const x=-52,y=-76,mode=s.displayMode;
+        if(mode==="error"){
+            path(c,"M-7 -82 L13 -44 L-27 -44 Z",null,"#e9a99f",4);
+            path(c,"M-7 -70 L-7 -57 M-7 -50 L-7 -49",null,"#edc7af",3);
+        }else if(mode==="limited"){
+            path(c,"M-25 -78 L10 -78 M-25 -45 L10 -45 M-22 -75 Q-21 -66 -8 -61 Q4 -55 6 -48 M6 -75 Q5 -67 -8 -61 Q-20 -54 -22 -48",null,gold,3.5);
+        }else if(s.paused){
+            box(c,-19,-73,7,26,2,gold);box(c,-4,-73,7,26,2,gold);
+        }else if(mode==="reading"||mode==="writing"){
+            const row=Math.floor(t*1.3)%3;
+            box(c,-47,-85,66,56,4,"#b3cdb7");
+            for(let i=0;i<3;i++){
+                const length=mode==="writing"&&i===row?11+30*((t*1.3)%1):[39,45,28][i];
+                box(c,-38,-75+i*14,length,4,1.6,i===row?"#876e88":"#718c80");
+            }
+            if(mode==="reading")box(c,-46,-77+row*14,4,8,1,"#efe0a2");
+        }else if(mode==="searching"){
+            for(let i=0;i<5;i++)box(c,-47+i*14,-57,8,5,2,"#91b7a5");
+            const u=-17+22*Math.sin(t*1.8);oval(c,u,-61,13,13,"rgba(204,224,185,.27)","#efcfa0",4);
+            c.beginPath();c.moveTo(u+9,-51);c.lineTo(u+19,-41);c.strokeStyle=gold;c.lineWidth=4;c.stroke();
+        }else if(mode==="compact"){
+            for(let i=2;i>=0;i--)box(c,-36+i*5,-78+i*6,46,33,3,i?"#748f82":"#c5d9bc","#57746b",2.4);
+            box(c,-28,-68,25,3,1,"#809785");box(c,-28,-61,16,3,1,"#809785");
         }else{
             c.save();c.translate(x,y);path(c,"M0 -4 L8 2 L0 8 M14 8 L24 8",null,"#c3f0d1",4);c.restore();
             const lineCount=1+Math.floor(4*s.boot);
@@ -45,6 +57,18 @@
             }
             if(t%1.08<.77)box(c,23,-35,6,5,1,"#f1d3aa");
         }
+    }
+    function monitor(c,s,t){
+        const desk=window.DragonStage.desk;
+        c.save();c.translate(desk.screenX,desk.screenY);c.scale(.89,.89);
+        path(c,"M-9 -26 L8 -26 L10 -6 L30 -3 Q35 2 27 4 L-29 4 Q-38 2 -30 -2 L-9 -7 Z","#afa7aa",rim);
+        // A hinged display rotates from a thin edge to the full painted face.
+        c.save();c.transform(1+.13*s.present,-.035*s.present,.18*(1-s.open),.18+.82*s.open,-4*s.present,-13);
+        box(c,-68,-102,132,102,12,"#c69b97",rim,4);
+        box(c,-72,-106,132,102,12,"#f3ddbc",rim,4);
+        box(c,-63,-96,112,78,7,s.boot>.05?"#294544":"#445052","#847f78",3);
+        c.save();c.globalAlpha*=s.boot;
+        display(c,s,t);
         c.restore();
         oval(c,44,-11,2.8,2.8,s.boot>.3?"#a6e6bb":"#ab9a9a");
         path(c,"M-57 -10 L-45 -10",null,"#ae8e8d",2.6);
@@ -97,8 +121,9 @@
                 c.save();c.globalAlpha*=s.dock;
                 path(c,"M11 -14 L133 -16 L147 1 L2 4 Z","#607774",rim,2.9);
                 for(let row=0;row<2;row++)for(let col=0;col<9;col++){
-                    const active=s.boot>.6&&s.typing&&Math.floor(t*8)%12===col+row;
-                    box(c,13+col*13-row*3,-11+row*6,9,3.6,1.4,active?gold:"#b4cabe");
+                    const active=s.boot>.65&&s.keyLights&&row===0&&
+                                 ((col===2&&s.keyStroke>.45)||(col===8&&s.keyStroke<-.45));
+                    box(c,13+col*13-row*3,-11+row*6+(active?2:0),9,3.6,1.4,active?gold:"#b4cabe");
                 }
                 c.restore();
             }

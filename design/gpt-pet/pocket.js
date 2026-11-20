@@ -20,6 +20,9 @@
             find("pocket-open").addEventListener("click",()=>this.open());
             find("pocket-close").addEventListener("click",()=>this.close(true));
             find("desk-start").addEventListener("click",()=>{this.close();this.work();});
+            find("show-monitor").addEventListener("click",()=>{
+                this.close();pet.stage.showMonitor();pet.canvas.focus({preventScroll:true});
+            });
             find("work-button").addEventListener("click",()=>this.work());
             this.panel.addEventListener("click",e=>{
                 if(e.target===this.panel){this.close(true);return;}
@@ -81,12 +84,15 @@
         sync(){
             const w=this.pet.work,id=w.id,item=w.item,r=w.round;
             const moody=this.pet.stage.sulking, mood=find("story-mood");
+            const icon=mood.querySelector("canvas"), art=moody?"candy":"tail";
+            if(icon.dataset.art!==art){icon.dataset.art=art;draw(icon,art);}
             mood.dataset.story=moody?"mend":"tease";mood.querySelector("span").textContent=moody?"递和好糖":"逗逗尾巴";
             if(id!==this.lastId){
                 if(["waiting","error","limited","offline"].includes(id))this.close();
                 draw(find("work-button").querySelector("canvas"),id);draw(find("desk-drawing"),id);this.lastId=id;
             }
             find("desk-state").textContent=this.stateLabel();
+            find("show-monitor").hidden=!this.pet.stage.canPresent;
             find("desk-start").textContent=r?"收起这次互动":item.name+" ›";
             const button=find("work-button");button.querySelector("span").textContent=r?"收起":item.short;
             button.setAttribute("aria-label",r?"收起"+item.name:item.name);button.setAttribute("aria-pressed",String(!!r));

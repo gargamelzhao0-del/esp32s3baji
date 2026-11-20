@@ -1,5 +1,11 @@
 .screen .charm{position:absolute;top:247px;width:65px;height:65px;border:1px solid #9484a04f;border-radius:24px 24px 18px 18px;background:linear-gradient(155deg,#332e3b,#1b2225 82%);color:#e6dce8;padding:4px 0 5px;display:grid;justify-items:center;align-content:center;gap:0;line-height:1.25;font-size:15px;box-shadow:0 5px 12px #0005}
 .charm-work{left:36px}.charm-pocket{right:36px}.charm canvas{width:32px;height:28px;pointer-events:none}.screen .charm:hover,.screen .charm:focus-visible{background:#393441;border-color:#ccbbcc}
+.screen .charm{transition:top .22s ease-in-out,width .18s,height .18s}
+#gpt-canvas.in-theatre+#desk-tools .charm{top:148px;width:55px;height:54px;border-radius:18px;font-size:13px;background:linear-gradient(150deg,#302c36,#192321);box-shadow:0 3px 9px #0004}
+#gpt-canvas.in-theatre+#desk-tools .charm-work{left:27px}
+#gpt-canvas.in-theatre+#desk-tools .charm-pocket{right:27px}
+#gpt-canvas.in-theatre+#desk-tools .charm canvas{width:27px;height:23px}
+@media(pointer:coarse){#gpt-canvas.in-theatre+#desk-tools .charm::after{content:"";position:absolute;inset:-9px}}
 .screen .charm[aria-pressed=true]{border-color:#e7c688;color:#ffe3ab}
 #work-cue{position:absolute;top:74px;left:90px;right:90px;text-align:center;color:#ffe4ad;font-size:15px;line-height:1.2;font-weight:600;text-shadow:0 1px 4px #000;pointer-events:none}
 .screen.has-gpt.work-open .brand{top:14px}.screen.has-gpt.work-open .model{top:40px}
@@ -13,6 +19,7 @@
 .screen .pocket-tabs button[aria-selected=true]{color:#ffe3ac;border-bottom-color:#e4bd82}
 .pocket-desk{display:flex;gap:13px;align-items:center;justify-content:center;min-height:106px}.pocket-desk>canvas{width:70px;height:70px;background:radial-gradient(circle,#59493855,transparent 70%)}
 .pocket-desk small{display:block;color:#bdcec6;font-size:15px;margin-bottom:4px}.screen #desk-start{background:#e5d2ad;color:#352f39;border-color:#eddbbc;font-size:17px;font-weight:600;padding:6px 11px}
+.screen #show-monitor{display:block;min-height:44px;background:transparent;border:0;color:#c3decf;font-size:15px;padding:4px 3px}.screen #show-monitor[hidden]{display:none}
 .pocket-toys{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}.screen .pocket-toys button{grid-column:span 2;font-size:15px;padding:6px 2px;background:#38323e;border-color:#5a505f;color:#f1e4e9}.screen .pocket-toys button:nth-last-child(-n+2){grid-column:span 3}
 .pocket-wear{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;min-height:106px;align-items:center}
 .pocket-story{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;align-items:center;min-height:106px}

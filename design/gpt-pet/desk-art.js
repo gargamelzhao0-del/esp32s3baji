@@ -25,6 +25,19 @@
         dot(c,0,0,3.3,paper);c.restore();
     }
     const art={
+        cart(c){
+            path(c,"M-18 4 L20 4 L18 9 L-19 9Z","#efce9f");
+            path(c,"M-15 10 L-15 21 M15 10 L15 21",null,mint,3.8);
+            dot(c,-15,22,3.4,"#cfbac2");dot(c,15,22,3.4,"#cfbac2");
+            path(c,"M-6 -21 L18 -21 L18 -5 L-6 -5 Z",paper);
+            path(c,"M-3 -17 L15 -17 L15 -9 L-3 -9Z","#618d83",null);
+            path(c,"M4 -4 L4 1 L10 1 M-16 -2 L-7 -2",null,gold,2.8);
+        },
+        tail(c){
+            path(c,"M-19 4 Q-19 20 -1 19 Q20 18 21 -4 Q22 -17 15 -22 Q14 -2 0 0 Q-10 2 -15 -10 Q-20 -6 -19 4Z","#d7cde2");
+            path(c,"M-17 7 Q-10 11 -5 6 Q-1 11 4 6 Q9 8 13 0 M-11 13 Q-7 17 -1 12",null,"#ac9cb7",2);
+            glint(c,-12,-16,5,gold);
+        },
         candy(c){
             path(c,"M-9 -5 L-23 -12 L-20 0 L-23 9 L-9 5 M10 -5 L23 -12 L20 0 L23 9 L10 5Z",rose);
             path(c,"M0 -16 L6 -6 L16 -5 L10 3 L11 14 L1 9 L-9 15 L-9 5 L-17 -4 L-6 -6Z",gold);
