@@ -67,6 +67,17 @@
         sulk:"她鼓起脸把身子扭开了。给她一颗星糖，或安静陪她一会儿。",
         mend:"她从眼角偷看了一下，慢慢伸手接过和好糖。"
     };
+    function cartPose(office){
+        const s=officePose(office.age),settle=office.settle;
+        if(settle){
+            const f=ease(0,.58,settle.age);
+            for(const name of ["x","scale","bodyY","tilt","seat","desk","handle","open","dock","stool","roll",
+                               "footLX","footLY","footRX","footRY","workMix","ruffle"]){
+                s[name]=mix(settle.from[name],s[name],f);
+            }
+        }
+        return s;
+    }
     class DragonStage {
         constructor(pet){this.pet=pet;this.office=null;this.mood=null;this.taps=[];this.timer=0;this.showTimer=0;}
         get sulking(){return this.mood?.kind==="sulk";}
@@ -105,11 +116,16 @@
             if(!o||o.exit)return;
             this.clearShow();
             if(this.pet.scene.reduced||o.age<.06){this.office=null;return;}
-            o.exit={age:0,from:officePose(o.age)};
+            o.exit={age:0,from:cartPose(o)};
         }
         finishSetup(){
-            if(this.office && !this.office.exit && this.office.age<setUp){
-                this.office.age=setUp;this.office.beat=setupNotes.length;
+            const o=this.office;
+            if(!o || o.exit)return;
+            const animate=this.pet.scene.active && !this.pet.scene.reduced;
+            if(!animate)o.settle=null;
+            if(o.age<setUp){
+                if(animate)o.settle={from:officePose(o.age),age:0};
+                o.age=setUp;o.beat=setupNotes.length;
             }
         }
         sync(prior,next){
@@ -200,6 +216,7 @@
                 if(o.exit){o.exit.age+=dt;if(o.exit.age>=.98)this.office=null;}
                 else{
                     const before=o.age;o.age+=dt;
+                    if(o.settle){o.settle.age+=dt;if(o.settle.age>=.58)o.settle=null;}
                     if(o.showAge!=null){
                         o.showAge+=dt;
                         if(o.showAge>=2.13){this.clearShow();p.note(p.baseNote());}
@@ -234,7 +251,7 @@
         }
         sample(){
             const o=this.office,m=this.mood;
-            const s=o?(o.exit?{...o.exit.from}:officePose(o.age)):neutral();
+            const s=o?(o.exit?{...o.exit.from}:cartPose(o)):neutral();
             if(o?.exit){
                 const t=ease(0,.98,o.exit.age);
                 s.handle=mix(s.handle,865,t);s.roll+=t*1.65;s.desk*=1-ease(.47,.98,o.exit.age);

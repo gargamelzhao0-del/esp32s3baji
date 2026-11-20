@@ -14,7 +14,8 @@
         leftX:0, leftY:0, rightX:0, rightY:0, lid:1, smile:0.12, jaw:0, blush:0,
         wing:1, tailBend:0, tailTip:0, tailLift:0, hair:0, tassel:0, tuft:0,
         breath:0, side:0, squash:0, jump:0, book:0, pad:0, keys:0, lens:0, nap:0,
-        leftWing:0, rightWing:0, winkL:0, winkR:0, light:0, squint:0, pout:0, keyContact:0
+        leftWing:0, rightWing:0, winkL:0, winkR:0, light:0, squint:0, pout:0, keyContact:0,
+        brushX:0, brushY:0, press:0, penPark:0, deskFocus:0
     };
     const activities = {
         idle:{},
@@ -38,8 +39,14 @@
         ended:"她放下手里的活，慢慢舒了口气。", error:"她缩了缩翅膀，抬头看看你。", limited:"她垂下翅膀，歇一会儿。",
         compact:"她把摊开的纸拢起来，对齐折角。",succeeded:"她悄悄捏住礼花筒的拉绳。",cancelled:"她合上笔帽，等下一次开工。"
     };
-    const durations={pat:1.95,feed:2.75,play:2.65,wing:1.72,tail:2.12,nose:1.2,sneeze:1.73};
-    const careAt={pat:0.52,feed:1.3,play:1.46};
+    const durations={pat:1.95,feed:7.8,bubblePop:1.65,play:2.65,wing:1.72,tail:2.12,nose:1.2,sneeze:1.73};
+    const careAt={pat:0.52,feed:1.3,play:1.39};
+    function actionAge(action,now){
+        const age=now-action.at,flight=action.cast?.flight;
+        if(action.kind!=="play" || !flight)return age;
+        if(age<flight)return .18+1.2*age/flight;
+        return 1.38+age-flight;
+    }
     const careNotes={pat:"她眯起眼，往你的手心蹭了蹭。",feed:"她接过糖，认真地嚼了几口。",play:"接住了！她把星星抱进怀里。"};
     const startNotes={pat:"她轻轻仰起了头。",feed:"她看见了你手里的星糖。",play:"她盯住星星，悄悄屈起膝盖。",
         wing:"被碰到的翅膀抖了一下。她回头找你的手。",tail:"尾巴绕开了你的手。她回过头来，又把尾巴轻轻摆回来。",
@@ -50,15 +57,25 @@
     const touchAreas=[["nose",35,24],["left",45,44],["right",45,44],
                       ["wingL",61,48],["wingR",61,48],["tail",58,63]];
 
-    function busyDetails(goal,state,t,elapsed) {
+    function busyDetails(goal,state,t,elapsed,writing) {
         if(state==="reading") {
-            const line=(t*0.77)%1;
-            goal.gazeX+=0.60*(2*(ease(0.10,0.82,line)-ease(0.88,1,line))-1);
-            goal.rightY-=6*pulse(0,0.43,0.85,t%3.4);
+            const {scan, turn, peek}=window.dragonReadingBeat(t);
+            goal.gazeX+=.76*scan;
+            goal.gazeY-=1.35*peek;
+            goal.head+=3.4*scan;
+            goal.nod+=2.8*scan-10*peek;
+            goal.smile+=.55*peek;
+            const lift=Math.sin(Math.PI*turn);
+            goal.rightY-=21*lift;
+            goal.rightX-=14*lift;
+            goal.leftWing+=4*pulse(.55,.78,1,turn);
         } else if(state==="writing") {
-            goal.rightX+=10*Math.sin(t*7.2);
-            goal.rightY+=4*Math.sin(t*12.4);
-            goal.gazeX+=0.23*Math.sin(t*2.3);
+            goal.gazeX+=.64*writing.x/43;
+            goal.gazeY-=1.20*writing.peek;
+            goal.nod+=writing.y*.09-7*writing.peek;
+            goal.head+=writing.x*.054-3.2*writing.peek;
+            goal.smile+=.63*writing.peek;
+            goal.leftWing+=4*writing.peek;
         } else if(state==="running") {
             const burst=1-pulse(1.45,1.83,2.22,t%2.55);
             goal.leftY-=13*burst*Math.max(0,Math.sin(t*12));
@@ -141,6 +158,21 @@
     }
 
     function carePose(goal,kind,t,side,bond,cast,anchors) {
+        if(kind==="bubblePop"){
+            const startle=pulse(0,.12,.34,t), giggle=pulse(.13,.51,1.55,t);
+            goal.book*=1-giggle; goal.keys*=1-giggle; goal.pad*=1-giggle; goal.lens*=1-giggle;
+            goal.lid*=1-.92*giggle;
+            goal.jaw+=.72*startle+.47*giggle;
+            goal.nod-=12*startle;
+            goal.head+=8*giggle; goal.smile+=1.35*giggle; goal.blush+=.86*giggle;
+            goal.jump+=12*pulse(.18,.41,.76,t);
+            goal.leftY-=26*giggle; goal.rightY-=48*giggle;
+            goal.leftX+=16*giggle; goal.rightX-=28*giggle;
+            goal.squash+=.68*pulse(.42,.57,.78,t);goal.headX+=6*giggle;
+            goal.rightWing+=15*startle; goal.leftWing+=16*pulse(.13,.34,.84,t);
+            goal.tailTip+=20*Math.sin(8*t)*giggle;
+            return;
+        }
         if(!(kind in careAt)) {touchPose(goal,kind,t,side);return;}
         const weight=ease(0,0.23,t)*(1-ease(durations[kind]-0.43,durations[kind],t));
         for(const name of ["book","pad","keys","lens","leftX","leftY","rightX","rightY"]) goal[name]*=1-weight;
@@ -165,6 +197,13 @@
             goal.head+=4*reach-4*bite; goal.nod+=4*bite+3*jaw*chew;
             goal.lid*=1-0.75*chew; goal.jaw+=0.95*bite+0.56*jaw*chew;
             goal.smile+=0.7*chew; goal.blush+=0.48*chew;
+            const blow=pulse(1.72,2.04,2.68,t);
+            const watch=ease(2.12,2.96,t)*(1-ease(7.12,7.76,t));
+            goal.pout+=.90*blow; goal.jaw+=.52*blow;
+            goal.head+=6.5*watch; goal.nod-=8*watch;
+            goal.gazeX+=watch*(.88-goal.gazeX); goal.gazeY+=watch*(-.48-goal.gazeY);
+            goal.rightY-=26*watch; goal.rightX+=16*watch;
+            goal.light+=.76*watch; goal.smile+=.42*watch;
         } else if(kind==="play") {
             const crouch=pulse(0.34,0.64,0.86,t);
             const landing=pulse(1.34,1.56,1.98,t);
@@ -181,6 +220,9 @@
             const toward=hand==="left"?-1:1;
             goal.jump+=(32+7*(cast?.height??1))*up; goal.side+=toward*8*up;
             goal[hand+"X"]+=toward*20*up; goal[hand+"Y"]-=49*up+24*landing;
+            const cradle=pulse(1.37,1.78,2.48,t);
+            goal[hand+"X"]-=toward*25*cradle;goal[hand+"Y"]-=19*cradle;
+            goal.nod+=6*cradle;goal.head-=toward*3.5*cradle;
             goal[hand==="left"?"rightY":"leftY"]-=18*up; goal.wing+=18*up-5*crouch;
             goal.tailLift-=14*up; goal.lid*=1-0.55*landing;
             goal.smile+=0.72*landing; goal.blush+=0.42*landing;
@@ -195,6 +237,7 @@
             this.pose={...rest}; this.velocity=Object.fromEntries(springs.map(k=>[k,0]));
             this.scene={state:"idle",offline:false,reduced:false,active:false};
             this.time=0; this.stateTime=0; this.quiet=0; this.attention=null;
+            this.writingTime=0;this.stamped=false;
             this.autoX=0; this.autoY=0; this.nextLook=1.5;
             this.blinkAt=1.25; this.doubleBlink=false; this.blink=0;
             this.action=null; this.nextCare=null; this.heldStar=null; this.slept=false;
@@ -207,8 +250,10 @@
             this.frame=this.frame.bind(this);
             const image=new Image();
             image.src=window.GPT_DRAGON_PORTRAIT;
-            this.ready=image.decode().then(()=>{
-                this.rig=new window.DragonRig(canvas,image);
+            const armArt=new Image();
+            armArt.src=window.GPT_ARM_ART;
+            this.ready=Promise.all([image.decode(),armArt.decode()]).then(()=>{
+                this.rig=new window.DragonRig(canvas,image,armArt);
                 this.refresh(true);
                 canvas.dataset.ready="true";
             });
@@ -244,6 +289,11 @@
                next.offline===prior.offline && next.state===prior.state && next.scope===prior.scope) return;
             this.scene={...next};
             const stateChanged=prior.offline!==next.offline || prior.state!==next.state || prior.scope!==next.scope;
+            if(stateChanged){this.writingTime=0;this.stamped=false;}
+            if(stateChanged && (this.action?.kind==="feed" || this.action?.kind==="bubblePop")){
+                this.action=this.nextCare=null;
+                clearTimeout(this.stillTimer);
+            }
             if(stateChanged || !next.active || prior.reduced!==next.reduced)this.work.clear();
             if(stateChanged) { this.stateTime=0; this.quiet=0; this.slept=false; this.wakeAt=-Infinity;this.craneIndex=-1; }
             if(!next.active || prior.reduced!==next.reduced || prior.scope!==next.scope ||
@@ -283,15 +333,19 @@
             const x=(clientX-box.left)*window.DragonRig.world.width/box.width;
             const y=(clientY-box.top)*window.DragonRig.world.height/box.height;
             const eye=this.rig.anchors.eyes;
-            const inHead=((x-eye.x)/180)**2+((y-eye.y+75)/157)**2<1;
-            const inBody=((x-eye.x)/213)**2+((y-523)/179)**2<1;
+            const scale=this.pose.stage.scale;
+            const inHead=((x-eye.x)/(180*scale))**2+((y-eye.y+75*scale)/(157*scale))**2<1;
+            const waist=(this.rig.anchors.leftShoulder.y+this.rig.anchors.footL.y)*.5;
+            const inBody=((x-eye.x)/(213*scale))**2+((y-waist)/(179*scale))**2<1;
             const touch=pointerType==="touch"||pointerType==="pen";
             const slop=touch?clamp(14*window.DragonRig.world.width/box.width-35,0,20):0;
             const hitRadius=touch?clamp(22*window.DragonRig.world.width/box.width,51,82):51;
             let part=null;
             for(const [key,rx,ry] of touchAreas) {
                 const a=this.rig.anchors[key];
-                if(((x-a.x)/(rx+slop))**2+((y-a.y)/(ry+slop))**2<=1) {part=key;break;}
+                if(((x-a.x)/(rx*scale+slop))**2+((y-a.y)/(ry*scale+slop))**2>1)continue;
+                if(this.rig.hiddenByDesk(key,a))continue;
+                part=key;break;
             }
             return {region:inHead?"head":inBody?"body":"surround",part,hitRadius,worldX:x,worldY:y,
                     x:clamp((x-eye.x)/204,-1,1),y:clamp((y-eye.y)/150,-1,1)};
@@ -303,29 +357,94 @@
                 this.note("她睁开一只眼，先伸左翅，再慢慢伸开右翅。");
             }
             if(this.quiet>=4.6) this.quietSide=this.random()<0.5?-1:1;
-            this.attention={x:point.x,y:point.y,until:this.time+2.8};
+            this.attention={x:point.x,y:point.y,since:this.attention?.since??this.time,until:this.time+2.8};
             this.quiet=0;
         }
         releaseAttention() {
             if(this.attention) this.attention.until=Math.min(this.attention.until,this.time+0.32);
         }
 
-        stroke(point) {
-            if(this.action?.kind!=="pat" || this.scene.reduced) return;
-            this.action.lastStroke=this.time;
-            if(Math.abs(point.x)>0.08) this.action.side=clamp(point.x*2,-1,1);
+        beginStroke(point, stamp) {
+            if(this.action && this.action.kind!=="pat")return null;
+            if(!this.action)this.care("pat",point.x);
+            const action=this.action;
+            if(action?.kind!=="pat" || this.scene.reduced)return null;
+            const contact={x:point.worldX,y:point.worldY,side:point.x,stamp,held:true,began:this.time,
+                vx:0,vy:0,travel:0,sparks:[],lastMove:this.time};
+            action.contact=contact;
+            action.at=this.time;
+            return contact;
         }
-        holdStar(point) {
-            if(!this.action && !this.scene.reduced && !this.stage.sulking) {
-                this.heldStar={x:clamp(point.worldX,38,778),y:clamp(point.worldY,36,669)};
+        stroke(contact, point, stamp) {
+            if(!contact?.held || this.action?.contact!==contact || !point)return;
+            if(point.region!=="head"){
+                const slipped=this.time-this.action.at<.16 && !this.action.awarded;
+                this.endStroke(contact,slipped);return;
+            }
+            const dx=point.worldX-contact.x,dy=point.worldY-contact.y;
+            const dt=clamp((stamp-contact.stamp)/1000,.008,.20);
+            const gain=1-Math.exp(-dt/.055);
+            contact.vx+=(clamp(dx/dt/360,-1,1)-contact.vx)*gain;
+            contact.vy+=(clamp(dy/dt/360,-1,1)-contact.vy)*gain;
+            contact.x=point.worldX;contact.y=point.worldY;contact.side=point.x;
+            contact.stamp=stamp;contact.lastMove=this.time;
+            contact.travel+=Math.hypot(dx,dy);
+            if(contact.travel>=59 && this.time-(contact.sparks.at(-1)?.at??-1)>.17){
+                contact.travel%=59;
+                contact.sparks.push({x:contact.x,y:contact.y,dx:contact.vx,at:this.time});
+                if(contact.sparks.length>5)contact.sparks.shift();
             }
         }
-        releaseStar(dx,dy) {
-            const release=this.heldStar;
+        endStroke(contact, cancelled=false) {
+            if(!contact || this.action?.contact!==contact || (!contact.held && !cancelled))return;
+            contact.held=false;contact.released=this.time;
+            if(cancelled){
+                this.action=null;this.note(this.baseNote());
+                return;
+            }
+            // A quick tap still completes the nuzzle. A held stroke starts to settle here.
+            if(this.time-this.action.at>=.82)this.action.at=this.time-.94;
+        }
+        holdStar(point,stamp,origin,originStamp) {
+            if(this.action || this.scene.reduced || this.stage.sulking || !point)return;
+            const prev=this.heldStar || {x:origin.worldX,y:origin.worldY,stamp:originStamp,vx:0,vy:0};
+            const x=clamp(point.worldX,38,778),y=clamp(point.worldY,36,669);
+            const dt=clamp((stamp-prev.stamp)/1000,.008,.5),gain=1-Math.exp(-dt/.052);
+            this.heldStar={x,y,stamp,vx:prev.vx+(clamp((x-prev.x)/dt,-1200,1200)-prev.vx)*gain,
+                           vy:prev.vy+(clamp((y-prev.y)/dt,-1200,1200)-prev.vy)*gain};
+        }
+        releaseStar(point,stamp) {
+            const last=this.heldStar;
+            if(!last){
+                if(this.scene.reduced)this.care("play",point?.x);
+                return;
+            }
+            if(point && (Math.abs(point.worldX-last.x)>1 || Math.abs(point.worldY-last.y)>1))this.holdStar(point,stamp);
+            const {x,y,vx,vy,stamp:sample}=this.heldStar;
             this.heldStar=null;
-            const side=dx<-7?-1:dx>7?1:(release && release.x<400?-1:1);
-            const cast=release?{...release,side,height:clamp(-dy/87)}:null;
-            this.care("play",side,cast);
+            const freshness=Math.exp(-Math.max(0,stamp-sample-35)/95);
+            const height=clamp(-vy*freshness/790);
+            const side=x+vx*freshness*.19<this.rig.anchors.eyes.x?-1:1;
+            this.care("play",side,{x,y,side,height,curve:clamp(vx*freshness*.095,-79,79),flight:.68+.59*height});
+        }
+        offeredBubble() {
+            if(this.action?.kind!=="feed")return null;
+            const bubble=window.dragonSugarBubble(this.time-this.action.at,this.rig.anchors.mouth);
+            return bubble?.ready ? bubble : null;
+        }
+        popBubble(point) {
+            const bubble=this.offeredBubble();
+            if(!bubble || (point && Math.hypot(point.worldX-bubble.x,point.worldY-bubble.y)>bubble.r+18))return false;
+            this.action={kind:"bubblePop",at:this.time,cast:bubble};
+            this.attention=null;
+            this.onTone("bubblePop");
+            this.note("啵！碎星落在鼻尖，她缩了一下，又眯起眼睛笑了。");
+            if(this.scene.reduced){
+                this.action.at-=.52;
+                this.advance(0,true);
+                this.stillTimer=setTimeout(()=>{this.action=null;this.advance(0,true);this.note(this.baseNote());},1350);
+            }
+            return true;
         }
         care(kind,side=0,cast=null) {
             if(!durations[kind] || !this.scene.active || !this.rig) return;
@@ -335,6 +454,7 @@
                 return;
             }
             if(kind==="tail" && this.stage.tailTap())return;
+            if(this.offeredBubble())this.action=null;
             this.stage.interrupt();
             this.work.clear();
             this.game.clear();
@@ -349,10 +469,15 @@
             }
             this.quiet=0; this.slept=false;
             const direction=Math.abs(side)>0.12?Math.sign(side):(this.random()<0.5?-1:1);
-            this.action={kind,side:direction,cast,at:this.time,awarded:false,lastStroke:-Infinity};
+            this.action={kind,side:direction,cast,at:this.time,awarded:false};
             this.note(startNotes[kind]);
             if(this.scene.reduced) {
                 clearTimeout(this.stillTimer);
+                if(kind==="feed"){
+                    this.action.at=this.time-3.4;
+                    this.advance(0,true);
+                    return;
+                }
                 this.action.at=this.time-(careAt[kind]??0.44)-0.05;
                 this.advance(0,true);
                 this.stillTimer=setTimeout(()=>{
@@ -381,11 +506,14 @@
                 this.doubleBlink=short;
             }
             if(this.action) {
-                if(this.action.kind==="pat" && this.time-this.action.lastStroke<0.20 &&
-                   this.time-this.action.at>0.84 && this.time-this.action.at<1.12) this.action.at+=dt;
-                const age=this.time-this.action.at;
+                if(this.action.contact?.held && this.time-this.action.at>.84)this.action.at=this.time-.84;
+                const age=actionAge(this.action,this.time);
                 if(!this.action.awarded && this.action.kind in careAt && age>=careAt[this.action.kind]) {
                     this.action.awarded=true; this.reward(); this.note(careNotes[this.action.kind]);
+                }
+                if(this.action.kind==="feed" && !this.action.offered && age>=2.45){
+                    this.action.offered=true;
+                    this.note("她吹出一颗糖泡泡。轻点泡泡，或在角色上按空格。");
                 }
                 if(age>=durations[this.action.kind]) {
                     this.action=null; this.quiet=0; this.note(this.baseNote());
@@ -399,7 +527,9 @@
             const state=this.scene.offline?"idle":this.scene.state;
             const g={...rest,...activities[state]};
             const t=this.time;
-            busyDetails(g,state,t,this.stateTime);
+            busyDetails(g,state,t,this.stateTime,this.pose.writing);
+            g.penPark=this.work.round?.id==="writing"?1:0;
+            g.deskFocus=stage.kind?0:stage.dock*stage.desk;
             const atRest=["idle","ended","succeeded","cancelled"].includes(state);
             const free=atRest && !this.action && !this.game.round && !this.work.round && !this.stage.mood && !this.stage.office;
             g.nap=free && !this.attention ? ease(22,27,this.quiet) : 0;
@@ -409,12 +539,19 @@
             const rhythm=state==="running"?2.9:1.85;
             g.breath=(Math.sin(t*rhythm)+0.16*Math.sin(t*rhythm*2-0.6))*(2.45+g.nap);
             const attention=this.attention;
-            const follow=attention ? (atRest?0.96:0.76) : 0;
+            const noticed=attention?t-attention.since:0;
+            const follow=attention ? (atRest?.96:.76)*ease(0,.09,noticed)*ease(0,.28,attention.until-t) : 0;
             g.gazeX=(g.gazeX+this.autoX*(atRest?0.85:0.23))*(1-follow)+(attention?.x||0)*follow;
             g.gazeY=(g.gazeY+this.autoY*(atRest?0.8:0.18))*(1-follow)+(attention?.y||0)*follow;
             g.head+=g.gazeX*4.8*aw+1.15*Math.sin(t*0.74);
             g.headX=g.gazeX*6*aw; g.nod+=g.gazeY*3.8+13*g.nap;
             g.lean=g.gazeX*3.6*aw; g.head+=6*g.nap; g.lid*=1-g.nap;
+            if(free && attention && !this.scene.reduced){
+                const hello=pulse(.22,.57,1.36,noticed)*follow;
+                g.head+=attention.x*3.6*hello;g.nod-=2.8*hello;
+                g.smile+=.42*hello;g.blush+=.22*hello;
+                g.light+=.48*pulse(.04,.20,.68,noticed);
+            }
             const wingBeat=Math.sin(t*1.72-0.3)*2+Math.sin(t*0.74+0.7);
             g.wing+=wingBeat*aw-10*g.nap;
             g.tailBend=(6*Math.sin(t*1.65)+3*Math.sin(t*0.69))*aw;
@@ -443,8 +580,23 @@
                 const stretch=pulse(0,0.44,1.55,t);
                 g.wing+=10*stretch; g.head-=4*stretch; g.leftY-=15*stretch;
             }
-            if(this.action) carePose(g,this.action.kind,t-this.action.at,this.action.side,
+            if(this.action) carePose(g,this.action.kind,actionAge(this.action,t),this.action.contact?.side??this.action.side,
                                      this.bond,this.action.cast,this.rig.anchors);
+            const c=this.action?.contact;
+            if(c){
+                const pressure=c.held?1:1-ease(0,.42,t-c.released);
+                const glide=Math.exp(-Math.max(0,t-c.lastMove-.05)/.12)*pressure;
+                g.press=pressure;g.brushX=c.vx*glide;g.brushY=c.vy*glide;
+                g.head+=c.side*3*pressure+5*g.brushX;
+                g.headX+=8*g.brushX;g.nod+=3*pressure+5*g.brushY;
+                g.leftWing+=5*Math.max(0,-g.brushX);g.rightWing+=5*Math.max(0,g.brushX);
+                g.tailBend-=9*g.brushX;
+                if(!c.held && c.released-c.began>.56 && atRest){
+                    const linger=pulse(.08,.34,.86,t-c.released);
+                    g[c.side<0?"winkL":"winkR"]+=.46*linger;
+                    g.smile+=.53*linger;g.nod-=2.8*linger;
+                }
+            }
             this.game.pose(g);
             this.work.pose(g);
             this.stage.pose(g,stage);
@@ -466,6 +618,19 @@
             if(!this.rig || !this.scene.active) return;
             this.updateClocks(dt);
             const stage=this.stage.sample();
+            if(this.scene.state==="writing" && !this.scene.offline){
+                if(this.work.round?.id==="writing" && this.writingTime>=5.12){
+                    this.writingTime=0;this.stamped=false;
+                }
+                if(this.work.round?.id==="writing" && this.work.round.phase==="done" &&
+                   (this.scene.reduced || this.work.round.age>=.26))this.stamped=true;
+                if(!this.action && !this.game.round && !this.work.round && !stage.kind && !stage.present && !stage.setup){
+                    this.writingTime+=dt;
+                    if(this.writingTime>=5.8){this.writingTime%=5.8;this.stamped=false;}
+                }
+            }
+            this.pose.writing=window.DragonWriting.beat(this.scene.reduced?4.53:this.writingTime);
+            this.pose.stamped=this.stamped;
             const goal=this.target(stage);
             const steps=Math.max(1,Math.ceil(dt*96)), step=dt/steps;
             for(const name of springs) {
@@ -479,6 +644,11 @@
                 }
                 this.pose[name]=x; this.velocity[name]=speed;
             }
+            const focus=Math.round(clamp(this.pose.deskFocus)*100);
+            if(focus!==this.deskFocus){
+                this.deskFocus=focus;
+                this.canvas.style.transform=focus?`translateY(${-focus*.09}px) scale(${1+focus*.0024})`:"";
+            }
             this.pose.blink=this.scene.reduced?0:this.blink;
             this.pose.time=this.time;
             this.pose.stage=stage;
@@ -487,8 +657,9 @@
                 this.inTheatre=theatre;this.canvas.classList.toggle("in-theatre",theatre);
             }
             this.pose.action=this.action?.kind||"";
-            this.pose.actionTime=this.action ? this.time-this.action.at : 0;
+            this.pose.actionTime=this.action ? actionAge(this.action,this.time) : 0;
             this.pose.cast=this.action?.cast;
+            this.pose.contact=this.action?.contact;
             this.pose.heldStar=this.heldStar;
             this.pose.round=this.game.round;
             this.pose.still=this.scene.reduced;

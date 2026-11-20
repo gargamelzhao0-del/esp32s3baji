@@ -8,10 +8,10 @@
 | --- | --- |
 | 迪士尼角色动画流程重视动作预备、时机、清楚的构图和主动作后的跟随。Lasseter 用传统动画原则解释计算机关键帧中的重量、动作弧线和观众注意力。[迪士尼角色动画流程](https://www.disneyanimation.com/process/animation/) · [SIGGRAPH 原论文](https://users.cs.northwestern.edu/~animation/Lasseter_1987.pdf) | 拉桌前给她一拍看向目标，抓稳再压低重心。桌子起步慢，两次发力中间留一个停顿。跳跃先收翅蹲低，再张翅腾空，落地缓冲之后接一个较小的回弹。小屏上同时保留一个主要动作，把两枚菜单按钮让到上侧。 |
 | Kovar、Schreiner 和 Gleicher 描述了脚该着地时随身体平移的滑步问题，并研究了接触开始和结束时怎样平滑过渡。[脚底接触论文与对照片段](https://research.cs.wisc.edu/graphics/Gallery/kovar.vol/Cleanup/) | 本项目按身体走过的距离推进左右脚相位。支撑脚反向抵消身体横移，摆动脚走抬起、跨过、落下的弧线。角色减速时，两脚随路程一起放慢。起步和停步逐渐接入脚步位移。 |
-| Spine 的 IK 约束允许用目标点控制手脚，并在约束与原动画之间调节权重。[Spine IK 手册](https://esotericsoftware.com/spine-ik-constraints) | 浏览器里沿用自己的二维网格。先求出画面里手心所在三角形的实际位置，再把误差按手臂权重分给顶点。拖桌时目标是把手，按电源时目标是开关，坐好后目标变成左右键区。手指轮廓单独参与道具遮挡。 |
+| Spine 的 IK 约束允许用目标点控制手脚，并在约束与原动画之间调节权重。[Spine IK 手册](https://esotericsoftware.com/spine-ik-constraints) | 浏览器原型从当前肩点求肘与手腕，在可及范围内够把手、开关和左右键区。袖口与手掌独立绘制，握笔时拇指最后落到笔杆上。 |
 | Live2D 的物理设置把模型角度和位置作为输入，分别调节反应时间和摆幅。[Cubism 物理设置](https://docs.live2d.com/en/cubism-editor-manual/physics-operation/) | 在现有弹簧上加入拉桌发力的输入。脸先朝向目标，鬓发、头顶发束、流苏以不同速度跟随。尾尖在起跳后才扬起。眼睛和手的响应保持更快，方便立即看懂她在追什么。 |
 
-当前角色由一张透明原画、变形网格、独立眼口和手绘道具连续生成。这样在动作中途仍能找到当下的手心、书角和屏幕。这里借用了接触约束和次级运动的做法，运行依赖是浏览器 Canvas 2D。若要做完整背身、交叉抱臂时露出的袖内侧或大角度绕桌，下一轮美术工作是补画后脑、前后发片和独立袖臂，再用分层骨骼或 Cubism 形变来演。现有原画支持侧身、偏头和收爪的表演。
+当前角色由透明原画、局部补画、独立袖臂、眼口和手绘道具连续生成。肩点跟随身体，掌心、书角和屏幕在动作中都有可查询的位置。完整背身和大角度绕桌仍需对应视角的后脑、发片与衣袖素材。运行依赖是浏览器 Canvas 2D。
 
 ## 表演、触发与打断
 
@@ -28,7 +28,7 @@ Agent 工作、宠物心情、玩家输入各有自己的状态。重复快照�
 ## 代码入口
 
 - 时间、走位、动作混合以及打断规则集中在动作控制器。表演使用秒和逻辑画布坐标，玩家输入及 Agent 消息共用这一套时钟。[stage.js](../design/gpt-pet/stage.js)
-- 角色网格负责身体重心、脚步、手掌目标和五官局部形变。桌子分为凳子等后景和桌沿等前景，再通过手指轮廓处理遮挡。背景阴影保留在地面。[rig.js](../design/gpt-pet/rig.js) · [face.js](../design/gpt-pet/face.js) · [stage-art.js](../design/gpt-pet/stage-art.js)
+- 身体网格限制局部拉伸，凳子在角色身后，桌沿遮住衣裙。伸到桌前的袖臂覆盖桌面，握持道具再按手指的遮挡关系绘制。阴影留在地面。[rig.js](../design/gpt-pet/rig.js) · [arms.js](../design/gpt-pet/arms.js) · [stage-art.js](../design/gpt-pet/stage-art.js)
 - 收到 Agent 事件后由角色控制器决定进入哪一段。击掌、工作玩法和口袋按钮只派发本地输入。新加的回归用例覆盖脚步、连续工具事件、成功判定、和好、双手击掌、指屏和减少动效。[companion.js](../design/gpt-pet/companion.js) · [动作回归测试](../tests/gpt-pet-stage.test.cjs)
 
 ## ESP32-S3 上的实现取舍

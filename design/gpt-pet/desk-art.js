@@ -91,6 +91,11 @@
     }
     function work(c,p,a){
         const r=p.work;
+        if(p.stamped && p.pad>.012){
+            const seal=window.DragonWork.target("writing",a);
+            c.save();c.globalAlpha=Math.min(1,p.pad)*Math.min(1,Math.max(0,(5.68-p.writing.t)/.46));
+            c.translate(seal.x,seal.y);c.rotate(-.12);c.scale(.62,.62);paw(c);c.restore();
+        }
         if(!r)return;
         const pos=window.DragonWork.target(r.id,a,r);
         const done=r.phase==="done", t=p.still && done ? .62 : r.age;
@@ -120,7 +125,6 @@
                 break;
             }
             case "writing":
-                if(done&&t>.26){c.save();c.translate(pos.x,pos.y);c.scale(.80,.80);paw(c);c.restore();}
                 if(!done||t<.84)icon(c,"writing",pos.x+7,pos.y-17+(done?15*Math.sin(Math.min(1,t/.55)*Math.PI):0),.83,-.12);break;
             case "searching":
                 glint(c,pos.x,pos.y,done?16:12,gold);glint(c,pos.x+15,pos.y-13,5,paper);

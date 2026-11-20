@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f8f5ef"><link rel="icon" href="data:,"><title>白龙娘像素互动调研</title><style>:root{color-scheme:light;--ink:#302a35;--muted:#635b68;--line:#d9cedb;--purple:#5e426f;--paper:#f8f5ef;--panel:#fffdf9}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.7 system-ui,"Microsoft YaHei",sans-serif}main{max-width:1130px;margin:0 auto;padding:0 clamp(16px,4vw,52px) 62px}header{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:32px 0 20px;border-bottom:2px solid var(--purple)}header img{width:138px;height:132px;image-rendering:pixelated}h1,h2,h3,p{margin:0}h1{font-size:clamp(28px,4vw,46px);line-height:1.23}h2{font-size:clamp(22px,3.1vw,30px);line-height:1.32;margin:0 0 13px}h3{font-size:18px}p+p{margin-top:10px}header p,.hint,.by{color:var(--muted);font-size:14px}.intro{margin-top:12px;max-width:53em}nav{display:flex;flex-wrap:wrap;gap:8px 22px;padding:13px 0;border-bottom:1px solid var(--line)}a{color:var(--purple);text-underline-offset:.2em}a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #9b6caa;outline-offset:2px}section{margin-top:38px}ul{padding-left:1.4em}li+li{margin-top:5px}.tip{padding:12px 15px;margin:13px 0;background:#eee8f2;border-left:4px solid #9c7aad}.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0 22px;align-items:start}.cards details{border:1px solid var(--line);background:var(--panel);padding:11px 14px}.cards summary{cursor:pointer;font-weight:650;line-height:1.6}.cards summary small{display:block;color:var(--muted);font-weight:400;margin-left:17px}.cards details p{font-size:14px;margin-top:8px}.by{margin-top:8px}.refwrap{overflow-x:auto}.ref{width:100%;border-collapse:collapse;font-size:14px}.ref th,.ref td{text-align:left;vertical-align:top;padding:7px 8px;border-bottom:1px solid var(--line)}.ref th{background:#eae1ed;color:#47374e}.ref tr:nth-child(even) td{background:#f2edf3}.ref td:first-child{font-variant-numeric:tabular-nums}.gif{white-space:nowrap}.num{white-space:nowrap;font-variant-numeric:tabular-nums}.examples{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.examples article{padding:12px 14px;border-left:2px solid #b9a2c4}.examples p{font-size:15px;margin-top:5px}dialog{width:min(95vw,530px);color:var(--ink);background:var(--panel);border:2px solid var(--purple);padding:18px}dialog::backdrop{background:#292433ab}.dlg-head{display:flex;justify-content:space-between;align-items:center;gap:10px}dialog img{display:block;width:min(100%,390px);aspect-ratio:69/66;object-fit:contain;image-rendering:pixelated;background:#e9e2ed;margin:12px auto}button{cursor:pointer;font:inherit;background:#f3eef5;color:var(--purple);border:1px solid var(--purple);padding:3px 12px}footer{border-top:1px solid var(--line);margin-top:30px;padding-top:12px;color:var(--muted);font-size:14px}@media(max-width:670px){header{padding-top:20px}header img{width:69px;height:66px}.cards,.examples{grid-template-columns:1fr}.ref th,.ref td{padding:7px 5px}.refwrap{border:1px solid var(--line)}.ref{min-width:680px}section{margin-top:29px}}</style></head>
+<body><main>
+<header><div><p>星屑小屋　·　互动调研　·　2026 年 11 月 20 日</p><h1>白龙娘还能怎么玩？</h1><p class="intro">以 P01 鲸娘的 22 个循环为样本，对照白龙娘普通版、138 × 132 像素版和掌上电子宠物，筛出 18 项可审核的玩法。</p></div><img width="138" height="132" src="../assets/ai-girls/pixel/gpt/v4/idle-close-138x132.png" alt="已审核的近景像素白龙娘"></header>
+<nav aria-label="报告目录"><a href="#choice">优先试哪几个</a><a href="#p01">看 22 个原动图</a><a href="#compare">其他作品</a><a href="#current">项目里有什么</a><a href="#ideas">18 项候选</a><a href="#test">试做怎么验</a></nav>
+<section id="choice"><h2>先试四种玩家能察觉的回应</h2>
+<p>轻点脸颊能看到她让开，按住额头能感觉她靠过来，在她打盹时靠近能撞见她偷看，读书时松手能看见纸页自己弹回。这四个动作分别回应<b>点哪里、摸多久、何时靠近、何时松手</b>。每个都有可辨认的停顿或收尾，用一根手指就能体验。</p>
+<p class="tip"><b>最值得先打样的是脸颊和装睡。</b> 前者适合打开网页的第一秒，后者让人过一会儿再回来看。先在近景观察眼神与嘴角，再切全身检查两翼、鞋底和尾巴是否跟得上。<a href="#ideas">查看四个动作的具体分镜</a></p></section>
+<section id="p01"><h2>P01 鲸娘的 22 个动作</h2>
+<p>实测原页的 22 个触发入口，逐一读取原作者播放器的动作标注，并解码全部 22 个原始 GIF 核对时长。角色画布是 <b>69 × 66</b>，GIF 最近邻放大到 552 × 528。时间轴合计 <b>268 帧</b>，单帧停留 60–800 毫秒。点动作名称可单独播放作者的 GIF。<a href="https://dshtui.com/pets/whale-girl-emoji/">作者演示与逐帧说明</a></p>
+<div class="refwrap" tabindex="0" aria-label="22 个原作动作对照"><table class="ref"><thead><tr><th>编号</th><th>播放原作</th><th>原作演示入口</th><th>编排帧 / 循环</th><th>白龙娘可以怎样借鉴</th></tr></thead><tbody><tr><td>01</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/01-idle.gif">眨眼与呼吸</a></td><td>开始会话／空闲</td><td class="num">21 / 5.28 s</td><td>保留双眨之间的小停顿，让白龙娘看起来在端详你。</td></tr>
+<tr><td>02</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/02-idle-look.gif">东张西望</a></td><td>待机变体</td><td class="num">13 / 3.29 s</td><td>先看左下角，再看自己的尾尖，最后发现你也在看她。</td></tr>
+<tr><td>03</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/03-idle-spout.gif">蓄力喷水</a></td><td>待机彩蛋</td><td class="num">11 / 2.47 s</td><td>换成小龙憋一口气，吐出一粒哑火的星，自己愣一下。</td></tr>
+<tr><td>04</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/04-thinking.gif">思考冒泡</a></td><td>收到提问</td><td class="num">17 / 3.40 s</td><td>紫瞳追着三个点转，想通时只亮一只龙角。</td></tr>
+<tr><td>05</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/05-typing.gif">轮流敲键</a></td><td>一个会话用工具</td><td class="num">14 / 2.34 s</td><td>现版已有敲键。可增加敲错、看一眼爪尖再补一键的短分支。</td></tr>
+<tr><td>06</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/06-music.gif">听歌打拍</a></td><td>两个会话并行的演示</td><td class="num">8 / 1.20 s</td><td>把两侧耳机的交替节拍移给两翼，保留无声也能辨认的左右重音。</td></tr>
+<tr><td>07</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/07-conducting.gif">小鲸鱼分身</a></td><td>派出多个子代理</td><td class="num">12 / 1.80 s</td><td>沿用原版纸鹤，助手增加时放飞一只，回收时由掌心接住。</td></tr>
+<tr><td>08</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/08-building.gif">搭积木</a></td><td>多个会话并行的演示</td><td class="num">24 / 2.52 s</td><td>每件新工作落下一枚星砖，她扶住晃动的一角。应先有可观测的工作事件。</td></tr>
+<tr><td>09</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/09-error.gif">出错冒汗</a></td><td>工具失败</td><td class="num">10 / 1.48 s</td><td>她捡起滚落的笔，回望屏幕。可接普通版的星星贴安慰。</td></tr>
+<tr><td>10</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/10-happy.gif">弹跳庆祝</a></td><td>完成提示</td><td class="num">11 / 1.52 s</td><td>明确成功时击掌再落地，裙摆和尾巴分别多晃一拍。</td></tr>
+<tr><td>11</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/11-notification.gif">招手求回应</a></td><td>等待确认</td><td class="num">8 / 0.88 s</td><td>探出一只爪，碰它就把信封抱好。确认仍在电脑端完成。</td></tr>
+<tr><td>12</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/12-compacting.gif">收拢碎片</a></td><td>整理上下文</td><td class="num">10 / 1.74 s</td><td>纸片逐张叠好，碰纸角，她把最后一张折成小飞机。</td></tr>
+<tr><td>13</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/13-carrying.gif">抱书走路</a></td><td>新建工作区</td><td class="num">8 / 1.12 s</td><td>可以做搬星图的小剧场。当前桥接没有独立的新建工作区字段。</td></tr>
+<tr><td>14</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/14-sleeping.gif">呼吸入睡</a></td><td>模拟长时间闲置</td><td class="num">6 / 1.98 s</td><td>改用尾巴盖住膝盖。只动眼睑、胸口和尾尖也能读出呼吸。</td></tr>
+<tr><td>15</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/15-waking.gif">醒来发愣</a></td><td>模拟唤醒／睡中轻点</td><td class="num">11 / 1.88 s</td><td>先睁靠近手指的一只眼，认出你，再把另一边的翅膀伸开。</td></tr>
+<tr><td>16</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/16-poke-left.gif">左脸被戳</a></td><td>点画布左半侧</td><td class="num">11 / 2.11 s</td><td>给左脸单独的触点，被碰侧眯眼，流苏随后摆回。</td></tr>
+<tr><td>17</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/17-poke-right.gif">右脸被戳</a></td><td>点画布右半侧</td><td class="num">11 / 2.11 s</td><td>右侧花结固定在原位；左右演出可共用时序、分别制作面部与鬓发。</td></tr>
+<tr><td>18</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/18-tickle.gif">连续挠痒</a></td><td>短时间连续点击</td><td class="num">14 / 1.68 s</td><td>第三下缩肩捂嘴，松手换气，留一拍偷笑再恢复。</td></tr>
+<tr><td>19</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/19-drag.gif">被拎起扑腾</a></td><td>按住并移动</td><td class="num">10 / 0.90 s</td><td>只在围巾或衣领启用，先踮脚再悬空；手指离开圆屏时也要能落回。</td></tr>
+<tr><td>20</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/20-swim.gif">游泳漫游</a></td><td>自由活动演示</td><td class="num">8 / 1.20 s</td><td>让白龙娘藏在圆屏下沿，只露出角和眼睛，再从另一边探头。</td></tr>
+<tr><td>21</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/21-smile-hearts.gif">微笑冒心</a></td><td>夸奖按钮／可选彩蛋</td><td class="num">16 / 1.60 s</td><td>改为慢半拍回礼，先抱住一颗爱心，等你松手再递出来。</td></tr>
+<tr><td>22</td><td><a class="gif" href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/22-thumbs-up.gif">认真比赞</a></td><td>夸奖按钮／可选彩蛋</td><td class="num">14* / 1.97 s</td><td>先攥爪蓄力，再短促竖拇指，最后停在最清楚的剪影。</td></tr></tbody></table></div>
+<p class="hint">* 第 22 项时间轴列 14 帧，GIF 编码为 13 帧。第 10、11 拍的 110 + 320 毫秒在 GIF 中合为 430 毫秒，总时长同为 1.97 秒。其余 21 项的逐帧时长全部一致。本次访问时，原站部分逐帧图集地址返回 HTML，表内 22 个链接均采用已成功解码的原 GIF。首次播放需要联网。</p>
+<h3>三个值得慢看的地方</h3>
+<ul><li><b>戳脸的动作很短，害羞的余韵很长。</b> 第 16 项在 110、90、90 毫秒三拍内完成受力、越过原位和回正，脸红与飘心占了后面的大半段。给白龙娘试做时，手落下就进入受力帧，省去 GIF 为循环预留的起始等待。<a href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/16-poke-left.gif">看左脸受力</a></li>
+<li><b>挠痒有喘息，才能接回原来的事。</b> 第 18 项的前 12 拍各 90 毫秒，随后两拍为 200 和 400 毫秒。实际在敲键状态点左、右、左，第三下开始挠痒，笑完继续敲键。作者按钮写“四连点”，网页手势使用约 1.1 秒内至少三次的阈值。<a href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/18-tickle.gif">看挠痒的收尾</a></li>
+<li><b>睡觉和醒来使用两套节奏。</b> 睡眠只有六个等长的 330 毫秒姿势。醒来有一段快眨，最后让清醒的表情停 500 毫秒。按住移动超过 6 个网页 CSS 像素则会进“被拎起”，实测松手直接回到原工作。移到圆屏时，应按逻辑格和触点部位重新试阈值。<a href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/14-sleeping.gif">看睡眠</a> · <a href="https://dshtui.com/pets/whale-girl-emoji/assets/gifs/15-waking.gif">看醒来</a></li></ul>
+<p class="hint">表中“并行”“工作区”“长时间闲置”等是作者给演示事件的对应关系。点击左半侧或右半侧即可触发 P01 的戳脸，白龙娘候选则按实际脸部区域命中。此处引用原站作动作研究，白龙娘试做沿用本项目自己的角色帧。<a href="https://dshtui.com/pets/whale-girl-emoji/#rig">作者分层说明</a> · <a href="../design/pixel-badge/credits.html">白龙娘素材署名</a></p></section>
+<section id="compare"><h2>其他作品解决了什么问题</h2><div class="examples">
+<article><h3>Clawd on Desk · 把工作接回去</h3><p>P01 原页指向的事件参考。作者记录了多阶段入睡、拖动释放后恢复以及从屏边探头。白龙娘可以借用“打断后再回来”，探头适合移植到真实圆框的遮挡边缘。<a href="https://github.com/rullerzhou-afk/clawd-on-desk/blob/main/docs/guides/features.md">作者功能说明</a></p></article>
+<article><h3>DSH Pixel Toons · 任务结束以后</h3><p>作者把阅读、敲键、构建和完成分别编排，庆祝后角色会走走停停。白龙娘可在成功后收笔、抖一下手腕，再回到小屋，给任务一个可见的结尾。<a href="https://github.com/Hjh-12138/DSH-Pixel-Toons">作者动作预览</a></p></article>
+<article><h3>Original Tamagotchi · 一次选择就能玩</h3><p>万代的猜方向只要左右二选一。白龙娘可以让两只爪子藏糖，猜中和猜错各有一套值得看的反应，适合小屏幕。<a href="https://tamagotchi-official.com/gb/series/original/item/01_1307/">万代官方玩法</a></p></article>
+<article><h3>Nintendogs + Cats · 先引起注意</h3><p>任天堂手册把呼唤靠近与抚摸分开，口哨也可能引来小狗。用到白龙娘身上，可以先让耳尖动、眼睛找你，在手指持续接触后才贴近。<a href="https://csassets.nintendo.com/noaext/image/private/t_KA_PDF/manual-3DS-nintendogs-cats-en?_a=DATAg1AAZAA0">任天堂操作手册</a></p></article>
+<article><h3>Bitzee · 整个设备也是玩具</h3><p>Bitzee 用轻触、倾斜和摇动回应玩家，也允许摇哄入睡。佩戴中的吧唧会随步伐晃动，倾斜接星适合做成主动进入的小游戏，走路时仍保持普通待机。<a href="https://www.spinmaster.com/en-US/brands/bitzee/bitzee-interactive-toy-digital-pet-and-case-with-15-animals-inside-virtual-electronic-pets-react-to-touch-kids-toys-for-girls-and-boys">Spin Master 官方玩法</a></p></article>
+<article><h3>微雪 1.75C · 哪些输入用得上</h3><p>厂商列出 466 × 466 AMOLED、CST9217 电容触摸、QMI8658 六轴 IMU 和双麦克风。首批都用单指。体感和听声在网页用替代输入验证分镜，佩戴时的噪声与误触要留给实机测量。<a href="https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/">当前型号的官方规格</a></p></article></div></section>
+<section id="current"><h2>白龙娘已经具备的动作</h2>
+<p><b>当前像素版</b>有 13 个状态和 10 个互动片段。左右额头、左右翼、尾尖、碰鼻和喷嚏已分别响应；星糖可以吹泡并戳破，抛星有独立片段。工作状态覆盖阅读、敲键、写入、搜索、等待确认等。本轮在本地页面逐个切换了 13 个状态，点过四个互动按钮，并验证了喂糖到戳泡泡的衔接。<a href="../design/pixel-badge/index.html">打开像素版</a> · <a href="../design/pixel-badge/app.js">播放与命中逻辑</a></p>
+<p><b>普通版值得移回来</b>的还有持续抚摸、击掌后再挥手、引萤落掌、翻书和盖章；普通版还能拖出星星、控制抛物弧线，像素版目前以按钮触发一段抛星。旧原型已有手感和道具时序，可以先用实录作为像素版的对照。<a href="../design/badge-prototype.html">打开普通版</a> · <a href="../design/gpt-pet/gpt-pet-preview.webp">击掌与引萤实录</a> · <a href="../design/gpt-pet/agent-pocket-preview.webp">工作互动实录</a> · <a href="../design/gpt-pet/README.md">普通版动作目录</a></p>
+<p><b>当前播放方式有两个直接影响。</b> 像素版每段使用固定帧率，状态帧到末尾后倒序往返；摸头等一次性片段结束后则恢复 Agent 状态。慢呼吸可以往返，翻页、盖章、放飞纸鹤都应按单向进度播放。逐帧停留时长也可以独立记录，用少数新姿势就能拉开“刚碰到”和“反应过来”的时间差。<a href="../design/pixel-badge/clips.js">像素片段数据</a> · <a href="../design/pixel-badge/app.js">播放逻辑</a></p></section>
+<section id="ideas"><h2>18 项白龙娘互动候选</h2><p class="hint">展开一项可看玩家怎么触发、她如何收尾、制作时要解决什么。工作量是相对于现有网页素材的估计。前两项需要新脸部命中或持续手势，普通版已完成的动作也需要重新采成两套像素取景。</p>
+<h3>首批 · 4 项</h3><div class="cards"><details open><summary>脸颊回弹与挠痒<small>触脸 · 近景 · 工作量中</small></summary><p>点左或右脸，她先眯同侧眼、把脸让开，再红着脸挨回来。短时间连点脸颊，她才笑到缩肩。</p><p><b>制作要点</b>　新增双颊触点和局部嘴眼帧。鼻尖独立计数，双点仍能打喷嚏。</p><p class="by">P01 16–18，现版已有鼻尖双点。<a href="https://dshtui.com/pets/whale-girl-emoji/">P01 原作</a></p></details>
+<details open><summary>顺着刘海摸<small>抚摸 · 近景 · 工作量中</small></summary><p>额头按住时先等你，缓慢划过刘海才闭眼靠上来；手停一下，她还会往原方向蹭半步。</p><p><b>制作要点</b>　新增按下、移动和松手三阶段，复用旧版触摸轨迹。离开额头时顺势收动作。</p><p class="by">普通版已有长按抚摸；参考 Nintendogs。<a href="../design/gpt-pet/README.md">普通版动作</a> · <a href="https://csassets.nintendo.com/noaext/image/private/t_KA_PDF/manual-3DS-nintendogs-cats-en?_a=DATAg1AAZAA0">任天堂手册</a></p></details>
+<details open><summary>装睡偷看<small>陪伴 · 两种取景 · 工作量中</small></summary><p>闲下来时打哈欠、收翅，用尾巴当被子。第一次轻点只睁一只眼，接着碰她才伸懒腰起身。</p><p><b>制作要点</b>　单眼醒复用原版姿态，分两次回应是新设计。工作和等待确认期间保持清醒。</p><p class="by">P01 14–15，普通版已有打盹和单眼醒。<a href="../design/gpt-pet/README.md">普通版动作</a> · <a href="https://dshtui.com/pets/whale-girl-emoji/">P01 原作</a></p></details>
+<details open><summary>折角翻书<small>协作 · 全身 · 工作量中</small></summary><p>她读到页脚，先用爪子压住书脊。你从右角划到一半就松手，书页弹回，她瞄你一下；划过去才换页。</p><p><b>制作要点</b>　分纸面、拇指、前后页。拖动进度决定纸页姿势，阅读状态切走就收书。</p><p class="by">普通版已有跟手翻页与松手回弹。<a href="../design/gpt-pet/README.md">普通版动作</a></p></details>
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+<h3>第二批 · 6 项</h3><div class="cards">
+
+
+
+<details><summary>引一粒萤火落手<small>游戏 · 两种取景 · 工作量高</small></summary><p>拖光点时先看到紫瞳追光。光点在掌心停稳，她合爪又摊开；过几秒还会看一次空手心。</p><p><b>制作要点</b>　需要可移动的光点、掌心锚点、眼内反光。近景让手始终留在圆内。</p><p class="by">普通版引萤与成功后的短期回忆。<a href="../design/gpt-pet/README.md">普通版动作</a></p></details>
+<details><summary>左右击掌与慢一拍回礼<small>游戏 · 全身 · 工作量中</small></summary><p>她先举手邀请，点对手有接触瞬间，错过就收回挠头。稍后再举刚才那只手跟你打招呼。</p><p><b>制作要点</b>　用手心的逐帧位置判定。挥手回忆只触发一次。</p><p class="by">普通版已有左右击掌、双手庆祝和回忆。<a href="../design/gpt-pet/README.md">普通版动作</a></p></details>
+<details><summary>藏糖猜爪<small>日常 · 近景 · 工作量中</small></summary><p>两手合拢藏好糖，再摊出两个拳头。猜对她把星糖递给你；猜错自己剥开，嘴角粘一粒糖。</p><p><b>制作要点</b>　左右手需同时入镜，锁定藏糖侧。眼神可作轻微提示。</p><p class="by">借鉴 Tamagotchi 的二选一，谜面为白龙娘新设计。<a href="https://tamagotchi-official.com/gb/series/original/item/01_1307/">万代玩法</a></p></details>
+<details><summary>尾巴闹别扭再和好<small>日常 · 全身 · 工作量中</small></summary><p>头两次尾尖躲开，第三次抱尾背过去；递糖才悄悄转回来，先看糖，再看你。</p><p><b>制作要点</b>　复用尾巴与喂糖帧，补抱尾和侧眼。离开一会儿自然消气。</p><p class="by">普通版已有尾巴三碰与糖果和好。<a href="../design/gpt-pet/README.md">普通版动作</a></p></details>
+
+
+
+<details><summary>纸鹤替她送信<small>协作 · 全身 · 工作量中</small></summary><p>有助手工作时纸鹤起飞，她跟着看；助手数量减少，纸鹤落回掌心，她收起信。</p><p><b>制作要点</b>　读取 helpers 的变化，快照首连直接摆好当前数量。减员仅表示离场。</p><p class="by">P01 07，普通版已有协作纸鹤。<a href="https://dshtui.com/pets/whale-girl-emoji/">P01 原作</a> · <a href="../design/gpt-pet/README.md">普通版动作</a> · <a href="../host/baji_bridge/preview.py">桥接字段</a></p></details>
+<details><summary>落爪盖章<small>协作 · 近景需看见本子 · 工作量低至中</small></summary><p>点本子右角，她停笔、拿章、印一只梅花爪，举起本子给你看，再从刚才那一笔接着写。</p><p><b>制作要点</b>　沿用爪印位置和前后遮挡。换页时清掉旧印，避免回放倒着盖章。</p><p class="by">普通版写入时已能盖爪印。<a href="../design/gpt-pet/README.md">普通版动作</a></p></details>
+
+
+
+
+</div>
+<h3>备选 · 6 项</h3><div class="cards">
+
+
+
+
+
+
+
+<details><summary>捧走后落地理衣角<small>日常 · 全身 · 工作量高</small></summary><p>从衣领按住往上提，她脚尖离地、两翼扑腾；放低时鞋尖先着地，松手后理好歪掉的袖子。</p><p><b>制作要点</b>　单独制作抓起和着地帧。手一直压住的衣领作为锚点，圆边不裁掉脸。</p><p class="by">P01 19，降落和理衣角为新设计。<a href="https://dshtui.com/pets/whale-girl-emoji/">P01 原作</a></p></details>
+<details><summary>隔着圆框躲猫猫<small>陪伴 · 两种取景 · 工作量中</small></summary><p>她缩到圆框下只露出两只角；点其中一边，她从另一边探头偷笑。</p><p><b>制作要点</b>　圆框遮住身体，角、发饰保持朝向。需要与屏幕边缘滑动分区。</p><p class="by">Clawd 的边缘探头，结合 P01 20。<a href="https://github.com/rullerzhou-afk/clawd-on-desk/blob/main/docs/guides/features.md">Clawd 原作</a> · <a href="https://dshtui.com/pets/whale-girl-emoji/">P01 原作</a></p></details>
+<details><summary>呵出一粒星火<small>陪伴 · 近景 · 工作量低</small></summary><p>闲时鼓起一边脸颊，第一次只吹出烟点，再努力才吐出一颗星；眼睛一路追着它。</p><p><b>制作要点</b>　四种嘴形和三段星火即可试样，看持续跟随是否盖住眼线。</p><p class="by">P01 03 的蓄力节奏，白龙新表演。<a href="https://dshtui.com/pets/whale-girl-emoji/">P01 原作</a></p></details>
+
+
+<details><summary>三拍同奏<small>协作 · 全身 · 工作量中</small></summary><p>亮左键、右键、左键，你敲中第三拍她才用尾尖补第四拍。错过会抬爪等你跟上。</p><p><b>制作要点</b>　以实际点击驱动节拍，音效可选，常态敲键与小游戏分别计时。</p><p class="by">普通版已有按键节奏；P01 05–06。<a href="../design/gpt-pet/README.md">普通版动作</a> · <a href="https://dshtui.com/pets/whale-girl-emoji/">P01 原作</a></p></details>
+<details><summary>抬眼等你拆信<small>协作 · 近景 · 工作量低</small></summary><p>等电脑确认时她举起信封。碰手，她点头抱好，安静陪你等；电脑状态变化才收起信。</p><p><b>制作要点</b>　对接只读 waiting 状态。保持提示可见，避免反复挥手。</p><p class="by">P01 11，普通版等待确认时已有信封。<a href="../design/gpt-pet/README.md">普通版动作</a> · <a href="https://dshtui.com/pets/whale-girl-emoji/">P01 原作</a></p></details>
+<details><summary>星星贴修补坏心情<small>协作 · 两种取景 · 工作量低</small></summary><p>工作出错，一片小星贴掉到桌上。点一下她贴到本子上，叹气，再把笔拿好。</p><p><b>制作要点</b>　点击改变本地表情；屏幕保留真实异常，直到主机发新状态。</p><p class="by">普通版异常安慰，P01 09。<a href="../design/gpt-pet/README.md">普通版动作</a></p></details>
+
+</div>
+<h3>实机候选 · 2 项</h3><div class="cards">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<details><summary>倾斜接星<small>体感 · 全身 · 工作量高</small></summary><p>略向左倾，星珠沿圆框滚向左爪；停稳一瞬她才把星珠捧起来。反向倾斜则换手。</p><p><b>制作要点</b>　网页先用左右键模拟，再测佩戴走动的误触、回正死区和接星延迟。</p><p class="by">Bitzee 的倾斜输入，白龙新玩法。<a href="https://www.spinmaster.com/en-US/brands/bitzee/bitzee-interactive-toy-digital-pet-and-case-with-15-animals-inside-virtual-electronic-pets-react-to-touch-kids-toys-for-girls-and-boys">Bitzee 玩法</a> · <a href="https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/">微雪板卡</a></p></details>
+<details><summary>听见轻唤才探头<small>声音 · 近景 · 工作量高</small></summary><p>玩家主动进入聆听后发一个短音，她先侧耳，听到第二声才探头；安静时慢慢缩回去。</p><p><b>制作要点</b>　网页用按钮模拟声脉冲。区分音量响应与识别名字，后者需要单独实验。</p><p class="by">Nintendogs 的呼唤回应，板卡有双麦克风。<a href="https://csassets.nintendo.com/noaext/image/private/t_KA_PDF/manual-3DS-nintendogs-cats-en?_a=DATAg1AAZAA0">任天堂手册</a> · <a href="https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/">微雪板卡</a></p></details></div>
+</section>
+<section id="test"><h2>138 × 132 试做时怎么验</h2><ul>
+<li><b>用同一只眼作对照。</b> 留住审核稿的角、右侧花结、紫瞳和嘴线。先试眼线、脸颊或发束移动 1–2 个逻辑格，再比较全身和近景；左右动作用各自的脸和发饰，头部大小保持一致，网格固定在屏幕。</li>
+<li><b>让玩家看见手指的后果。</b> 脸颊连点与鼻尖双点独立计数；读书时书角优先于躯干。按下、拖动、抬手、拖出圆边分别试一次。时间、动作名和泡泡留在圆内，点击随镜头和平移后的逐帧位置命中。</li>
+<li><b>让动作正确收场。</b> 起跳脚底先着地再回弹；指腹盖在书角上，翻过去的页面不会穿过袖子。工作中被摸头，回来继续当前实际状态；互动期间收到错误或等待确认，状态提示及时可见；“本轮结束”与“明确成功”分别编排。<a href="../host/baji_bridge/preview.py">项目状态投影</a></li>
+<li><b>先看懂，再加特效。</b> 网格开启、手机宽度下静音观看，先辨认“让开、回蹭、憋笑、睡醒”四个动作，再开启爱心与星屑；减少动态效果时用关键姿势和静态结果表达同一互动。上板后再记录触摸到首个可见变化的延迟和佩戴时的误触。</li></ul></section>
+<footer>本轮交付为动作调研与试做建议。调研页可离线阅读，原作者动图按需联网播放。</footer></main>
+<dialog id="viewer" aria-labelledby="clip-title"><div class="dlg-head"><h3 id="clip-title">P01 原作</h3><button type="button" id="close">关闭</button></div><img id="movie" alt=""><p id="clip-hint"></p><p><a id="original" target="_blank" rel="noopener">在原站打开 GIF</a></p></dialog>
+<script>
+const dlg = document.querySelector('#viewer'), movie = document.querySelector('#movie'), hint = document.querySelector('#clip-hint');
+if (typeof dlg.showModal === 'function') {
+  for (const link of document.querySelectorAll('.gif')) {
+    link.setAttribute('aria-haspopup','dialog');
+    link.addEventListener('click', event => {
+      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      const title = link.textContent, row = link.closest('tr').cells;
+      document.querySelector('#clip-title').textContent = 'P01 · ' + title;
+      document.querySelector('#original').href = link.href;
+      movie.alt = '鲸娘原作 · ' + title;
+      hint.textContent = row[3].textContent.replace('*','') + '　' + row[4].textContent;
+      dlg.showModal(); movie.src = link.href;
+    });
+  }
+  document.querySelector('#close').addEventListener('click', () => dlg.close());
+  dlg.addEventListener('close', () => { if (!dlg.open) movie.removeAttribute('src'); });
+  movie.addEventListener('error', () => { if (movie.hasAttribute('src')) hint.textContent = '原站动图暂未载入，可以单独打开 GIF 重试。'; });
+}
+</script></body></html>

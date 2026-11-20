@@ -48,10 +48,10 @@
             sclera.addColorStop(1,"#fffaf4"); ctx.fillStyle=sclera;
             ctx.fillRect(-36, -33, 73, 68);
             const color = ctx.createLinearGradient(0, irisY - 25, 0, irisY + 25);
-            color.addColorStop(0, "#51496e");
-            color.addColorStop(0.33, "#80729f");
-            color.addColorStop(0.7, "#bcabdf");
-            color.addColorStop(1, "#f2ddf5");
+            color.addColorStop(0, "#3b345e");
+            color.addColorStop(0.33, "#73639b");
+            color.addColorStop(0.68, "#b79cd9");
+            color.addColorStop(1, "#f2d2e7");
             ctx.beginPath();
             ctx.ellipse(irisX, irisY, 19.5, 24, -0.03, 0, 2 * Math.PI);
             ctx.fillStyle = color;
@@ -67,6 +67,8 @@
             ctx.ellipse(irisX + 2, irisY + 13, 10, 5, -0.2, 0, Math.PI * 2);
             ctx.fillStyle = "#dfd5fa";
             ctx.fill();
+            ctx.strokeStyle="#fbddb8";ctx.lineWidth=1.8;
+            ctx.beginPath();ctx.ellipse(irisX,irisY+2,15,17,0,.38,1.96);ctx.stroke();
             ctx.fillStyle = "#fffafa";
             ctx.beginPath();
             ctx.ellipse(irisX - facing * 6, irisY - 11, 4.9, 6.2, 0.2, 0, 2 * Math.PI);
@@ -76,9 +78,13 @@
             ctx.fill();
             if(p.light>0.03) {
                 ctx.globalAlpha=Math.min(1,p.light);
-                ctx.fillStyle="#ffec9f";
+                ctx.fillStyle="#fff2b2";
+                const glintX=irisX+facing*p.gazeX*7,glintY=irisY+6;
                 ctx.beginPath();
-                ctx.arc(irisX+facing*p.gazeX*7,irisY+6,3.8,0,Math.PI*2); ctx.fill();
+                ctx.moveTo(glintX,glintY-6);ctx.quadraticCurveTo(glintX+.7,glintY-1,glintX+4.4,glintY);
+                ctx.quadraticCurveTo(glintX+1,glintY+.7,glintX,glintY+5.7);
+                ctx.quadraticCurveTo(glintX-.8,glintY+1,glintX-4.4,glintY);
+                ctx.quadraticCurveTo(glintX-.8,glintY-1,glintX,glintY-6);ctx.fill();
             }
             ctx.restore();
         }
@@ -128,6 +134,12 @@
             if (p.blush > 0.02) {
                 ctx.save(); ctx.globalAlpha=Math.min(0.84,p.blush);
                 for (const x of [201, 342]) ctx.drawImage(this.rouge,x-18-4*p.pout,299,36+8*p.pout,14+9*p.pout);
+                ctx.lineWidth=1.4;ctx.lineCap="round";ctx.strokeStyle="#c4869b";
+                ctx.beginPath();
+                for(const cheek of [198,342])for(const offset of [-5,0,5]){
+                    ctx.moveTo(cheek+offset,304);ctx.lineTo(cheek+offset-2,307);
+                }
+                ctx.stroke();
                 ctx.restore();
             }
             drawEye(ctx, 208, 280, 1, p);
@@ -148,8 +160,15 @@
                 lip.addColorStop(0,"#986e7e"); lip.addColorStop(0.62,"#b88395"); lip.addColorStop(1,"#edb8bb");
                 ctx.fillStyle = lip;
                 ctx.fill();
-            }
-            ctx.stroke();
+                ctx.stroke();
+                if(smile>.45 && jaw>.24){
+                    ctx.save();ctx.clip();
+                    ctx.fillStyle="#ffcad3";ctx.beginPath();
+                    ctx.ellipse(271,321+jaw*7,lipWidth*.7,2.4,0,0,Math.PI*2);ctx.fill();
+                    ctx.fillStyle="#fff9ed";ctx.beginPath();ctx.moveTo(270+lipWidth*.22,319);
+                    ctx.lineTo(270+lipWidth*.52,319);ctx.lineTo(270+lipWidth*.32,322.4);ctx.fill();ctx.restore();
+                }
+            } else ctx.stroke();
             if(p.pout>.06){
                 ctx.save();ctx.globalAlpha=Math.min(1,p.pout);ctx.lineWidth=2.4;ctx.strokeStyle="#bd8f96";
                 ctx.beginPath();ctx.moveTo(181,300);ctx.quadraticCurveTo(173,307,181,312);

@@ -25,7 +25,7 @@
         const cx=(a.left.x+a.right.x)/2, cy=(a.left.y+a.right.y)/2;
         switch(id){
             case "reading":return {x:cx+51,y:cy+9};
-            case "writing":return {x:cx+14,y:cy+32};
+            case "writing":return {x:a.left.x+131,y:a.left.y+27};
             case "running":return {x:cx+[-46,46,-46][Math.min(2,r.beats||0)],y:cy+22};
             case "searching":{
                 const gather=r.phase==="done"?ease(0,.73,r.age):0;
@@ -62,7 +62,7 @@
             this.clear();p.game.clear();clearTimeout(p.stillTimer);
             p.action=p.nextCare=p.heldStar=p.attention=null;
             p.quiet=0;p.slept=false;
-            if(moving&&!p.scene.reduced)p.advance(0,true);
+            if(moving&&!p.scene.reduced)p.advance(0);
             this.round={id:this.item.id,phase:"offer",age:0,beats:0,progress:0,drag:null,returning:false,miss:0,beatGlow:0,lastSide:-1};
             this.changed();
             p.note(this.item.name+"。"+this.item.cue+"。");

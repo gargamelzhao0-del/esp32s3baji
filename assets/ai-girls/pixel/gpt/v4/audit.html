@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPT 白龙娘 · 待机帧像素核对</title>
+<style>
+*{box-sizing:border-box}body{max-width:1080px;margin:auto;padding:clamp(16px,4vw,40px);color:#332f39;background:#faf8f6;font:15px/1.6 "Microsoft YaHei UI",sans-serif}
+h1,h2,p,figure{margin:0}h1{font-size:clamp(25px,4vw,36px)}h2{font-size:18px;margin-bottom:8px}a{color:#654171}
+.intro{max-width:770px;margin:5px 0 20px}
+.layout{display:grid;grid-template-columns:minmax(0,552px) minmax(230px,1fr);gap:clamp(18px,3vw,32px)}
+.controls{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;margin-bottom:12px}label{display:inline-flex;align-items:center;gap:6px}
+select,input{accent-color:#69487c;font:inherit}select{border-radius:5px;border:1px solid #b8adb9;background:white;padding:4px 8px}
+.stage{width:100%;background:#352e40;border-radius:8px;text-align:center;line-height:0}canvas{max-width:100%;display:inline-block}
+.split{width:100%;margin-top:10px}.split input{flex:1;min-width:45px}.split span{font-size:13px;white-space:nowrap}
+aside{padding:16px;border:1px solid #dfd5e3;border-radius:10px;background:#fff}table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:13px}td,th{text-align:left;padding:4px 5px;border-bottom:1px solid #e9e3e9}
+.hint,figcaption{font-size:13px;color:#655c68;margin:8px 0}.findings{margin-top:20px}.findings ul{padding-left:1.3em;margin-top:6px}footer{margin-top:16px}
+@media(max-width:780px){.layout{grid-template-columns:1fr}.stage{max-width:552px}}
+</style>
+</head>
+<body>
+<main>
+<h1>GPT 白龙娘 · 待机帧像素核对</h1>
+<p class="intro">取自原型实际显示的待机首帧。拖动分界线，看原动画和像素稿里的龙角、眼睛、两手和裙摆是否落在同一个位置。</p>
+<div class="controls">
+<label>取景 <select id="view"><option value="full">全身</option><option value="close">P01 近景</option></select></label>
+<label>原生网格 <select id="grid-size"><option value="1">69 × 66</option><option value="2">138 × 132</option></select></label>
+<label><input type="checkbox" id="lines">显示像素网格</label>
+</div>
+<div class="layout">
+<figure>
+  <div id="stage" class="stage"><canvas id="comparison" width="552" height="528" role="img" aria-label="原动画待机帧与校准像素稿，同取景分界对照"></canvas></div>
+  <label class="split"><span>原动画</span><input id="split" type="range" min="0" max="100" value="50" aria-label="原动画占画面的比例"><span>校准像素稿</span></label>
+  <figcaption id="frame-caption" aria-live="polite"></figcaption>
+</figure>
+<aside>
+  <h2>部位落在哪一格</h2>
+  <p class="hint">左上角为 (0, 0)。原帧定位点按当前取景等比投影，左、右均以看图者为准。</p>
+  <table><thead><tr><th>部位</th><th>原帧坐标（约）</th><th>像素格</th></tr></thead><tbody id="landmarks"></tbody></table>
+  <p class="hint">双眼主高光与嘴线按原帧色块定位，双手、翼膜、尾和鞋按动画骨架锚点定位。</p>
+</aside>
+</div>
+<section class="findings"><h2>上一版偏在哪里</h2>
+<ul>
+<li>双手收到了领口，水平间距约 5 格。原动画里，两手分在腰侧。同样采用 69 × 66 画布，本次近景投影约为 27 格。</li>
+<li>上版把两眼画得细长，嘴角另加了尖牙。原动画睁眼时能看到圆润的紫虹膜与两处主高光，嘴是一小段浅色曲线。</li>
+<li>全身参照能看到侧垂的长袖、腰上两朵盘结花、双鞋与沿右裙边落下的粗尾。切到近景可以看清取景线截去了哪些部位。</li>
+</ul></section>
+<footer><a href="idle-render.png">查看原帧角色层</a> · <a id="sprite-link" href="idle-full-69x66.png">当前透明精灵</a> · <a href="../v3/idle-4x.png">上一版近景</a> · <a href="README.md">测量记录与署名</a></footer>
+</main>
+<script>
+"use strict";
+const byId = id => document.getElementById(id);
+const canvas = byId("comparison");
+const ctx = canvas.getContext("2d");
+const crops = {
+  full: {x:28, y:12, step:8, title:"全身"},
+  close: {x:113, y:34.5, step:5.5, title:"P01 近景"}
+};
+const points = [
+  ["左眼主高光",247.17,247.13],["右眼主高光",333.85,244.85],["嘴线",295.38,284.63],
+  ["左手",226.45,365.89],["右手",373.52,365.87],["左翼膜",130.82,354.08],
+  ["右翼膜",480.39,351.80],["右侧尾部",466.28,452.37],["左鞋",267,507],["右鞋",321.75,507]
+];
+const images = new Map();
+function loadImage(file) {
+  const image = new Image();
+  images.set(file,image);
+  image.onload = draw;
+  image.onerror = () => { byId("frame-caption").textContent = "读取图片失败，请保留本页与同目录的 PNG 文件。"; };
+  image.src=file;
+}
+function draw() {
+  const view=byId("view").value, scale=Number(byId("grid-size").value), width=69*scale, height=66*scale;
+  const crop=crops[view], step=crop.step/scale;
+  const file="idle-"+view+"-"+width+"x"+height+".png", base=images.get("idle-render.png"), sprite=images.get(file);
+  if (!base?.naturalWidth || !sprite?.naturalWidth) return;
+  const zoom=Math.max(1,Math.floor(Math.min(552,byId("stage").clientWidth)/width));
+  canvas.width=width*zoom; canvas.height=height*zoom;
+  const boundary=Math.round(Number(byId("split").value)*width/100)*zoom;
+  ctx.fillStyle="#352e40";ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(sprite,0,0,canvas.width,canvas.height);
+  if(boundary>0){
+    ctx.save();ctx.beginPath();ctx.rect(0,0,boundary,canvas.height);ctx.clip();
+    ctx.fillRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingEnabled=true;
+    ctx.drawImage(base,crop.x,crop.y,step*width,step*height,0,0,canvas.width,canvas.height);ctx.restore();
+  }
+  if(byId("lines").checked){
+    ctx.fillStyle="rgba(171,147,191,.40)";
+    for(let x=0;x<canvas.width;x+=zoom)ctx.fillRect(x,0,1,canvas.height);
+    for(let y=0;y<canvas.height;y+=zoom)ctx.fillRect(0,y,canvas.width,1);
+  }
+  if(boundary>0 && boundary<canvas.width){ctx.fillStyle="#f5cc78";ctx.fillRect(boundary,0,1,canvas.height);}
+  byId("frame-caption").textContent=crop.title+" · "+width+" × "+height+" · 每格放大 "+zoom+" 倍";
+  byId("sprite-link").setAttribute("href",file);
+  const rows=points.map(([name,x,y])=>{
+    const col=Math.floor((x-crop.x)/step),row=Math.floor((y-crop.y)/step);
+    const tr=document.createElement("tr");
+    for(const cell of [name,Math.round(x)+", "+Math.round(y),col>=0&&col<width&&row>=0&&row<height?col+", "+row:"取景外"]){
+      const td=document.createElement("td");td.textContent=cell;tr.append(td);
+    }
+    return tr;
+  });
+  byId("landmarks").replaceChildren(...rows);
+}
+for(const id of ["view","grid-size","lines","split"])byId(id).addEventListener("input",draw);
+new ResizeObserver(draw).observe(byId("stage"));
+loadImage("idle-render.png");
+for(const view of Object.keys(crops))for(const size of ["69x66","138x132"])loadImage("idle-"+view+"-"+size+".png");
+</script>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#18242a" />
+    <title>Codex 白龙娘 · 星屑小屋</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="style.css" />
+    <script defer src="clips.js"></script>
+    <script defer src="gesture-clips.js"></script>
+    <script defer src="display.js"></script>
+    <script defer src="gestures.js"></script>
+    <script defer src="telemetry.js"></script>
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <header class="site-head">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">&gt;_</span>星屑小屋
+      </div>
+      <div class="connection">
+        <span id="connection-light"></span
+        ><span id="connection-label">本地模拟</span>
+      </div>
+    </header>
+    <main>
+      <section class="device-card" aria-label="圆形像素吧唧预览">
+        <div class="card-bar">
+          <span class="bar-label"><i aria-hidden="true"></i> 圆屏预览</span
+          ><span>138 × 132 PX</span>
+        </div>
+        <div class="workmat" id="workmat">
+          <div class="corner tl" aria-hidden="true"></div>
+          <div class="corner tr" aria-hidden="true"></div>
+          <div class="corner bl" aria-hidden="true"></div>
+          <div class="corner br" aria-hidden="true"></div>
+          <canvas
+            id="badge"
+            width="432"
+            height="432"
+            tabindex="0"
+            role="button"
+            aria-label="和白龙娘互动的圆屏。按空格或回车摸头、叫醒、翻页或回应工作道具，按住左右方向键顺毛。"
+            aria-keyshortcuts="Space Enter ArrowLeft ArrowRight"
+            aria-describedby="gesture-hint metrics-description"
+          ></canvas>
+        </div>
+        <div class="device-foot">
+          <span id="view-label">全身取景</span
+          ><span id="grid-label">网格开启</span>
+        </div>
+        <output class="metrics-description" id="metrics-description"></output>
+      </section>
+      <div class="side">
+        <section class="identity">
+          <div class="model"><i aria-hidden="true"></i> CODEX / GPT</div>
+          <h1>白龙娘<span class="title-star" aria-hidden="true">✦</span></h1>
+          <p class="state-line">
+            <span id="state-chip">待机</span><span id="clock"></span>
+          </p>
+        </section>
+        <div class="speech">
+          <span class="talk-mark" aria-hidden="true">“</span>
+          <p id="reply" role="status" aria-live="polite">
+            她抬眼望向你，右侧的尾尖轻轻一晃。
+          </p>
+        </div>
+        <section class="interaction" aria-labelledby="interact-title">
+          <h2 id="interact-title">陪她玩</h2>
+          <div class="actions">
+            <button type="button" data-action="pat">
+              <canvas data-icon="hand" width="16" height="16"></canvas>摸摸头
+            </button>
+            <button type="button" data-action="feed">
+              <canvas data-icon="candy" width="16" height="16"></canvas>喂星糖
+            </button>
+            <button type="button" data-action="nose">
+              <canvas data-icon="nose" width="16" height="16"></canvas>碰鼻尖
+            </button>
+            <button type="button" data-action="play">
+              <canvas data-icon="comet" width="16" height="16"></canvas>抛颗星
+            </button>
+            <button type="button" id="cheek-button">
+              <canvas data-icon="cheek" width="16" height="16"></canvas>戳脸颊
+            </button>
+            <button type="button" id="scene-button">
+              <canvas
+                data-scene-icon="nap"
+                data-icon="moon"
+                width="16"
+                height="16"
+              ></canvas>
+              <canvas
+                data-scene-icon="book"
+                data-icon="book"
+                width="16"
+                height="16"
+                hidden
+              ></canvas>
+              <canvas
+                data-scene-icon="brush"
+                data-icon="hand"
+                width="16"
+                height="16"
+                hidden
+              ></canvas>
+              <canvas
+                data-scene-icon="keys"
+                data-icon="keys"
+                width="16"
+                height="16"
+                hidden
+              ></canvas>
+              <canvas
+                data-scene-icon="lens"
+                data-icon="lens"
+                width="16"
+                height="16"
+                hidden
+              ></canvas>
+              <canvas
+                data-scene-icon="hand"
+                data-icon="hand"
+                width="16"
+                height="16"
+                hidden
+              ></canvas>
+              <span id="scene-label">打个盹</span>
+            </button>
+          </div>
+          <p id="gesture-hint">轻点两颊，或按住刘海慢慢划。</p>
+        </section>
+        <section class="settings" aria-label="像素吧唧控制">
+          <div class="setting">
+            <label for="agent-state">Agent 状态</label
+            ><select id="agent-state" aria-label="模拟 Agent 状态"></select>
+          </div>
+          <div class="setting">
+            <span id="lens-title">取景</span>
+            <div class="segmented" role="group" aria-labelledby="lens-title">
+              <button type="button" data-view="full" aria-pressed="true">
+                全身</button
+              ><button type="button" data-view="close" aria-pressed="false">
+                近景
+              </button>
+            </div>
+          </div>
+          <div class="setting">
+            <label for="grid">像素网格</label
+            ><label class="switch"
+              ><input id="grid" type="checkbox" checked /><span
+                aria-hidden="true"
+              ></span
+            ></label>
+          </div>
+        </section>
+      </div>
+    </main>
+    <footer>
+      <span>白龙娘设定 <b>ZipZipPipe</b> · 动画立绘 <b>CrossPet</b></span
+      ><a href="credits.html">素材与许可 ↗</a>
+    </footer>
+  </body>
+</html>

@@ -14,7 +14,13 @@
         if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lineWidth; ctx.stroke(path); }
     }
 
-    function book(ctx, t) {
+    window.dragonReadingBeat = function(t) {
+        const beat=t%4.8;
+        const scan=smooth(.16,1.28,beat)-smooth(1.28,1.52,beat)+smooth(1.64,2.65,beat);
+        return {scan:2*scan-1,turn:smooth(3.44,4.40,beat),
+                peek:smooth(2.67,2.99,beat)*(1-smooth(3.24,3.62,beat))};
+    };
+    function book(ctx, turn) {
         ctx.rotate(-0.05);
         shape(ctx, "M-88 -23 Q-39 -33 0 -14 Q44 -41 87 -29 L84 39 Q38 36 2 55 Q-44 39 -85 45 Z",
               "#42635c", "#334540", 4);
@@ -24,38 +30,118 @@
         for (let i = 0; i < 4; i++) {
             ctx.beginPath();
             ctx.moveTo(-68, -12 + i * 9); ctx.quadraticCurveTo(-45, -15 + i * 9, -16, -6 + i * 9);
-            ctx.moveTo(17, -5 + i * 9); ctx.quadraticCurveTo(41, -18 + i * 9, 65, -19 + i * 9);
             ctx.stroke();
         }
+        // A gilded star chart on the illuminated page, visible even when held still.
+        shape(ctx,"M12 -7 Q45 -24 71 -23 L69 22 Q39 19 12 32Z","#595a7f","#ccab76",2.4);
+        shape(ctx,"M20 19 L33 -3 L49 7 L62 -14",null,"#e3cca4",1.5);
+        for(const [x,y,size] of [[20,19,3],[33,-3,5],[49,7,3],[62,-14,4]])fourPoint(ctx,x,y,size,"#ffe4aa");
         // A page curls up, crosses the spine, then settles on the other side.
-        const phase = t % 3.4;
-        if (phase < 0.85) {
-            const progress = smooth(0, 0.85, phase);
-            const tip = 77 * Math.cos(Math.PI * progress);
-            const curl = 29 * Math.sin(Math.PI * progress);
+        if (turn > 0 && turn < 1) {
+            const tip = 77 * Math.cos(Math.PI * turn);
+            const curl = 34 * Math.sin(Math.PI * turn);
             ctx.beginPath(); ctx.moveTo(1,-13);
             ctx.quadraticCurveTo(tip * 0.52, -28-curl, tip, -31-curl);
             ctx.lineTo(tip * 0.96, 34-curl);
             ctx.quadraticCurveTo(tip * 0.44, 30-curl, 1, 45); ctx.closePath();
-            ctx.fillStyle = "#fff3d9"; ctx.fill(); ctx.strokeStyle = "#bfb295"; ctx.stroke();
+            const paper=ctx.createLinearGradient(0,0,tip||.01,0);
+            paper.addColorStop(0,"#c6ab92");paper.addColorStop(.43,"#fff5d9");paper.addColorStop(1,"#dfcbb2");
+            ctx.fillStyle = paper; ctx.fill(); ctx.strokeStyle = "#bfa684"; ctx.stroke();
         }
-        shape(ctx, "M14 39 L21 36 L20 55 L16 51 L13 56 Z", "#cb9b97");
+        const swing=10*Math.sin(Math.PI*turn*2)*Math.sin(Math.PI*turn);
+        shape(ctx,"M14 39 Q19 49 "+(16+swing)+" 61",null,"#b67a85",3);
+        fourPoint(ctx,16+swing,64,7,"#ffda85");
     }
 
-    function notepad(ctx, t) {
-        ctx.rotate(0.07);
-        shape(ctx, "M-80 -9 L52 -25 L75 34 L-58 51 Z", "#9294aa", "#626477", 3);
-        shape(ctx, "M-83 -15 L51 -30 L71 28 L-62 45 Z", "#fff0d6", "#c6b69b", 2);
-        ctx.strokeStyle = "#aa9c98"; ctx.lineWidth = 2.5;
-        for (let i = 0; i < 3; i++) {
-            ctx.beginPath(); ctx.moveTo(-57, i*10);
-            ctx.lineTo(-57 + (i===2 ? 25 + 20*(1 + Math.sin(t*2.6)) : 72), i*10-8); ctx.stroke();
+    // Quadratic spans are sampled once by distance. The nib and the visible end of
+    // each line use the same point, including at sharp corners and between strokes.
+    function inkStroke(start,end,color,width,x,y,curves){
+        const points=[{x,y,d:0}];
+        let length=0;
+        for(const [cx,cy,ex,ey] of curves){
+            for(let i=1;i<=10;i++){
+                const u=i/10,v=1-u,px=v*v*x+2*v*u*cx+u*u*ex,py=v*v*y+2*v*u*cy+u*u*ey;
+                const prev=points[points.length-1];
+                length+=Math.hypot(px-prev.x,py-prev.y);
+                points.push({x:px,y:py,d:length});
+            }
+            x=ex;y=ey;
+        }
+        return {start,end,color,width,points,length};
+    }
+    const ink=[
+        inkStroke(.36,2.12,"#64526e",3.8,-23,3,[
+            [-30,-2,-28,-20],[-26,-24,-12,-14],[1,-19,12,-16],[21,-28,24,-25],
+            [28,-20,27,-7],[38,5,24,12],[7,21,-11,16],[-29,14,-23,3]]),
+        inkStroke(2.34,2.60,"#64526e",3.5,-15,0,[[-11,-7,-7,-1]]),
+        inkStroke(2.82,3.08,"#64526e",3.5,7,-2,[[11,-9,16,-3]]),
+        inkStroke(3.26,3.56,"#b67480",3.2,-5,4,[[-2,10,1,4],[5,9,9,3]]),
+        inkStroke(3.79,4.17,"#b87980",3.1,39,-12,[[25,-22,33,-25],[36,-26,39,-22],[48,-34,49,-23],[49,-20,39,-12]])
+    ];
+    function inkPoint(stroke,f){
+        const d=clamp(f)*stroke.length,ps=stroke.points;
+        let i=1;
+        while(i<ps.length-1 && ps[i].d<d)i++;
+        const a=ps[i-1],b=ps[i],w=(d-a.d)/(b.d-a.d||1);
+        return {x:a.x+(b.x-a.x)*w,y:a.y+(b.y-a.y)*w,index:i};
+    }
+    function writingBeat(time){
+        const t=time%5.8;
+        let last={x:-16,y:-15},lastEnd=0;
+        for(const s of ink){
+            if(t<s.start){
+                const next=s.points[0],u=smooth(lastEnd,s.start,t);
+                return {t,x:last.x+(next.x-last.x)*u,y:last.y+(next.y-last.y)*u-10*Math.sin(Math.PI*u),peek:0};
+            }
+            if(t<=s.end)return {t,...inkPoint(s,smooth(s.start,s.end,t)),peek:0};
+            last=s.points[s.points.length-1];lastEnd=s.end;
+        }
+        const lift=smooth(4.17,4.48,t),home=smooth(5.10,5.8,t);
+        return {t,x:last.x+8*lift+(-16-last.x-8)*home,y:last.y-16*lift+(-15-last.y+16)*home,
+                peek:lift*(1-home)};
+    }
+    function nibAt(beat,park){
+        return {x:beat.x+(54-beat.x)*park,y:beat.y+(-38-beat.y)*park};
+    }
+    function writingLayout(left,beat,park){
+        const x=left.x+79,y=left.y+19,nib=nibAt(beat,park);
+        return {x,y,tipX:x+nib.x,tipY:y+nib.y};
+    }
+    window.DragonWriting={beat:writingBeat,layout:writingLayout};
+    function notepad(ctx,beat){
+        shape(ctx,"M-89 -22 L70 -39 Q76 -40 78 -33 L87 31 L-69 51 Q-75 52 -77 45Z","#668780","#414e55",3.5);
+        shape(ctx,"M-75 37 L77 20 L82 28 L-72 47Z","#d5c1a3","#9b8b80",2);
+        shape(ctx,"M-84 -23 L70 -38 L81 23 L-72 42Z","#fff1d9","#b8a48d",2.6);
+        shape(ctx,"M-58 -20 L-48 38",null,"#cf9ba0",2.5);
+        for(let i=0;i<4;i++){
+            const y=-16+i*14;
+            shape(ctx,"M-82 "+y+" q-12 -3 -13 4 q0 6 12 5",null,"#817781",3.8);
+        }
+        shape(ctx,"M-38 26 L63 15",null,"#e5cfad",1.8);
+        ctx.save();ctx.strokeStyle="#cc9da5";ctx.lineWidth=1.8;ctx.setLineDash([3.3,3.3]);
+        ctx.beginPath();ctx.ellipse(52,8,11,9,-.12,0,tau);ctx.stroke();ctx.restore();
+        ctx.save();ctx.globalAlpha*=1-smooth(5.12,5.73,beat.t);
+        for(const s of ink){
+            if(beat.t<=s.start)break;
+            const end=inkPoint(s,smooth(s.start,s.end,beat.t));
+            ctx.beginPath();ctx.moveTo(s.points[0].x,s.points[0].y);
+            for(let i=1;i<end.index;i++)ctx.lineTo(s.points[i].x,s.points[i].y);
+            ctx.lineTo(end.x,end.y);ctx.strokeStyle=s.color;ctx.lineWidth=s.width;ctx.stroke();
+        }
+        ctx.restore();
+        const flip=smooth(5.1,5.8,beat.t);
+        if(flip>0 && flip<1){
+            const w=158*flip,curl=20*Math.sin(Math.PI*flip);
+            ctx.save();ctx.globalAlpha*=Math.sin(Math.PI*flip);
+            ctx.beginPath();ctx.moveTo(75-w,-37+.1*w);ctx.quadraticCurveTo(59-w-curl,-10-curl,81-w,23+.1*w);
+            ctx.strokeStyle="#b3a49a";ctx.lineWidth=3;ctx.stroke();ctx.restore();
         }
     }
     function quill(ctx) {
-        shape(ctx, "M-1 1 Q-2 -44 26 -66 Q27 -51 22 -40 L16 -36 L19 -35 Q12 -17 1 -2 Z",
-              "#e2d9f3", "#79718e", 2.5);
-        shape(ctx, "M0 0 Q8 -28 24 -62 M1 -4 L-5 8", null, "#746981", 2.7);
+        shape(ctx,"M0 -2 Q-9 -29 4 -49 Q12 -62 29 -69 Q28 -54 25 -48 L18 -43 L23 -44 Q21 -34 15 -30 L10 -28 L14 -28 Q11 -15 0 -2Z",
+              "#9dd5ca","#506f78",3);
+        shape(ctx,"M1 -7 Q5 -36 26 -64 M7 -33 L4 -43 M13 -43 L20 -48",null,"#e5f2da",2.4);
+        shape(ctx,"M-1 -10 L5 -7 L1 0 L-5 8 L-5 1Z","#e8b771","#836757",2);
     }
     function keys(ctx, t) {
         shape(ctx, "M-83 -16 Q-86 -16 -88 -11 L-99 22 Q-101 29 -92 31 L77 31 Q88 31 88 23 L79 -11 Q78 -17 71 -17 Z",
@@ -101,31 +187,86 @@
         const x0=cast?.x??165, y0=cast?.y??387;
         const side=cast?.side??1, height=cast?.height??1;
         const x1=palm.x+side*3, y1=palm.y-14;
-        const midX=(x0+x1)/2+side*83;
-        const midY=Math.max(-152,Math.min(y0,y1)-270-height*270);
-        return {f,x:x0*(1-f)*(1-f)+2*midX*(1-f)*f+x1*f*f,
-                  y:y0*(1-f)*(1-f)+2*midY*(1-f)*f+y1*f*f};
+        const arc=4*f*(1-f);
+        const loft=Math.min(90+height*158,Math.max(0,Math.min(y0,y1)-34));
+        const curve=clamp(cast?.curve??side*44,24-Math.min(x0,x1),792-Math.max(x0,x1));
+        return {f,x:x0+(x1-x0)*f+curve*arc,y:y0+(y1-y0)*f-loft*arc};
     }
     window.dragonStarPath=starPath;
+    function sugarBubble(t,mouth) {
+        if(t<1.82 || t>=7.78)return null;
+        const loft=smooth(2.02,3.24,t);
+        const fade=1-smooth(7.04,7.78,t);
+        const x=mouth.x+12+(685-mouth.x-12)*loft+6*Math.sin(2.8*t)*loft;
+        const y=mouth.y+4+(239-mouth.y-4)*loft-24*Math.sin(loft*Math.PI)+7*Math.sin(2*t)*loft-21*(1-fade);
+        return {x,y,r:51*smooth(1.82,2.65,t)*fade,ready:t>=2.45&&t<=7.04};
+    }
+    window.dragonSugarBubble=sugarBubble;
+    function bubbleArt(ctx,p,a) {
+        const t=p.actionTime;
+        if(p.action==="bubblePop"){
+            const f=clamp(t/.9),origin=p.cast;
+            ctx.save();
+            ctx.globalAlpha=1-smooth(.38,.95,t);
+            ctx.strokeStyle="#fff1dc";ctx.lineWidth=3.5*(1-f)+.3;
+            ctx.beginPath();ctx.arc(origin.x,origin.y,origin.r+27*f,0,tau);ctx.stroke();
+            const colors=["#ffedb4","#ffb7db","#b8f1ea"];
+            for(let i=0;i<11;i++){
+                const angle=i*2.40,travel=origin.r+(26+11*(i%4))*f;
+                fourPoint(ctx,origin.x+Math.cos(angle)*travel,origin.y+Math.sin(angle)*travel+28*f*f,
+                          (7+i%5)*(1-.48*f),colors[i%3]);
+            }
+            ctx.restore();
+            const drift=smooth(.10,.73,t);
+            ctx.save();ctx.globalAlpha=1-smooth(.85,1.45,t);
+            fourPoint(ctx,origin.x+(a.nose.x+4-origin.x)*drift,
+                      origin.y+(a.nose.y-origin.y)*drift-60*Math.sin(Math.PI*drift),13,"#fff0a8");
+            ctx.restore();
+            return;
+        }
+        const b=sugarBubble(t,a.mouth);
+        if(!b || b.r<1)return;
+        ctx.save();ctx.translate(b.x,b.y);ctx.scale(b.r,b.r);
+        const glass=ctx.createRadialGradient(-.23,-.37,.04,0,0,1);
+        glass.addColorStop(0,"#fffae999");glass.addColorStop(.34,"#f3d7ff28");
+        glass.addColorStop(.69,"#a7f7ec2e");glass.addColorStop(.91,"#e8b8fd8c");glass.addColorStop(1,"#fff1f3cc");
+        ctx.beginPath();ctx.arc(0,0,.98,0,tau);ctx.fillStyle=glass;ctx.fill();
+        const rim=ctx.createLinearGradient(-1,-1,1,1);
+        rim.addColorStop(0,"#c8fff3");rim.addColorStop(.47,"#ffa9d4");rim.addColorStop(.72,"#faf2be");rim.addColorStop(1,"#a9caff");
+        ctx.strokeStyle=rim;ctx.lineWidth=.064;ctx.stroke();
+        ctx.beginPath();ctx.arc(0,0,.78,3.68,4.48);ctx.strokeStyle="#fffcf0";ctx.lineWidth=.10;ctx.stroke();
+        ctx.beginPath();ctx.arc(0,0,.82,.42,1.08);ctx.strokeStyle="#aaffec";ctx.lineWidth=.052;ctx.stroke();
+        star(ctx,0,.06,.025,.22+.16*Math.sin(t*2),false);
+        fourPoint(ctx,.72,-.67,.28,"#fff9dd");
+        ctx.restore();
+    }
     function treats(ctx,p,a) {
         const t=p.actionTime;
+        if(p.action==="feed"||p.action==="bubblePop")bubbleArt(ctx,p,a);
         if(p.action==="feed" && t<1.35) {
-            const pickup=smooth(0.08,0.68,t), bite=smooth(0.68,1.26,t);
-            let x=643+(a.right.x-643)*pickup;
-            let y=355+(a.right.y-355)*pickup-35*Math.sin(pickup*Math.PI);
-            x+=(a.mouth.x-x)*bite;
-            y+=(a.mouth.y-y)*bite-18*Math.sin(bite*Math.PI);
+            const pickup=smooth(0.08,0.68,t),scale=p.stage.scale;
+            const x=643+(a.right.x-8*scale-643)*pickup;
+            const y=355+(a.right.y-9*scale-355)*pickup-35*Math.sin(pickup*Math.PI);
             const size=smooth(0,0.15,t)*(1-smooth(1.12,1.35,t));
             star(ctx,x,y,size*1.18,0.2-0.58*pickup,true);
         }
-        if(p.action==="play" && t<1.82) {
+        if(p.action==="play" && t<2.34) {
             const palm=p.cast?.side<0 ? a.left : a.right;
             const {x,y,f}=starPath(t,p.cast,palm);
-            const size=(p.cast?1:smooth(0,0.16,t))*(1-smooth(1.48,1.80,t));
-            star(ctx,x,y,1.22*size,f*4,false);
+            const size=(p.cast?1:smooth(0,0.16,t))*(1-smooth(1.92,2.34,t));
             if(f>0.08 && f<0.95) {
-                fourPoint(ctx,x-18,y+6,5*size,"#cadbb9");
-                fourPoint(ctx,x-29,y+14,3*size,"#ebe2ae");
+                for(let i=3;i>=1;i--){
+                    const tail=starPath(t-i*.048,p.cast,palm);
+                    fourPoint(ctx,tail.x,tail.y,(8-1.5*i)*size,i%2?"#ffe4a2":"#abe6da");
+                }
+            }
+            star(ctx,x,y,1.22*size,(p.cast?.side??1)*f*4,false);
+            const catchBeat=clamp((t-1.38)/.45);
+            if(catchBeat>0 && catchBeat<1){
+                for(let i=0;i<5;i++){
+                    const angle=3.6+i*.76,dist=20+20*catchBeat;
+                    fourPoint(ctx,x+Math.cos(angle)*dist,y+Math.sin(angle)*dist,7*Math.sin(Math.PI*catchBeat),"#fff1bc");
+                }
             }
         }
         if(p.heldStar) star(ctx,p.heldStar.x,p.heldStar.y,1.22,0,false);
@@ -136,7 +277,28 @@
             fourPoint(ctx,a.mouth.x-12-f*14,a.mouth.y+f*f*24,3.6,"#ecc3b2");
             ctx.globalAlpha=1;
         }
-        if(p.action==="pat" && t>0.3 && t<1.6) {
+        if(p.contact){
+            const c=p.contact;
+            ctx.save();
+            // The two short arcs leave the face visible, even under a stationary finger.
+            ctx.translate(c.x,c.y);ctx.rotate(.22*p.brushX);
+            ctx.strokeStyle="#ffefca";ctx.lineWidth=2.8;
+            ctx.globalAlpha=.78*p.press;
+            for(const start of [-2.8,.34]){
+                ctx.beginPath();ctx.ellipse(0,0,19+3*p.press,14,start*.04,start,start+.72);ctx.stroke();
+            }
+            ctx.restore();
+            for(const s of c.sparks){
+                const f=clamp((p.time-s.at)/.72);
+                if(f>=1)continue;
+                ctx.save();ctx.translate(s.x+12*s.dx*f,s.y-10-45*f);
+                ctx.globalAlpha=(1-smooth(.25,1,f))*.93;
+                const size=.34+.43*Math.sin(Math.PI*f);
+                ctx.scale(size,size);
+                shape(ctx,"M0 10 C-27 -6 -9 -18 0 -7 C13 -20 25 -4 0 10Z","#ffc4d4","#a56682",2);
+                ctx.restore();
+            }
+        } else if(p.action==="pat" && t>0.3 && t<1.6) {
             const f=(t-0.3)/1.3;
             ctx.save(); ctx.translate(a.forehead.x+122+12*f,a.forehead.y-48-49*f);
             ctx.scale(0.7+0.3*f,0.7+0.3*f); ctx.globalAlpha=Math.sin(Math.PI*f)*0.94;
@@ -223,7 +385,7 @@
         ctx.restore();
     }
 
-    window.drawDragonProps = function(ctx,p,a,fingers) {
+    window.drawDragonProps = function(ctx,p,a,arms) {
         const s=p.stage, airborne=clamp((p.jump+s.air)/88);
         ctx.save(); ctx.globalCompositeOperation="destination-over";
         window.DragonStageArt.furniture(ctx,s,p.time,false);
@@ -237,27 +399,25 @@
         ctx.lineCap="round"; ctx.lineJoin="round";
         const cx=(a.left.x+a.right.x)/2, cy=(a.left.y+a.right.y)/2;
         ctx.save();
-        if(fingers) {
-            // Leave the original inked palms visible over the instruments.
-            ctx.beginPath(); ctx.rect(0,0,816,720);
-            for(const hand of fingers) {
-                ctx.moveTo(hand[0].x,hand[0].y);
-                for(let i=1;i<hand.length;i++) ctx.lineTo(hand[i].x,hand[i].y);
-                ctx.closePath();
-            }
-            ctx.clip("evenodd");
-        }
         window.DragonStageArt.furniture(ctx,s,p.time,true);
+        if(s.desk>.005)arms.draw(ctx,p,"table");
         const guidedPage=p.work?.id==="reading";
-        const bookTime=guidedPage ? .85*(p.still && p.work.phase==="done" ? .60 : p.work.progress) : p.time;
-        const gear=s.kind?0:s.workMix*(1-s.present*.96);
-        prop(ctx,p.book*gear,cx,cy+3,book,bookTime);
-        prop(ctx,p.pad*gear,cx,cy+17,notepad,p.time);
-        prop(ctx,p.pad*gear,a.right.x-15,a.right.y+7,quill,p.time);
+        const pageTurn=guidedPage ? (p.still && p.work.phase==="done" ? .60 : p.work.progress) : window.dragonReadingBeat(p.time).turn;
+        const gear=s.kind?0:s.workMix*(1-s.present);
+        prop(ctx,p.book*gear,cx,cy+3,book,pageTurn);
+        if(p.pad*gear>.012){
+            const page=writingLayout(a.left,p.writing,p.penPark);
+            // Apply entrance opacity to the pair as a unit so the nib stays on the ink.
+            ctx.save();ctx.globalAlpha=clamp(p.pad*gear);
+            ctx.translate(page.x,page.y);notepad(ctx,p.writing);
+            ctx.translate(page.tipX-page.x+5,page.tipY-page.y-8);quill(ctx);
+            ctx.restore();
+        }
         prop(ctx,p.keys*gear*(1-s.dock),cx,cy+16,keys,p.time);
         prop(ctx,p.lens*gear,a.right.x-1,a.right.y-6,magnifier,p.time);
         ctx.restore();
         treats(ctx,p,a);
+        arms.draw(ctx,p,"grip");
         if(p.accessory && p.accessory!=="plain")window.DragonArt.icon(ctx,p.accessory,a.fringe.x,a.fringe.y,1.18,p.head*Math.PI/180-.12);
         window.DragonArt.flock(ctx,p,a);
         if(!s.kind)window.DragonArt.work(ctx,p,a);

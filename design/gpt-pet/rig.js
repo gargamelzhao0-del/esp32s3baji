@@ -29,8 +29,6 @@
             head: 1 - smooth(314, 395, y),
             upper: 1 - smooth(370, 626, y),
             aboveFeet:1-smooth(525,623,y),
-            leftPaw: oval(x,y,179,428,68,84),
-            rightPaw: oval(x,y,373,428,64,83),
             footL: oval(x,y,232,609,48,89),
             footR: oval(x,y,305,609,48,89),
             cheek: oval(x,y,left?188:351,306,35,27),
@@ -56,11 +54,9 @@
         let dy = -p.jump + n.upper*breath + n.head*(headY + p.nod);
         dx += n.wing*((wingCos-1)*wingX - wingSin*wingY);
         dy += n.wing*(wingSin*wingX + (wingCos-1)*wingY);
-        dx += n.leftPaw*p.leftX + n.rightPaw*p.rightX;
-        dy += n.leftPaw*p.leftY + n.rightPaw*p.rightY;
         dx += n.lock*p.hair + n.tassel*p.tassel + n.tuft*p.tuft;
         dx += n.hem*(p.hair*0.28 + (n.left?-1:1)*squash*2.1);
-        dx += n.tail*(p.tailBend*(1-n.tailEnd) + p.tailTip*n.tailEnd);
+        dx += n.tail*(p.tailBend*(1-n.tailEnd) + m.tailTip*n.tailEnd);
         dy += n.tail*p.tailLift*(0.18+0.82*n.tailEnd);
         dx += (x-277)*squash*0.023*n.upper;
         dy += (626-y)*squash*0.025;
@@ -73,6 +69,13 @@
         out.y=floor+(world.y+y+dy-floor)*s.scale-s.air+(s.bodyY+30*s.seat)*n.aboveFeet+
               n.footL*s.footLY+n.footR*s.footRY;
         out.x+=s.tilt*(floor-out.y);
+        if(p.contact && n.head>.01 && p.press>.005){
+            const nx=(out.x-p.contact.x)/85, ny=(out.y-p.contact.y)/72;
+            const falloff=Math.max(0,1-nx*nx-ny*ny);
+            const weight=n.head*falloff*falloff;
+            out.x+=13*p.brushX*weight;
+            out.y+=(5*p.press+8*p.brushY)*weight;
+        }
     }
 
     function makeMesh(pixels) {
@@ -93,7 +96,40 @@
                 if(visible) triangles.push(a,b,c,b,d,c);
             }
         }
-        return {points,triangles};
+        const strain=[];
+        for(let i=0;i<triangles.length;i+=3){
+            const a=points[triangles[i]],b=points[triangles[i+1]],c=points[triangles[i+2]];
+            const u=b.u-a.u,v=b.v-a.v,w=c.u-a.u,z=c.v-a.v;
+            const det=u*z-v*w;
+            strain.push({a,b,c,u,v,w,z,ia:z/det,ib:-w/det,ic:-v/det,id:u/det});
+        }
+        return {points,triangles,strain};
+    }
+
+    // Project an over-strained triangle towards a rigid rotation about its current
+    // centre. Neighbours share vertices, so alternate traversal to avoid directional drift.
+    function relaxSilhouette(mesh,scale){
+        const list=mesh.strain,limit=.22;
+        for(let pass=0;pass<10;pass++){
+            let worst=0;
+            for(let j=0;j<list.length;j++){
+                const q=list[pass%2?list.length-1-j:j],{a,b,c}=q;
+                const bx=(b.x-a.x)/scale,by=(b.y-a.y)/scale,cx=(c.x-a.x)/scale,cy=(c.y-a.y)/scale;
+                const xx=bx*q.ia+cx*q.ic,xy=bx*q.ib+cx*q.id;
+                const yx=by*q.ia+cy*q.ic,yy=by*q.ib+cy*q.id;
+                const h=xx+yy,k=yx-xy,norm=Math.hypot(h,k);
+                const cos=norm>1e-6?h/norm:1,sin=norm>1e-6?k/norm:0;
+                const error=(xx-cos)**2+(xy+sin)**2+(yx-sin)**2+(yy-cos)**2;
+                if(error<=limit*limit)continue;
+                worst=Math.max(worst,error);
+                const weight=(1-limit/Math.sqrt(error))*scale;
+                const ux=(cos*q.u-sin*q.v-bx)*weight,uy=(sin*q.u+cos*q.v-by)*weight;
+                const vx=(cos*q.w-sin*q.z-cx)*weight,vy=(sin*q.w+cos*q.z-cy)*weight;
+                const mx=(ux+vx)/3,my=(uy+vy)/3;
+                a.x-=mx;a.y-=my;b.x+=ux-mx;b.y+=uy-my;c.x+=vx-mx;c.y+=vy-my;
+            }
+            if(worst<.24*.24)break;
+        }
     }
 
     // Scan-convert triangles into one transparent frame. Adjacent triangles share
@@ -158,92 +194,113 @@
         out.x=(a.x*bind.wi+b.x*bind.wj+c.x*bind.wk)/sx;
         out.y=(a.y*bind.wi+b.y*bind.wj+c.y*bind.wk)/sy;
     }
-    const fingers=[
-        [[159,427],[162,417],[169,411],[178,410],[188,413],[195,422],[197,429],[193,440],[186,447],[176,449],[166,445],[161,438]],
-        [[354,425],[358,416],[366,410],[375,410],[385,413],[392,420],[394,429],[391,438],[384,446],[374,448],[365,446],[358,440]]
-    ];
-
     class DragonRig {
-        constructor(canvas,image) {
+        constructor(canvas,image,armArt) {
             this.canvas=canvas;
             const backing=document.createElement("canvas");
             backing.width=W; backing.height=H;
             const art=backing.getContext("2d",{willReadFrequently:true});
             art.drawImage(image,0,0);
+            art.drawImage(armArt,0,0,263,98,145,360,263,98);
+            this.arms=new window.DragonArms(armArt);
             this.texture=art.getImageData(0,0,W,H).data;
             this.face=new window.DragonFace(image);
             this.mesh=makeMesh(this.texture);
             this.ctx=canvas.getContext("2d",{alpha:true});
             this.frame=this.ctx.createImageData(canvas.width,canvas.height);
+            const probe=document.createElement("canvas");probe.width=probe.height=3;
+            this.depthProbe=probe.getContext("2d",{willReadFrequently:true});
             this.landmarks={
                 mouth:bindPoint(270,320), left:bindPoint(178,427), right:bindPoint(374,427),
+                leftShoulder:bindPoint(217,375),rightShoulder:bindPoint(332,375),
                 forehead:bindPoint(263,173), fringe:bindPoint(153,192), eyes:bindPoint(270,279), nose:bindPoint(270,305),
                 wingL:bindPoint(51,413), wingR:bindPoint(516,410), tail:bindPoint(506,547),
                 footL:bindPoint(232,615), footR:bindPoint(305,615)
             };
             this.anchors=Object.fromEntries(Object.keys(this.landmarks).map(k=>[k,{x:0,y:0}]));
-            this.fingers=fingers.map(hand=>hand.map(([x,y])=>({...bindPoint(x,y),x:0,y:0})));
-            this.palmWeights={};
-            for(const hand of ["left","right"]){
-                const b=this.landmarks[hand],pts=this.mesh.points,key=hand+"Paw";
-                this.palmWeights[hand]=b.wi*pts[b.i][key]+b.wj*pts[b.j][key]+b.wk*pts[b.k][key];
-            }
             const mask=this.ctx.createLinearGradient(this.canvas.width*.927,0,this.canvas.width,0);
-            mask.addColorStop(0,"#000");mask.addColorStop(1,"transparent");this.edge=mask;
+            mask.addColorStop(0,"transparent");mask.addColorStop(1,"#000");this.edge=mask;
         }
 
-        pin(hand,x,y,amount,sx,sy){
+        pin(hand,x,y,amount){
             if(amount<=.003)return;
-            const at=this.anchors[hand], key=hand+"Paw";
-            readPoint(this.landmarks[hand],this.mesh.points,sx,sy,at);
-            const w=amount/this.palmWeights[hand], dx=(x-at.x)*w*sx,dy=(y-at.y)*w*sy;
-            for(const n of this.mesh.points){n.x+=n[key]*dx;n.y+=n[key]*dy;}
+            const at=this.anchors[hand],w=Math.min(1,amount);
+            at.x+=(x-at.x)*w;at.y+=(y-at.y)*w;
+        }
+
+        hiddenByDesk(key,at){
+            const p=this.rendered,s=p?.stage;
+            if(!s || s.desk<.5 || this.arms.hands[key]?.depth==="table")return false;
+            if(at.x<s.handle-34 || at.x>s.handle+320 || at.y<380 || at.y>688)return false;
+            const c=this.depthProbe;
+            c.resetTransform();c.clearRect(0,0,3,3);c.translate(1.5-at.x,1.5-at.y);
+            window.DragonStageArt.furniture(c,s,p.time,true);
+            return c.getImageData(1,1,1,1).data[3]>150;
         }
 
         draw(p) {
             const sx=this.canvas.width/world.width, sy=this.canvas.height/world.height;
             const rad=Math.PI/180, headRad=p.head*rad;
-            const leftRad=(p.wing+p.leftWing)*rad, rightRad=(p.wing+p.rightWing)*rad;
+            const leftRad=22*Math.tanh((p.wing+p.leftWing)/22)*rad;
+            const rightRad=22*Math.tanh((p.wing+p.rightWing)/22)*rad;
             const m={headCos:Math.cos(headRad),headSin:Math.sin(headRad),
                      leftCos:Math.cos(leftRad),leftSin:Math.sin(leftRad),
-                     rightCos:Math.cos(rightRad),rightSin:Math.sin(rightRad)};
+                     rightCos:Math.cos(rightRad),rightSin:Math.sin(rightRad),tailTip:22*Math.tanh(p.tailTip/22)};
             this.face.update(this.texture,W,p);
             for(const n of this.mesh.points) {
                 project(n,p,m,n);
+            }
+            relaxSilhouette(this.mesh,p.stage.scale);
+            for(const n of this.mesh.points){
                 n.x*=sx; n.y*=sy;
             }
             const s=p.stage,desk=window.DragonStage.desk;
-            this.pin("right",s.handle,desk.y,s.grip,sx,sy);
-            this.pin("right",s.handle+desk.buttonX,desk.y+desk.buttonY-5+4*s.press,s.switchReach,sx,sy);
+            const {points,triangles}=this.mesh;
+            for(const [name,point] of Object.entries(this.landmarks))readPoint(point,points,sx,sy,this.anchors[name]);
+            for(const hand of ["left","right"]){
+                this.anchors[hand].x+=s.scale*p[hand+"X"];this.anchors[hand].y+=s.scale*p[hand+"Y"];
+            }
+            this.pin("right",s.handle,desk.y,s.grip);
+            this.pin("right",s.handle+desk.buttonX,desk.y+desk.buttonY-5+4*s.press,s.switchReach);
             if(!s.kind && s.boot>0 && s.desk>.99 && !s.switchReach && p.keyContact>.003){
                 const phase=s.keyStroke;
                 const accents=p.work?.id==="running"?p.work:null;
                 for(const [hand,sign,keyX] of [["left",-1,desk.keyLeft],["right",1,desk.keyRight]]){
                     const hit=accents?.lastSide===sign?Math.min(1,accents.beatGlow/.25):0;
                     this.pin(hand,s.handle+keyX,desk.y-23-12*Math.max(0,sign*phase)+4*hit,
-                             p.keyContact,sx,sy);
+                             p.keyContact);
                 }
             }
-            if(s.present>0)this.pin("right",s.handle+desk.screenX-65,desk.y+desk.screenY-26,s.present,sx,sy);
+            if(s.present>0)this.pin("right",s.handle+desk.screenX-65,desk.y+desk.screenY-26,s.present);
+            const writing=s.kind?0:Math.min(1,p.pad*s.workMix*(1-s.present));
+            if(writing>.003){
+                const page=window.DragonWriting.layout(this.anchors.left,p.writing,p.penPark);
+                this.pin("right",page.tipX+10,page.tipY-17,writing);
+            }
+            if(p.action==="feed"){
+                const bite=smooth(.68,1.18,p.actionTime)*(1-smooth(1.30,1.65,p.actionTime));
+                this.pin("right",this.anchors.mouth.x+8*s.scale,this.anchors.mouth.y+9*s.scale,bite);
+            }
+            for(const [hand,side] of [["left",-1],["right",1]]){
+                const at=this.anchors[hand];
+                const arm=window.DragonArms.solve(this.anchors[hand+"Shoulder"],at,side,s.scale);
+                this.arms.hands[hand]=arm;at.x=arm.x;at.y=arm.y;
+            }
             const dst=this.frame.data;
             dst.fill(0);
-            const {points,triangles}=this.mesh;
             for(let i=0;i<triangles.length;i+=3) {
                 paintTriangle(points[triangles[i]],points[triangles[i+1]],points[triangles[i+2]],
                               this.texture,dst,this.canvas.width,this.canvas.height);
             }
-            for(const [name,point] of Object.entries(this.landmarks)) {
-                readPoint(point,points,sx,sy,this.anchors[name]);
-            }
-            const holding=Math.max(p.book,p.pad,p.lens,p.keys,p.stage.desk)>0.012;
-            if(holding) for(const hand of this.fingers) for(const finger of hand) readPoint(finger,points,sx,sy,finger);
             this.ctx.putImageData(this.frame,0,0);
             this.ctx.save();
             this.ctx.setTransform(sx,0,0,sy,0,0);
-            window.drawDragonProps(this.ctx,p,this.anchors,holding?this.fingers:null);
+            this.arms.draw(this.ctx,p,"body");
+            window.drawDragonProps(this.ctx,p,this.anchors,this.arms);
             this.ctx.restore();
+            this.rendered=p;
             if(s.desk>.005 && s.handle+314>765){
-                this.ctx.save();this.ctx.globalCompositeOperation="destination-in";this.ctx.fillStyle=this.edge;
+                this.ctx.save();this.ctx.globalCompositeOperation="destination-out";this.ctx.fillStyle=this.edge;
                 this.ctx.fillRect(this.canvas.width*.927,0,this.canvas.width*.073+1,this.canvas.height);this.ctx.restore();
             }
         }

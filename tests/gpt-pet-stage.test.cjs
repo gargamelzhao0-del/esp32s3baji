@@ -50,6 +50,21 @@ test("a planted foot holds its ground through a stride while the other foot rise
     }
     assert(longest>=12);assert(drift<.001);
 });
+test("a confirmation during a pull takes the display immediately and preserves the cart position",()=>{
+    const {stage,scene,tick}=create();
+    scene({state:"working"});tick(2.27);
+    const before=stage.sample();
+    scene({state:"waiting"});
+    const interrupted=stage.sample();
+    assert.equal(interrupted.displayMode,"waiting");assert.equal(interrupted.grip,0);
+    for(const key of ["x","handle","scale","footLX","footRY"])assert.equal(interrupted[key],before[key]);
+    tick(.24);
+    const middle=stage.sample();
+    assert(middle.handle<before.handle && middle.handle>324);
+    scene({state:"ended"});
+    assert.equal(stage.sample().handle,middle.handle);
+    tick(1);assert.equal(stage.office,null);
+});
 test("only an explicit success edge automatically starts the two-hop celebration",()=>{
     const {stage,scene,tick}=create();
     for(const state of ["working","ended","cancelled"]){scene({state});assert.equal(stage.mood,null);}

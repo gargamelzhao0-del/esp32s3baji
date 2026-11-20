@@ -12,7 +12,7 @@ header{max-width:1160px;margin:0 auto;padding:35px 32px 24px;border-bottom:1px s
 .tag{font-size:12px;border:1px solid #354344;border-radius:30px;padding:7px 12px;white-space:nowrap;color:#b2c1c2}
 main{max-width:1160px;margin:auto;display:grid;grid-template-columns:1.15fr 1fr;gap:50px;padding:30px 32px}
 .stage{display:flex;flex-direction:column;align-items:center;gap:20px;min-width:0}.stage-label{align-self:stretch;display:flex;justify-content:space-between;font-size:11px;letter-spacing:2px;color:#738787}
-.device{width:min(100%,500px);aspect-ratio:1;border-radius:50%;padding:16px;background:linear-gradient(140deg,#465052,#151d20 30%,#070c0e 70%,#384446);box-shadow:0 22px 70px #0009,inset 0 0 0 1px #62707150}
+.device{width:min(100%,500px);aspect-ratio:1;border-radius:50%;padding:13px;background:conic-gradient(from -38deg,#51434e,#e8cba5 12%,#6a6065 24%,#3a3440 36%,#b49e90 52%,#6b5964 65%,#d5b8a3 84%,#51434e);box-shadow:0 22px 70px #0009,inset 0 0 0 1px #eddbbb80,inset 0 0 0 4px #302d39,inset 0 0 0 5px #f5e3bf66}
 .viewport{width:100%;aspect-ratio:1;border-radius:50%;overflow:hidden;position:relative;background:#000;box-shadow:0 0 0 2px #020505}
 .screen{width:466px;height:466px;position:absolute;top:0;left:0;transform-origin:0 0;transform:scale(var(--scale,1));background:#030807;border-radius:50%;overflow:hidden;touch-action:none;user-select:none;--theme:#96ddcb;--glow:#14382c}
 .screen[data-theme=claude_code]{--theme:#ecad89;--glow:#462718}
@@ -28,7 +28,7 @@ main{max-width:1160px;margin:auto;display:grid;grid-template-columns:1.15fr 1fr;
 [hidden]{display:none!important}
 .screen.has-gpt .brand{top:24px}.screen.has-gpt .model{top:50px;font-size:18px}
 .gpt-canvas{position:absolute;left:63px;top:61px;width:340px;height:300px;cursor:grab;touch-action:none;outline-offset:-18px}
-.gpt-canvas:active{cursor:grabbing}.gpt-canvas:focus-visible{outline:2px dotted var(--theme);border-radius:40%}
+.gpt-canvas{transform-origin:50% 96%}.gpt-canvas:active{cursor:grabbing}.gpt-canvas:focus-visible{outline:2px dotted var(--theme);border-radius:40%}
 .pet-panel{width:min(100%,460px);border-top:1px solid var(--line);padding-top:15px}
 .pet-response{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:24px;margin-bottom:11px;color:#dce9e4;font-size:14px}
 .bond{flex:none;font-size:12px;color:#c6b2d7}.pet-actions{display:flex;gap:8px}
@@ -43,8 +43,36 @@ main{max-width:1160px;margin:auto;display:grid;grid-template-columns:1.15fr 1fr;
 .pill i{width:6px;height:6px;background:var(--theme);border-radius:50%}.screen.waiting .pill{color:#ffd89d;background:#382a17;border-color:#765c32}.screen.offline .pill{background:#1b2327;color:#abb5b9}
 .meters{position:absolute;left:111px;top:391px;width:244px;display:grid;grid-template-columns:1fr 1fr;text-align:center}.meter span{display:block;font-size:18px;color:#8fa4a0;line-height:1.15}.meter b{font-weight:500;font-size:21px;line-height:1.25}.meter+ .meter{border-left:1px solid #ffffff18}
 .connection{position:absolute;top:441px;width:100%;text-align:center;font-size:11px;letter-spacing:1px;color:#7f9390}
-.heart{position:absolute;top:138px;left:320px;font-size:28px;color:#f5a7ad;opacity:0;pointer-events:none}.heart.pop{animation:heart .9s ease-out}
+.heart{position:absolute;pointer-events:none;color:#ffeac7;opacity:0}
+.heart.pop{opacity:1}.heart i{position:absolute;top:-10px;left:-10px;width:18px;height:18px;display:grid;place-items:center;font:600 18px/1 Georgia,serif;filter:drop-shadow(0 1px 3px #0b1527);animation:greeting 1.2s ease-out both}
+.heart i:nth-child(1){--dx:-28px;--dy:-33px;--angle:-22deg}.heart i:nth-child(2){--dx:4px;--dy:-48px;--angle:12deg}.heart i:nth-child(3){--dx:31px;--dy:-24px;--angle:24deg}
+.heart[data-family="deepseek"] i{border-radius:50%;color:transparent;width:13px;height:13px;border:1.5px solid #b9f7ff;background:radial-gradient(circle at 29% 23%,#fff 5%,transparent 15%),linear-gradient(140deg,#64eaf34a,#be9efb77)}
+.heart[data-family="claude"] i{clip-path:polygon(0 26%,100% 0,63% 100%,45% 54%);background:linear-gradient(145deg,#fff1c9 45%,#d8a8a1 47% 61%,#ffe2ba 64%)}
+.screen.reduced .heart i,.heart i{transform:translate(var(--dx),var(--dy)) rotate(var(--angle))}
+@keyframes greeting{0%{opacity:0;transform:translate(0,0) scale(.3)}18%{opacity:1}76%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--angle)) scale(.78)}}
+.heart{transform:scaleX(var(--heading,1))}
+.heart[data-family="claude"] i{animation-name:paper-flight}
+.heart[data-family="claude"] i:nth-child(2){animation-delay:85ms;width:14px;height:14px}
+.heart[data-family="claude"] i:nth-child(3){animation-delay:150ms;width:10px;height:10px}
+@keyframes paper-flight{0%{opacity:0;transform:translate(-6px,6px) rotate(43deg) scale(.45)}16%{opacity:1}43%{transform:translate(23px,-13px) rotate(15deg)}72%{opacity:1;transform:translate(calc(25px + var(--dx)),-33px) rotate(-38deg)}100%{opacity:0;transform:translate(calc(38px + var(--dx)),var(--dy)) rotate(21deg) scale(.65)}}
+.heart[data-family="deepseek"] i{animation-name:whale-bubbles}
+.heart[data-family="deepseek"] i:nth-child(2){width:19px;height:19px;animation-delay:65ms}
+.heart[data-family="deepseek"] i:nth-child(3){width:9px;height:9px;animation-delay:125ms}
+@keyframes whale-bubbles{0%{opacity:0;transform:translateY(5px) scale(.28)}22%{opacity:.96;transform:translate(3px,-8px) scale(1.08,.93)}58%{transform:translate(var(--dx),-24px) scale(.94,1.06)}87%{opacity:.94;transform:translate(calc(var(--dx) - 6px),var(--dy)) scale(1)}100%{opacity:0;transform:translate(var(--dx),calc(var(--dy) - 8px)) scale(1.32)}}
+.heart[data-family="gemini"]::before{content:"";position:absolute;left:-28px;top:-48px;width:60px;height:28px;background:#f4dfb4;clip-path:polygon(0 54%,53% 0,100% 86%,53% 8%,2% 60%);animation:constellation 1.15s both}
+@keyframes constellation{0%,28%{opacity:0}56%,77%{opacity:.88}100%{opacity:0}}
+.screen.reduced .heart::before{animation:none;opacity:.82}
 .page{display:none;position:absolute;inset:0}.page.active{display:block}
+.night-sky{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.dial-rim{position:absolute;inset:6px;border:1px solid #d9c39c80;border-radius:50%;pointer-events:none;box-shadow:inset 0 0 0 3px #11172566,inset 0 0 0 4px #dccfef26}
+.dial-rim::after{content:"";position:absolute;inset:5px;border-radius:inherit;background:repeating-conic-gradient(from -1deg,#ebd5ba77 0 .27deg,transparent .42deg 6deg);mask:radial-gradient(closest-side,transparent calc(100% - 3px),#000 calc(100% - 2.5px))}
+.screen .page[data-page="0"] .brand{font-family:Georgia,"Times New Roman",serif;font-weight:500;letter-spacing:3px;color:var(--theme);text-shadow:0 2px 5px #081522}
+.page[data-page="0"] .model{font-size:16px;letter-spacing:.8px;color:#ece5e0;text-shadow:0 2px 4px #081522}
+.page[data-page="0"] .pill{background:#162032e8;border-color:#c5b9bc77;color:#f8e9d5;box-shadow:inset 0 1px 1px #fff1,0 2px 8px #0d132d55}
+.screen.waiting .page .pill{background:#443021;color:#ffe7ba;border-color:#d6a354}
+.screen.error .page .pill{color:#ffd4d5;border-color:#cb8991}
+.screen.offline .night-sky{filter:saturate(.55) brightness(.77)}
+.page .meters .meter span,.page .connection{color:#bdc5d7}
 .page-title{position:absolute;top:42px;width:100%;text-align:center;color:var(--theme);font-size:20px;font-weight:600}
 .detail-body{position:absolute;left:69px;top:90px;width:328px;display:grid;gap:12px}
 .card{border:1px solid #ffffff18;background:#15201dcc;border-radius:15px;padding:12px 16px;font-size:18px}
@@ -70,13 +98,15 @@ footer{max-width:1160px;padding:5px 32px 28px;margin:auto;font-size:11px;color:#
 </style>
 </head>
 <body>
-<header><div><h1>AI 电子吧唧</h1><p>Waveshare 1.75″ 圆屏 · 466 × 466</p></div><span class="tag" id="source-tag">Agent 和用量为演示数据</span></header>
+<header><div><h1>AI 电子吧唧</h1><p>Waveshare 1.75C 圆屏 · 466 × 466</p></div><span class="tag" id="source-tag">Agent 和用量为演示数据</span></header>
 <main>
 <section class="stage" aria-label="设备预览">
 <div class="device"><div class="viewport" id="viewport">
 <div class="screen" id="screen" data-theme="codex">
-<div class="halo"></div><svg class="ring" viewBox="0 0 466 466" aria-hidden="true"><circle class="ring-base" cx="233" cy="233" r="221"/><circle class="ring-active" cx="233" cy="233" r="221"/></svg>
+<div class="halo"></div>
 <section class="page active" data-page="0">
+<canvas class="night-sky" id="night-sky" width="932" height="932" aria-hidden="true"></canvas>
+<div class="dial-rim" aria-hidden="true"></div><svg class="ring" viewBox="0 0 466 466" aria-hidden="true"><circle class="ring-base" cx="233" cy="233" r="218"/><circle class="ring-active" cx="233" cy="233" r="218"/></svg>
 <div class="brand" id="brand">CODEX</div><div class="model" id="model">GPT · 演示型号</div>
 <img class="character" id="character" alt="GPT 白龙娘" src="../assets/ai-girls/state-poses/gpt/idle.webp">
 <canvas id="neutral-art" width="96" height="96" aria-label="等待识别角色" role="img" hidden></canvas>
@@ -85,7 +115,7 @@ footer{max-width:1160px;padding:5px 32px 28px;margin:auto;font-size:11px;color:#
 <button id="work-button" class="charm charm-work" aria-describedby="work-cue"><canvas width="70" height="60" aria-hidden="true"></canvas><span>摇铃</span></button>
 <button id="pocket-open" class="charm charm-pocket" aria-haspopup="dialog" aria-controls="pet-pocket" aria-expanded="false"><canvas width="70" height="60" data-art="pocket" aria-hidden="true"></canvas><span>口袋</span></button>
 <div id="work-cue" role="status" hidden></div></div>
-<div class="heart" id="heart">♥</div><div class="pill" id="pill"><i></i><span id="status">待命</span></div>
+<div class="heart" id="heart" aria-hidden="true"></div><div class="pill" id="pill"><i></i><span id="status">待命</span></div>
 <div class="meters"><div class="meter"><span>额度剩余</span><b id="remaining">68%</b></div><div class="meter"><span>上下文</span><b id="context">42%</b></div></div>
 <div class="connection" id="connection">USB · 最近活动</div>
 <div id="pet-pocket" role="dialog" aria-labelledby="pocket-title" hidden>
@@ -142,12 +172,15 @@ footer{max-width:1160px;padding:5px 32px 28px;margin:auto;font-size:11px;color:#
 </aside>
 </main>
 <footer>白龙娘设定来自 ZipZipPipe，角色立绘来自 CrossPet。动画改编沿用 CC BY-NC-SA 4.0。<a href="gpt-pet/README.md">动画与署名</a> · <a href="../assets/ai-girls/sources/crosspet/LICENSE.md">原始许可</a></footer>
+<script src="gpt-pet/night-sky.js"></script>
 <script src="gpt-pet/portrait.js"></script>
 <script src="gpt-pet/face.js"></script>
 <script src="gpt-pet/props.js"></script>
 <script src="gpt-pet/desk-art.js"></script>
 <script src="gpt-pet/stage-art.js"></script>
 <script src="gpt-pet/stage.js"></script>
+<script src="gpt-pet/arms-art.js"></script>
+<script src="gpt-pet/arms.js"></script>
 <script src="gpt-pet/rig.js"></script>
 <script src="gpt-pet/play.js"></script>
 <script src="gpt-pet/work.js"></script>
@@ -175,7 +208,7 @@ const linked=["http:","https:"].includes(location.protocol)&&new URLSearchParams
 let feed=null;
 if(linked){demo.model="neutral";demo.client="unknown";demo.unknown=true;demo.used=0;demo.context=0;}
 DragonArt.icon($("neutral-art").getContext("2d"),"pocket",48,48,1.45);
-let toastTimer,petTimer,sequenceTimer,petAt=-Infinity;
+let toastTimer,petTimer,sequenceTimer,portraitGreeting=null;
 const motionPreference=matchMedia("(prefers-reduced-motion: reduce)");
 const bondKey="ai-baji.gpt.bond.v1";
 function readBond(){
@@ -213,8 +246,8 @@ dragon.ready.then(()=>{petReady=true;render();}).catch(()=>{
  petFailed=true;$("pet-response").textContent="白龙娘的动画未能载入。";render();
 });
 function modelFamily(){return demo.model.startsWith("claude-")?"claude":demo.model}
-function posePath(){
- let pose=definitions[demo.state].pose, family=modelFamily();
+function posePath(pose=definitions[demo.state].pose){
+ const family=modelFamily();
  if(family==="claude"&&["reading","happy","sleeping"].includes(pose))pose+="-2";
  return "../assets/ai-girls/state-poses/"+family+"/"+pose+".webp";
 }
@@ -229,7 +262,7 @@ function petControls(round){
    button.querySelector(".game-label").textContent=five?(selected?"结束击掌":"和她击掌"):(selected?"送走萤火虫":"引萤火虫");
  }
  const touch=matchMedia("(pointer: coarse)").matches;
- let hint="点手心击掌，连点三次尾巴逗她。口袋里的「小剧场」可以看她搬桌开工。\n从袖口向上抛星，沿圆屏边缘滑动翻页。";
+ let hint="喂一颗星糖，等她吹出糖泡泡，再轻点戳破。\n碰手心可以击掌，沿圆屏边缘滑动翻页。";
  if(work){
    hint=work.phase==="done"?dragon.work.item.done:(work.id==="reading"?"按住书的右角往左翻，轻点书角也可以。":dragon.work.cue()+"。");
    if(!touch&&work.phase==="offer")hint+=" 空格可参与，Esc 可收起。";
@@ -245,10 +278,12 @@ function petControls(round){
    hint=reduced?"可以选择下一项互动。":"让她安静几秒，看看她还记不记得刚才用的是哪只手。";
  } else if(dragon.stage.sulking){
    hint="她正鼓着脸。喂颗星糖哄哄她，或给她一小会儿。";
+ } else if(dragon.stage.canPresent && demo.state==="writing"){
+   hint="她在纸上画一张猫脸。轻点手帐右下角，可以盖个小爪印。";
  } else if(dragon.stage.canPresent){
    hint="轻碰桌上的小显示器，她会转给你看。左侧小物件可以陪她工作。";
  }
- $("gesture-note").textContent=gpt?hint:"从圆屏边缘滑动翻页，长按空白处打开设置。";
+ $("gesture-note").textContent=gpt?hint:demo.model==="neutral"?"从圆屏边缘滑动翻页。":"轻点角色和她打招呼，从圆屏边缘滑动翻页。";
  $("gpt-canvas").setAttribute("aria-label",work?dragon.work.item.name:kind==="five"?"和白龙娘击掌":kind==="fly"?"引导萤火虫":dragon.stage.sulking?"白龙娘正鼓着脸，可以用喂星糖和好。":"GPT 白龙娘。按空格摸摸头。");
 }
 function render(){
@@ -261,8 +296,11 @@ function render(){
  const modelText=linked?(feed?.model||"型号未知"):modelLabels[demo.model];
  $("model").textContent=linked?modelText:modelText+" · 演示";$("model").title=modelText;
  const neutral=demo.model==="neutral";
- const path=isGpt?"../assets/ai-girls/state-poses/gpt/idle.webp":neutral?null:posePath();
+ if(portraitGreeting && (portraitGreeting.model!==demo.model || portraitGreeting.state!==demo.state ||
+    portraitGreeting.scope!==demo.scope || portraitGreeting.reduced!==reduced || demo.page!==0 || demo.offline || document.hidden))clearGreeting();
+ const path=isGpt?"../assets/ai-girls/state-poses/gpt/idle.webp":neutral?null:posePath(portraitGreeting?"happy":def.pose);
  if(path&&$("character").getAttribute("src")!==path)$("character").src=path;
+ $("character").tabIndex=isGpt||neutral?-1:0;
  $("character").hidden=neutral||isGpt&&petReady;$("neutral-art").hidden=!neutral;
  $("gpt-canvas").hidden=!isGpt||!petReady;
  $("pet-panel").hidden=!isGpt||demo.page!==0;
@@ -335,14 +373,46 @@ function render(){
  $("quota-range-label").textContent="额度已用 "+(linked?$("used-detail").textContent:demo.used+"%");$("context-range-label").textContent="上下文 "+(linked?$("context-detail").textContent:demo.context+"%");
 }
 function showPage(page){demo.page=page;render()}
-function pet(){
- if(demo.model==="gpt"){if(petReady)dragon.care("pat");return}
- if(demo.offline){toast("当前离线 · 等待电脑同步");return}
- if(performance.now()-petAt<3000)return;petAt=performance.now();
- if(demo.state==="waiting"||demo.state==="error"){toast(demo.state==="waiting"?"等待电脑端确认 · 提示保持可见":"异常提示保持可见");return}
- $("heart").classList.remove("pop");void $("heart").offsetWidth;$("heart").classList.add("pop");
- clearTimeout(petTimer);petTimer=setTimeout(()=>$("heart").classList.remove("pop"),1000);
+function clearGreeting(){
+ clearTimeout(petTimer);
+ portraitGreeting?.animation?.cancel();
+ portraitGreeting=null;
+ $("heart").classList.remove("pop");
+ $("heart").replaceChildren();
 }
+function pet(x=233,y=204){
+ if(demo.model==="gpt"){if(petReady)dragon.care("pat");return}
+ if(demo.model==="neutral" || demo.page!==0)return;
+ if(demo.offline){toast("当前离线 · 等待电脑同步");return}
+ if(["waiting","error","limited"].includes(demo.state)){toast(definitions[demo.state].label);return}
+ if(portraitGreeting)return;
+ const family=modelFamily(),art=$("character"),effect=$("heart");
+ portraitGreeting={model:demo.model,state:demo.state,scope:demo.scope,reduced:demo.reduced||motionPreference.matches};
+ effect.dataset.family=family;effect.style.left=x+"px";effect.style.top=y+"px";
+ const direction=x<233?-1:1;
+ effect.style.setProperty("--heading",direction);
+ for(const glyph of ["✧","✦","✧"]){const speck=document.createElement("i");speck.textContent=glyph;effect.append(speck);}
+ effect.classList.add("pop");
+ render();
+ if(!demo.reduced&&!motionPreference.matches){
+   const gestures={
+     claude:[[.18,-1,1,-1.2],[.45,2,-2,1.7],[.70,1,-1,.7]],
+     deepseek:[[.18,0,2,0],[.49,3,-5,1.8],[.77,-1,0,-.8]],
+     gemini:[[.17,-1,2,-1.2],[.38,5,-9,2.4],[.58,3,1,1.2],[.77,1,-2,-.6]]
+   };
+   const frames=[{transform:"none"}];
+   for(const [offset,dx,dy,angle] of gestures[family]||gestures.gemini){
+     frames.push({offset,transform:`translate(${direction*dx}px,${dy}px) rotate(${direction*angle}deg)`,easing:"ease-in-out"});
+   }
+   frames.push({transform:"none"});
+   portraitGreeting.animation=art.animate(frames,{duration:960,easing:"ease-in-out"});
+ }
+ petTimer=setTimeout(()=>{clearGreeting();render();},1200);
+}
+$("character").setAttribute("role","button");
+$("character").addEventListener("keydown",e=>{
+ if(!e.repeat&&(e.key===" "||e.key==="Enter")){e.preventDefault();pet();}
+});
 document.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click",()=>showPage(Number(b.dataset.goto))));
 document.querySelectorAll("[data-client]").forEach(b=>b.addEventListener("click",()=>{demo.client=b.dataset.client;render()}));
 document.querySelectorAll("[data-state]").forEach(b=>b.addEventListener("click",()=>{if(sequenceTimer)stopPlayback();demo.state=b.dataset.state;render()}));
@@ -355,7 +425,10 @@ $("reduce-motion").addEventListener("change",e=>{demo.reduced=e.target.checked;r
 motionPreference.addEventListener("change",render);
 document.addEventListener("visibilitychange",render);
 document.querySelectorAll("[data-care]").forEach(button=>{
- button.addEventListener("click",()=>dragon.care(button.dataset.care));
+ button.addEventListener("click",()=>{
+   dragon.care(button.dataset.care);
+   if(button.dataset.care==="feed")$("gpt-canvas").focus({preventScroll:true});
+ });
 });
 document.querySelectorAll("[data-game]").forEach(button=>button.addEventListener("click",()=>{
  if(dragon.game.round?.kind===button.dataset.game){dragon.game.end();return;}
@@ -365,11 +438,12 @@ document.querySelectorAll("[data-game]").forEach(button=>button.addEventListener
 $("gpt-canvas").addEventListener("keydown",event=>{
  const activate=event.key==="Enter"||event.key===" ";
  if(event.repeat && activate){event.preventDefault();return;}
+ if(activate && dragon.popBubble()){event.preventDefault();return;}
  if(dragon.work.key(event.key)||dragon.game.key(event.key)){event.preventDefault();return;}
  if(activate){event.preventDefault();dragon.care("pat");}
 });
 $("gpt-canvas").addEventListener("click",event=>{
- if(event.detail===0 && !dragon.work.key("Enter") && !dragon.game.key("Enter"))dragon.care("pat");
+ if(event.detail===0 && !dragon.popBubble() && !dragon.work.key("Enter") && !dragon.game.key("Enter"))dragon.care("pat");
 });
 $("brightness").addEventListener("input",e=>{$("brightness-value").textContent=e.target.value+"%";$("screen").style.filter="brightness("+(0.6+Number(e.target.value)/100)+")"});
 function stopPlayback(){clearInterval(sequenceTimer);sequenceTimer=null;$("play-button").textContent="播放工作流程 ↗"}
@@ -384,6 +458,7 @@ let start=null,holdTimer=null;
 function livePet(){return petReady&&demo.model==="gpt"&&demo.page===0;}
 function clearGesture(){clearTimeout(holdTimer);start=null;}
 function cancelGesture(){
+ dragon.endStroke(start?.contact,true);
  if(start?.work===dragon.work.round)dragon.work.cancelDrag();
  const round=start?.round;
  if(round && round===dragon.game.round && round.kind==="fly" && round.phase==="offer"){
@@ -392,8 +467,10 @@ function cancelGesture(){
  clearGesture();dragon.heldStar=null;dragon.releaseAttention();
 }
 function inPlayArea(p){return p && p.worldX>=69 && p.worldX<=747 && p.worldY>=32 && p.worldY<=680;}
-function patOnce(gesture){
- if(!gesture.handled){gesture.handled=true;dragon.care("pat",gesture.point.x);}
+function touchHead(gesture){
+ if(gesture.handled)return;
+ gesture.handled=true;
+ gesture.contact=dragon.beginStroke(gesture.point,gesture.stamp);
 }
 $("screen").addEventListener("pointerdown",e=>{
  if(start||!e.isPrimary||e.button!==0||e.target.closest("button,input,a,#pet-pocket"))return;
@@ -401,8 +478,12 @@ $("screen").addEventListener("pointerdown",e=>{
  const point=livePet()?dragon.pointAt(e.clientX,e.clientY,e.pointerType):null;
  const round=inPlayArea(point)?dragon.game.round:null;
  start={id:e.pointerId,x:e.clientX,y:e.clientY,scale,point,round,scene:dragon.scene,page:demo.page,model:demo.model,
-        rubbing:point?.region==="head",handled:false};
+        rubbing:point?.region==="head",stamp:e.timeStamp,handled:false};
  $("screen").setPointerCapture(e.pointerId);
+ const bubble=point && dragon.offeredBubble();
+ if(bubble && Math.hypot(point.worldX-bubble.x,point.worldY-bubble.y)<=bubble.r+18){
+   start.bubble=dragon.action;return;
+ }
  const bird=point?dragon.craneAtPoint(point):-1;
  if(bird>=0){start.bird=bird;return;}
  if(inPlayArea(point)&&(dragon.work.round||dragon.work.direct(point))){
@@ -416,9 +497,10 @@ $("screen").addEventListener("pointerdown",e=>{
  if(dragon.stage.onMonitor(point)){start.monitor=true;return;}
  if(point)dragon.attend(point);
  const gesture=start;
+ if(gesture.rubbing && !point.part && !dragon.scene.reduced){touchHead(gesture);return;}
  holdTimer=setTimeout(()=>{
    if(start!==gesture)return;
-   if(gesture.rubbing){patOnce(gesture);return;}
+   if(gesture.rubbing){touchHead(gesture);return;}
    if(["left","right"].includes(point?.part)){
      gesture.summoned=true;dragon.game.start("fly",point.part==="left"?-1:1);
      gesture.round=dragon.game.round;return;
@@ -431,7 +513,7 @@ $("screen").addEventListener("pointermove",e=>{
  if(!e.isPrimary||(start&&e.pointerId!==start.id))return;
  const point=livePet()?dragon.pointAt(e.clientX,e.clientY,e.pointerType):null;
  if(!pocket.panel.hidden)return;
- if(start?.bird!==undefined||start?.monitor)return;
+ if(start?.bird!==undefined||start?.monitor||start?.bubble)return;
  if(start?.work){if(start.work===dragon.work.round)dragon.work.move(point);return;}
  if(start?.round && start.round!==dragon.game.round)return;
  if(dragon.game.round && (!start||start.round)){
@@ -446,10 +528,12 @@ $("screen").addEventListener("pointermove",e=>{
  if(!start)return;
  const distance=Math.hypot(e.clientX-start.x,e.clientY-start.y)/start.scale;
  const dy=(e.clientY-start.y)/start.scale, dx=(e.clientX-start.x)/start.scale;
- if(start.rubbing&&distance>6&&point){clearTimeout(holdTimer);patOnce(start);dragon.stroke(point);}
+ if(start.rubbing&&point&&(start.contact||distance>6)){
+   clearTimeout(holdTimer);touchHead(start);dragon.stroke(start.contact,point,e.timeStamp);
+ }
  else if(point&&start.point?.region==="body"&&!start.handled&&
          (start.throwing||(dy< -13&&-dy>Math.abs(dx)*0.55))){
-   clearTimeout(holdTimer);start.throwing=true;dragon.holdStar(point);
+   clearTimeout(holdTimer);start.throwing=true;dragon.holdStar(point,e.timeStamp,start.point,start.stamp);
  }
  else if(distance>12)clearTimeout(holdTimer);
 });
@@ -461,7 +545,15 @@ $("screen").addEventListener("pointerup",e=>{
  const gesture=start;
  const dx=(e.clientX-start.x)/start.scale,dy=(e.clientY-start.y)/start.scale;
  clearGesture();
+ dragon.endStroke(gesture.contact);
  if(e.pointerType==="touch")dragon.releaseAttention();
+ if(gesture.bubble){
+   if(gesture.bubble===dragon.action && Math.hypot(dx,dy)<=14){
+      const hit=dragon.pointAt(e.clientX,e.clientY,e.pointerType);
+      if(hit)dragon.popBubble(hit);
+   }
+   return;
+ }
  if(gesture.work){
    if(gesture.work===dragon.work.round)dragon.work.release(dragon.pointAt(e.clientX,e.clientY,e.pointerType),Math.hypot(dx,dy));
    return;
@@ -477,7 +569,7 @@ $("screen").addEventListener("pointerup",e=>{
    }
    return;
  }
- if(gesture.throwing&&livePet()){dragon.releaseStar(dx,dy);return;}
+ if(gesture.throwing&&livePet()){dragon.releaseStar(dragon.pointAt(e.clientX,e.clientY,e.pointerType),e.timeStamp);return;}
  const part=gesture.point?.part;
  if(livePet() && Math.hypot(dx,dy)<=12 && part){
    if(part==="left"||part==="right")dragon.game.start("five",part==="left"?-1:1);
@@ -485,7 +577,7 @@ $("screen").addEventListener("pointerup",e=>{
    else dragon.care(part);
    return;
  }
- if(gesture.rubbing&&livePet()){patOnce(gesture);return;}
+ if(gesture.rubbing&&livePet()){touchHead(gesture);dragon.endStroke(gesture.contact);return;}
  if(Math.abs(dx)>40&&Math.abs(dx)>Math.abs(dy)*1.3){showPage((demo.page+(dx<0?1:2))%3);return}
  if(Math.abs(dy)>40&&Math.abs(dy)>Math.abs(dx)*1.3){showPage(dy<0?1:0);return}
  if(Math.hypot(dx,dy)>12||demo.page!==0)return;
@@ -493,7 +585,7 @@ $("screen").addEventListener("pointerup",e=>{
  const x=(e.clientX-rect.left)/(rect.width/466);
  if(demo.state==="waiting"&&y>=350&&y<=396&&x>110&&x<356){toast(demo.offline?"离线时无法定位":linked?"请回到电脑上的 Agent 确认":"演示：定位电脑端进行确认");return}
  if(livePet()&&gesture.point?.region==="body"){dragon.care("pat",gesture.point.x);return;}
- if(demo.model!=="gpt"&&y>=99&&y<=355)pet();
+ if(demo.model!=="gpt"&&y>=99&&y<=355)pet(x,y);
 });
 new ResizeObserver(()=>{$("screen").style.setProperty("--scale",$("viewport").clientWidth/466)}).observe($("viewport"));
 window.bajiDemo={set(patch){Object.assign(demo,patch);render()},get(){return {...demo}},showPage,pet,stopPlayback};
