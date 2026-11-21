@@ -53,11 +53,135 @@ window.startBadgeTake = async function ({ name, scene }) {
   function pulse(t, a, b, c) {
     return ease((t - a) / (b - a)) * (1 - ease((t - b) / (c - b)));
   }
+  // A held drawing has an attack, a readable contact pose, then a release.
+  function held(t, start, peak, last, end) {
+    return (
+      ease((t - start) / (peak - start)) * (1 - ease((t - last) / (end - last)))
+    );
+  }
+  function watchStar(p, dx, dy, weight) {
+    p.gazeX += 1.32 * dx * weight;
+    p.gazeY += 1.15 * dy * weight;
+    p.head += 4.5 * dx * weight;
+    p.headX += 6 * dx * weight;
+    p.nod += 6 * dy * weight;
+    p.lean += 3 * dx * weight;
+    p.leftX -= 8 * weight;
+    p.rightX += 8 * weight;
+    p.leftY -= (18 + 10 * Math.max(0, -dx)) * weight;
+    p.rightY -= (18 + 10 * Math.max(0, dx)) * weight;
+    p.palmOpen = { left: 0.95 * weight, right: 0.95 * weight };
+    p.lid += 0.12 * weight;
+    p.tailTip -= 12 * dx * weight;
+  }
+  function brushPose(p, contact, lean) {
+    p.gazeX += lean * 0.8 * (1 - contact);
+    p.lid *= 1 - 0.97 * contact;
+    p.smile += 0.96 * contact;
+    p.blush += 0.65 * contact;
+    p.headX += lean * 18 * contact;
+    p.head += lean * 10 * contact;
+    p.nod -= 6 * contact;
+    p.hair += lean * 5 * contact;
+    p.tassel += lean * 9 * contact;
+    p.tuft += lean * 10 * contact;
+    p.tailBend -= lean * 17 * contact;
+    p.leftWing += 6 * contact;
+    p.rightWing += 5 * contact;
+    if (job === "idle") {
+      p.leftY -= (14 + 10 * Math.max(0, -lean)) * contact;
+      p.rightY -= (14 + 10 * Math.max(0, lean)) * contact;
+      p.leftX += 12 * contact;
+      p.rightX -= 12 * contact;
+    }
+  }
+  function enterBrush(p, frame) {
+    const rested = frame >= 83;
+    const step = frame - (rested ? 83 : 77);
+    if (step === 5) {
+      brushPose(p, rested ? 1 : 0.5, side * 0.75);
+      return;
+    }
+    const target = { ...p };
+    browInvitation(p, rested ? 36 : 23);
+    if (!step) return;
+    brushPose(target, rested ? 1 : 0.5, side * 0.75);
+    const mix = ease(step / 5);
+    // The face multiplies the global lid by each eye's wink. Preserve
+    // its actual aperture through the transfer from wink to closed lids.
+    const aperture = (eye) =>
+      p.lid * (1 - p[eye]) * (1 - mix) + target.lid * (1 - target[eye]) * mix;
+    const left = aperture("winkL"), right = aperture("winkR");
+    for (const key of Object.keys(target)) {
+      if (typeof target[key] === "number") p[key] += (target[key] - p[key]) * mix;
+    }
+    p.winkL = 1 - left / p.lid;
+    p.winkR = 1 - right / p.lid;
+  }
+  // All four endings start at the very same offered pose. A resting finger
+  // can step backward through the nuzzle from the exact drawing it reached.
+  function browInvitation(p, frame) {
+    const rise = (f, start, end) => ease((f - start) / (end - start));
+    const hand = side < 0 ? "left" : "right";
+    const otherHand = side < 0 ? "right" : "left";
+    let offer = 1, comb = 0, sweep = 0, peek = 0, nest = 0, settle = 0;
+    if (frame < 24) {
+      // Her paw goes up to the side lock first. As it falls, her uncovered
+      // forehead stays tipped out. The eyes return to the viewer last.
+      comb = held(frame, 0, 6, 9, 17);
+      sweep = pulse(frame, 5, 9, 14);
+      peek = held(frame, 0, 4, 12, 22);
+      offer = rise(frame, 9, 19);
+    } else if (frame < 37) {
+      const f = frame - 24;
+      nest = rise(f, 0, 8);
+      settle = rise(f, 5, 12);
+    } else if (frame < 55) {
+      const f = frame - 37;
+      comb = held(f, 0, 5, 8, 15);
+      sweep = pulse(f, 4, 8, 12);
+      peek = held(f, 0, 3, 9, 15);
+      offer = 1 - rise(f, 6, 17);
+    } else if (frame < 65) {
+      const f = frame - 55;
+      offer = 1 - rise(f, 2, 9);
+      p.blink = 0.94 * pulse(f, 0, 2, 5);
+      p.smile += 0.48 * pulse(f, 0, 4, 9);
+    } else {
+      const f = frame - 65;
+      offer = 1 - rise(f, 4, 11);
+      const look = held(f, 0, 3, 6, 11);
+      p.gazeX -= side * 1.2 * look;
+      p.head -= side * 3.3 * pulse(f, 2, 6, 11);
+      p.tuft -= side * 5 * pulse(f, 3, 7, 11);
+    }
+    p[hand + "Y"] -= 180 * comb;
+    p[hand + "X"] += side * (18 * comb - 18 * sweep);
+    p.palmOpen = { [hand]: 0.96 * comb, [otherHand]: 0 };
+    p.nod += 5 * comb - 5 * offer - 3 * nest;
+    p.head += side * (3.7 * comb * (1 - offer) + 5.7 * offer + 1.8 * nest);
+    p.headX += side * (3 * comb + 5 * offer + 7 * nest);
+    p.lean += side * (2.5 * offer + 1.8 * nest);
+    p.gazeX += side * 0.85 * peek;
+    p.gazeY -= 0.64 * peek + 0.12 * offer;
+    p.hair += side * (3 * sweep - 2.5 * settle);
+    p.tassel -= side * (3.8 * offer + 2 * nest);
+    p.tuft += side * (6 * sweep - 2.5 * settle);
+    p[nearEye] += 0.99 * nest;
+    p[farEye] += 0.98 * settle;
+    p.smile += 0.21 * offer + 0.77 * nest;
+    p.blush += 0.28 * offer + 0.54 * settle;
+    p[otherHand + "Y"] -= 7 * offer + 8 * nest;
+    p[otherHand + "X"] -= side * 7 * nest;
+    p[otherHand + "Wing"] += 4.5 * offer - 7 * settle;
+    p.tailLift -= 8 * offer - 17 * settle;
+    p.tailTip -= 5 * offer - 13 * settle;
+  }
   function sleeping(p, depth, phase) {
     p.lid *= 1 - depth;
     p.nod += (19 + 2 * Math.cos(phase)) * depth;
     p.head += 7 * depth;
-    p.breath += 4 * Math.sin(phase) * depth;
+    p.breath += 1.8 * Math.sin(phase) * depth;
     p.tailLift -= 32 * depth;
     p.tailBend -= 25 * depth;
     p.tailTip -= 16 * depth;
@@ -65,6 +189,11 @@ window.startBadgeTake = async function ({ name, scene }) {
     p.rightWing -= 13 * depth;
     p.leftX += 12 * depth;
     p.rightX -= 12 * depth;
+    // Bring the paws under the chin; wings shut before the last sleepy breath.
+    p.leftX += 32 * depth;
+    p.rightX -= 39 * depth;
+    p.leftY -= 34 * depth;
+    p.rightY -= 27 * depth;
     p.blush += 0.32 * depth;
   }
   function workPose(p, u, holding) {
@@ -206,8 +335,9 @@ window.startBadgeTake = async function ({ name, scene }) {
       p.work.progress = turn ? u : 0;
       if (turn) {
         const curl = Math.sin(Math.PI * u);
-        p.gazeX = 0.72 - 1.52 * u;
-        p.gazeY = 0.72 - 0.35 * curl;
+        // Meet the corner, track it across the fold, and settle at the first line.
+        p.gazeX += 1.55 * held(u, 0, 0.16, 0.25, 0.87);
+        p.gazeY -= 0.35 * curl;
         p.rightX -= 15 * curl;
         p.rightY -= 13 * curl;
         p.head -= 3 * curl;
@@ -235,20 +365,27 @@ window.startBadgeTake = async function ({ name, scene }) {
     } else if (name === "lensFind") {
       const focus = pulse(u, 0, 0.22, 0.53),
         found = pulse(u, 0.31, 0.59, 1);
-      p.gazeX += 0.48 * focus;
-      p.rightX += 15 * focus;
-      p.rightY -= 12 * focus;
+      p.gazeX += 0.75 * focus + 0.43 * found;
+      p.rightX += 14 * focus + 5 * found;
+      p.rightY -= 21 * focus + 14 * found;
       p.winkL += 0.94 * focus;
       p.head += 5 * focus;
       p.lid += 0.16 * found;
       p.jaw += 0.55 * found;
       p.smile += 0.73 * found;
       p.tuft += 9 * found;
+      p.nod -= 6 * found;
+      p.leftWing += 11 * pulse(u, 0.39, 0.62, 0.94);
+      p.tailBend -= 14 * pulse(u, 0.48, 0.71, 1);
     } else if (name === "palmTap") {
       const reach = pulse(u, 0, 0.26, 0.52),
         nod = pulse(u, 0.27, 0.57, 1);
-      p.leftY -= 25 * reach;
-      p.leftX -= 7 * reach;
+      const highFive = held(u, 0, 0.14, 0.27, 0.56);
+      p.leftY -= 42 * highFive;
+      p.leftX -= 16 * highFive;
+      p.headX -= 5 * reach;
+      p.gazeX -= 0.69 * highFive;
+      p.tassel += 8 * pulse(u, 0.29, 0.43, 0.65);
       p.lid *= 1 - 0.91 * nod;
       p.nod += 8 * nod;
       p.smile += 0.93 * nod;
@@ -256,13 +393,13 @@ window.startBadgeTake = async function ({ name, scene }) {
       p.rightWing += 8 * pulse(u, 0.39, 0.7, 1);
       p.blush += 0.59 * nod;
     } else if (name.startsWith("cheek")) {
-      const press = pulse(t, 0, 0.14, 0.34),
-        rebound = pulse(t, 0.12, 0.29, 0.55),
-        shy = pulse(t, 0.17, 0.54, 1.16);
+      const press = held(u, 0, 0.115, 0.19, 0.37),
+        rebound = pulse(u, 0.22, 0.43, 0.66),
+        shy = held(u, 0.17, 0.38, 0.57, 0.93);
       p[nearEye] += 0.98 * press + 0.43 * shy;
       p[farEye] += 0.12 * press;
-      p.headX -= side * (14 * press - 5 * rebound);
-      p.head -= side * (6 * press - 3 * rebound);
+      p.headX -= side * (17 * press - 6 * rebound);
+      p.head -= side * (7 * press - 4 * rebound);
       p.gazeX += side * (0.76 * shy + 0.4 * press);
       p.pout += 0.87 * press;
       p.smile += 0.98 * shy;
@@ -271,42 +408,84 @@ window.startBadgeTake = async function ({ name, scene }) {
       p.hair -= side * 5 * rebound;
       p.tuft += side * 8 * rebound;
       p[side < 0 ? "leftWing" : "rightWing"] += 12 * pulse(t, 0.05, 0.22, 0.72);
+      if (job === "idle") {
+        // Her paw comes up to check the cheek after the finger has gone.
+        const paw = held(u, 0.2, 0.4, 0.58, 0.91);
+        p[side < 0 ? "leftY" : "rightY"] -= 66 * paw;
+        p[side < 0 ? "leftX" : "rightX"] -= side * 14 * paw;
+      }
     } else if (name === "tickle") {
-      const laugh = pulse(t, 0, 0.23, 1.36),
-        beat = Math.sin(t * 15),
-        after = pulse(t, 1.05, 1.43, 1.77);
-      p.lid *= 1 - 0.96 * laugh;
-      p.jaw += (0.73 + 0.24 * beat) * laugh;
-      p.smile += 1.25 * laugh + 0.62 * after;
-      p.blush += 0.91 * (laugh + 0.48 * after);
-      p.head += 4.6 * beat * laugh;
-      p.nod += (3 + 3.5 * beat) * laugh + 4 * after;
-      const free = job === "idle" ? 1 : 0.15;
-      p.leftY -= (28 + 5 * beat) * laugh * free;
-      p.rightY -= (32 - 5 * beat) * laugh * free;
-      p.leftX += 15 * laugh * free;
-      p.rightX -= 16 * laugh * free;
-      p.leftWing += (12 + 6 * beat) * laugh;
-      p.rightWing += (12 - 6 * beat) * laugh;
-      p.tassel += 10 * Math.sin(t * 15 - 0.8) * laugh;
-      p.tailTip += 16 * Math.sin(t * 15 - 1.4) * laugh;
+      const flinch = pulse(u, 0, 0.1, 0.23);
+      const first = pulse(u, 0.1, 0.22, 0.39),
+        second = pulse(u, 0.32, 0.48, 0.66);
+      const giggle = held(u, 0.16, 0.29, 0.53, 0.79),
+        sneak = pulse(u, 0.58, 0.74, 1);
+      p.head -= 5 * flinch + 4 * first - 5 * second;
+      p.nod += 5 * flinch - 6 * first - 5 * second;
+      p.lid *= 1 - 0.98 * giggle;
+      p.winkR += 0.88 * sneak;
+      p.jaw += 0.5 * flinch + first + 0.83 * second;
+      p.smile += 1.1 * giggle + 0.67 * sneak;
+      p.blush += 0.87 * giggle + 0.62 * sneak;
+      if (job === "idle") {
+        p.leftY -= 46 * giggle + 12 * first;
+        p.rightY -= 55 * giggle + 10 * second;
+        p.leftX += 21 * giggle;
+        p.rightX -= 28 * giggle;
+      }
+      p.leftWing += 17 * first + 9 * second;
+      p.rightWing += 11 * first + 16 * second;
+      p.tassel += 9 * first - 11 * second;
+      p.tailLift -= 14 * pulse(u, 0.3, 0.56, 0.92);
     } else if (name === "brush") {
       // Rows represent contact pressure; columns follow the finger from left to right.
       const contact = Math.floor(i / 9) / 4,
         lean = ((i % 9) - 4) / 4;
-      p.gazeX += lean * 0.8 * (1 - contact);
-      p.lid *= 1 - 0.97 * contact;
-      p.smile += 0.96 * contact;
-      p.blush += 0.65 * contact;
-      p.headX += lean * 18 * contact;
-      p.head += lean * 10 * contact;
-      p.nod -= 6 * contact;
-      p.hair += lean * 5 * contact;
-      p.tassel += lean * 9 * contact;
-      p.tuft += lean * 10 * contact;
-      p.tailBend -= lean * 17 * contact;
-      p.leftWing += 6 * contact;
-      p.rightWing += 5 * contact;
+      brushPose(p, contact, lean);
+    } else if (name.startsWith("browInvite")) {
+      if (i < 77) browInvitation(p, i);
+      else enterBrush(p, i);
+    } else if (name === "starWatch") {
+      watchStar(p, ((i % 9) - 4) / 4, Math.floor(i / 9) - 1, 1);
+    } else if (name.startsWith("starCatch")) {
+      const hold = 1 - ease((u - 0.67) / 0.33);
+      const cradle = held(u, 0.05, 0.34, 0.53, 0.86),
+        proud = held(u, 0.26, 0.44, 0.6, 0.92);
+      watchStar(p, 0.75 * side, 1, hold);
+      const hand = side < 0 ? "left" : "right";
+      p[hand + "X"] -= side * 34 * cradle;
+      p[hand + "Y"] -= 54 * cradle;
+      p.palmOpen[hand] = Math.max(p.palmOpen[hand], cradle);
+      p.nod += 5 * pulse(u, 0, 0.11, 0.27) - 6 * proud;
+      p.head += side * 3 * cradle;
+      p.gazeX -= side * 0.68 * proud;
+      p.gazeY -= 0.94 * proud;
+      p[farEye] += 0.94 * proud;
+      p.smile += 0.93 * proud;
+      p.blush += 0.64 * proud;
+      p[side < 0 ? "leftWing" : "rightWing"] += 16 * pulse(u, 0.36, 0.54, 0.83);
+      p.tailTip += 12 * pulse(u, 0.51, 0.71, 1);
+    } else if (name === "heartHug") {
+      const gather = held(u, 0, 0.24, 0.57, 0.79),
+        offer = held(u, 0.28, 0.46, 0.56, 0.72);
+      const follow = held(u, 0.53, 0.69, 0.79, 1);
+      p.leftX += 76 * gather;
+      p.rightX -= 78 * gather;
+      p.leftY -= 35 * gather + 12 * offer;
+      p.rightY -= 33 * gather + 14 * offer;
+      p.palmOpen = { left: offer, right: offer };
+      p.nod += 6 * gather - 13 * offer - 7 * follow;
+      p.gazeY += 0.93 * gather - 0.8 * offer - 0.65 * follow;
+      p.gazeX += 0.89 * follow;
+      p.head += 5 * follow;
+      p.lid *= 1 - 0.94 * held(u, 0.03, 0.15, 0.2, 0.36);
+      p.winkL += 0.8 * pulse(u, 0.42, 0.54, 0.68);
+      p.smile += 0.74 * gather + 0.58 * follow;
+      p.blush += 0.7 * gather + 0.31 * follow;
+      p.leftWing += 16 * pulse(u, 0.41, 0.57, 0.79);
+      p.rightWing += 15 * pulse(u, 0.44, 0.61, 0.84);
+      p.tailLift -= 16 * pulse(u, 0.49, 0.69, 0.99);
+      p.heartTime = u;
     } else if (
       ["wingLeft", "wing", "tail", "patLeft", "pat", "nose", "sneeze"].includes(
         name,
@@ -341,6 +520,15 @@ window.startBadgeTake = async function ({ name, scene }) {
         p.tassel += side * 8 * settle;
         p.smile += 0.94 * follow + 0.4 * settle;
         p.blush += 0.63 * follow;
+        const nestle = held(u, 0.25, 0.39, 0.53, 0.77);
+        p.lean += side * 5 * nestle;
+        p.nod -= 5 * nestle;
+        p[side < 0 ? "leftWing" : "rightWing"] +=
+          13 * pulse(u, 0.34, 0.53, 0.82);
+        if (job === "idle") {
+          p[side < 0 ? "leftY" : "rightY"] -= 37 * nestle;
+          p[side < 0 ? "leftX" : "rightX"] -= side * 13 * nestle;
+        }
       } else if (name === "nose") {
         p.gazeY += 0.82 * touch;
         p.nod -= 5 * touch;
@@ -363,7 +551,10 @@ window.startBadgeTake = async function ({ name, scene }) {
         phase = (Math.max(0, i - 15) * Math.PI * 2) / 20;
       sleeping(p, depth, phase);
       p.jaw += 1.04 * pulse(i, 0, 6, 14);
-      p.leftY -= 24 * pulse(i, 0, 7, 14);
+      const cover = pulse(i, 0, 6, 14);
+      p.leftY -= 62 * cover;
+      p.leftX += 33 * cover;
+      p.squint += 0.74 * cover;
     } else if (name.startsWith("peek")) {
       const peek = ease(i / 8);
       sleeping(p, 1, 0);
@@ -382,11 +573,17 @@ window.startBadgeTake = async function ({ name, scene }) {
       p[farEye] = 1 - up;
       p.gazeX += side * 0.65 * (1 - up);
       p.nod -= 7 * (1 - up) + 5 * first;
-      p.leftWing += 23 * first;
-      p.rightWing += 22 * second;
-      p.leftY -= 30 * first;
-      p.rightY -= 24 * second;
-      p.smile += 0.5 * (1 - up) + 0.66 * second;
+      const near = side < 0 ? "left" : "right",
+        far = side < 0 ? "right" : "left";
+      p[near + "Wing"] += 23 * first;
+      p[far + "Wing"] += 22 * second;
+      p[near + "Y"] -= 66 * first;
+      p[far + "Y"] -= 60 * second;
+      p[near + "X"] += side * 23 * first;
+      p[far + "X"] -= side * 21 * second;
+      p.lid *= 1 - 0.56 * pulse(u, 0.28, 0.45, 0.64);
+      p.smile += 0.47 * (1 - up) + 0.82 * second;
+      p.tuft += 4 * (1 - up) + 7 * second;
     }
     pet.rig.draw(p);
     const anchors = pet.rig.anchors;
@@ -416,6 +613,9 @@ window.startBadgeTake = async function ({ name, scene }) {
       png: canvas.toDataURL().split(",")[1],
       gear: gearCanvas?.toDataURL().split(",")[1],
       coords,
+      palms: name.startsWith("star")
+        ? [...xy(anchors.left), ...xy(anchors.right)]
+        : null,
       target: targets[job] ? xy(targets[job]) : null,
       book:
         job === "reading"
@@ -431,6 +631,45 @@ window.startBadgeTake = async function ({ name, scene }) {
 /* Called by the offline exporter at the original book's ink layer.
    The second chart is exposed as the right leaf lifts off the book. */
 window.drawBadgeInstrument = (c, p, a) => {
+  if (p.heartTime != null) {
+    // Build the gift between the hands; a tiny heart first, then a full one.
+    // It leaves from that same point and follows an arc beside the face.
+    const t = p.heartTime;
+    if (t < 0.22 || t > 0.9) return;
+    const f = Math.min(1, Math.max(0, (t - 0.52) / 0.38));
+    const cx = (a.left.x + a.right.x) / 2,
+      cy = (a.left.y + a.right.y) / 2 - 17;
+    const x = cx + (a.nose.x + 161 - cx) * f,
+      y = cy + (a.nose.y - 35 - cy) * f - 54 * f * (1 - f);
+    const small = t < 0.32 || f > 0.81;
+    const heart = small
+      ? [".o.o.", "owogo", "ogggg", ".ogo.", "..o.."]
+      : [
+          ".ooo.ooo.",
+          "owggofffo",
+          "ofggggggo",
+          "ofggggggo",
+          ".ofggggo.",
+          "..offgo..",
+          "...ofo...",
+          "....o....",
+        ];
+    const colors = { o: "#78586b", w: "#fff0e6", g: "#ed9b97", f: "#d8788c" };
+    const size = 4;
+    for (let row = 0; row < heart.length; row++)
+      for (let col = 0; col < heart[row].length; col++) {
+        const color = colors[heart[row][col]];
+        if (!color) continue;
+        c.fillStyle = color;
+        c.fillRect(
+          x + (col - heart[row].length / 2) * size,
+          y + (row - heart.length / 2) * size,
+          size,
+          size,
+        );
+      }
+    return;
+  }
   if (p.badgeJob !== "running" && p.badgeJob !== "compact") return;
   const alpha = p.stage.workMix;
   if (!alpha) return;

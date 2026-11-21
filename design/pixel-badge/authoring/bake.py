@@ -40,6 +40,8 @@ TOUCH = {"wingLeft": (16,25),"wing": (16,25),"tail": (16,29),"nose": (16,22),
 TAKES.update(JOBS, **TOUCH)
 TOOL_ACTIONS = {"keyChime":"running","lensFind":"searching","palmTap":"waiting"}
 TAKES.update({name:(16,27) for name in TOOL_ACTIONS})
+TAKES.update({"heartHug":(16,39),"starWatch":(12,27),"starCatchLeft":(16,32),"starCatchRight":(16,32)})
+TAKES.update({"browInviteLeft": (16,89), "browInviteRight": (16,89)})
 SETTLE = {name:TAKES[name][1]-1 for name in ("writing","compact","succeeded","ended","error","limited","cancelled")}
 for name in SETTLE:
     fps, length = TAKES[name]
@@ -140,7 +142,7 @@ def bake(page,name,fps,count,lookup,scene="idle"):
     rows = math.ceil(count/8)
     sheet = np.zeros((rows*2*132,8*138),dtype=np.uint8)
     gear_sheet = np.zeros_like(sheet) if name in ("writing","compact") else None
-    anchors,book,targets = [],[],[]
+    anchors,book,targets,palms = [],[],[],[]
     close_origin = (113,34.5)
     for i in range(count):
         data = page.evaluate("args => sampleBadgeTake(args)",dict(i=i,n=count,fps=fps,settle=SETTLE.get(name)))
@@ -152,6 +154,8 @@ def bake(page,name,fps,count,lookup,scene="idle"):
             book.append(data["book"])
         if data["target"]:
             targets.append(data["target"])
+        if data["palms"]:
+            palms.append(data["palms"])
         for view,(ox,oy,step) in enumerate([(28,12,4.),(*close_origin,2.75)]):
             tile = sample_pixels(image,ox,oy,step,lookup)
             x,y = i%8*138,(i//8+view*rows)*132
@@ -166,6 +170,8 @@ def bake(page,name,fps,count,lookup,scene="idle"):
         result["book"] = book
     if targets:
         result["target"] = targets
+    if palms:
+        result["palms"] = palms
     if gear_sheet is not None:
         result["gearAtlas"] = "hands-"+name
         save_sheet(result["gearAtlas"],gear_sheet)
@@ -188,6 +194,9 @@ def main():
         page.goto((DESIGN/"badge-prototype.html").as_uri())
         page.wait_for_function("document.querySelector('#gpt-canvas').dataset.ready==='true'")
         page.add_script_tag(content=(HERE/"poses.js").read_text(encoding="utf-8"))
+        arms = (DESIGN/"gpt-pet/arms.js").read_text(encoding="utf-8")
+        arms = arms.replace('const depth=s.desk', 'if(p.palmOpen)open=p.palmOpen[hand];\n                const depth=s.desk')
+        page.add_script_tag(content=arms)
         page.add_script_tag(content=book_art())
         takes = {}
         for name,(fps,count) in TAKES.items():
@@ -200,11 +209,18 @@ def main():
             name = "stow-"+scene
             takes[name],sheet = bake(page,name,24,8,lookup,scene)
             save_sheet(name,sheet)
-        for scene in WORK_SCENES:
+        props = ("reading","readingMoon","running","searching","writing","compact")
+        bundles = [(scene,"touch-",REACTIONS) for scene in WORK_SCENES]
+        for scene in props:
+            bundles.extend([
+                (scene,"touch-face-",("pat","patLeft","nose","sneeze")),
+                (scene,"touch-limb-",("wing","wingLeft","tail")),
+            ])
+        for scene,prefix,reactions in bundles:
             front,close = [],[]
-            atlas = "touch-"+scene
+            atlas = prefix+scene
             offset = 0
-            for name in REACTIONS:
+            for name in reactions:
                 metadata,sheet = bake(page,name,*TAKES[name],lookup,scene=scene)
                 first,second = np.split(sheet,2)
                 front.append(first)

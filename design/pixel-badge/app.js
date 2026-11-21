@@ -25,6 +25,8 @@ const actions = {
   cheekRight: ["脸红了", "BLUSH", "右脸让开了一点，花结旁的流苏还在轻晃。"],
   tickle: ["怕痒啦", "GIGGLE", "她缩起肩膀笑出声，笑够了才慢慢松开爪子。"],
   brush: ["顺毛", "PET", "她抬起额头，等你顺着刘海摸一摸。"],
+  browInviteLeft: ["想贴贴", "PET", "她理了理左边的刘海，歪着头，抬眼看你。"],
+  browInviteRight: ["想贴贴", "PET", "她拨开右边的发梢，把额头送过来，悄悄看你。"],
   doze: ["打盹", "NAP", "她打了个哈欠，收起龙翼，尾尖安静地拢在身边。"],
   peekLeft: ["偷看", "PEEK", "她只睁开左眼。再轻点一下，会被你抓个正着。"],
   peekRight: ["偷看", "PEEK", "右眼悄悄睁开了，她还以为你没发现。"],
@@ -49,6 +51,14 @@ const actions = {
   nose: ["碰鼻尖", "BOOP", "她盯住鼻尖，轻轻皱了皱鼻子。"],
   sneeze: ["打喷嚏", "ACHOO", "阿嚏！她缩起肩膀，甩了甩头发。"],
   play: ["追星星", "STAR", "她望着抛起的星星，悄悄屈起膝盖。"],
+  starWatch: [
+    "盯住啦",
+    "STAR",
+    "一只星萤飞到她身旁。牵着它左右绕一绕，看她追着谁。",
+  ],
+  starCatchLeft: ["接到啦", "CATCH", "接到啦！看，在左手。"],
+  starCatchRight: ["接到啦", "CATCH", "嘿，这次在右手。给你看一眼，就一眼。"],
+  heartHug: ["送给你", "LOVE", "刚刚那样摸，我最喜欢了。这颗给你。"],
   wing: ["抖翅膀", "WING", "右边的小龙翼抖了一下。"],
   wingLeft: ["抖翅膀", "WING", "左边的小龙翼抖了一下。"],
   tail: ["摇尾巴", "TAIL", "尾尖躲了一下，又绕回你身边。"],
@@ -96,6 +106,15 @@ const saved = readSettings();
 let view = saved.view === "close" ? "close" : "full",
   grid = saved.grid !== false;
 const motion = matchMedia("(prefers-reduced-motion: reduce)");
+const previewUrl = new URL(location.href);
+if (previewUrl.searchParams.get("observe") === "1") {
+  document.documentElement.classList.add("observe");
+  $("badge").setAttribute("aria-label", "白龙娘互动圆屏");
+  $("badge").setAttribute("aria-describedby", "metrics-description");
+  $("observation-link").textContent = "展开控制";
+  previewUrl.searchParams.delete("observe");
+} else previewUrl.searchParams.set("observe", "1");
+$("observation-link").href = previewUrl.href;
 const linked =
   location.protocol.startsWith("http") &&
   new URLSearchParams(location.search).get("agent") === "1";
@@ -175,22 +194,144 @@ stateControl.disabled = linked;
 function baseClip() {
   return desired === "reading" && gestures.moon ? "readingMoon" : desired;
 }
+const forehead = new BadgeForeheadInvite();
+const browClip = (id) => id === "browInviteLeft" || id === "browInviteRight";
+let nextBrowSide = -1;
+let assistedHold = 0;
+let heldBrowKey = "";
+let browCaption = "";
 const gestures = new BadgeGestures($("badge"), {
+  forehead,
+  acceptForehead,
+  cancelForehead,
   hit: hitAt,
   intent: () => intent,
   base: () => desired,
+  frame: () => frame,
   show: switchClip,
   care,
   note: speak,
   restore: () => switchClip(baseClip()),
+  invalidate: () => {
+    dirty = true;
+    render();
+  },
 });
+let wantsRematch = false;
+let quietBeforeInvite = 0;
+const starGame = new BadgeStarGame({
+  catchStar: (side) => {
+    wantsRematch = true;
+    switchClip(side < 0 ? "starCatchLeft" : "starCatchRight");
+  },
+  leave: () => {
+    // Ignoring her invitation still counts as quiet time before a nap.
+    if (quietBeforeInvite) gestures.quiet = quietBeforeInvite + starGame.clock;
+    switchClip(baseClip());
+  },
+  note: speak,
+});
+const starClip = (id) =>
+  id === "starWatch" || id === "starCatchLeft" || id === "starCatchRight";
+function beginForehead(side, quiet = 0) {
+  forehead.start(side, { quiet, reduced: motion.matches });
+  nextBrowSide = -side;
+  switchClip(forehead.clip);
+}
+function acceptForehead(side) {
+  // Reduced motion uses the same touch target with still poses and a manual start.
+  if (motion.matches && active === "idle" && intent === "idle" && desired === "idle")
+    beginForehead(side);
+  if (intent !== forehead.clip || !browClip(intent)) return false;
+  return forehead.touch(side);
+}
+function cancelForehead() {
+  if (forehead.phase === "off") return;
+  forehead.cancel();
+  if (browClip(intent)) switchClip(baseClip());
+}
+function offerHand() {
+  if (browClip(intent)) {
+    if (!gestures.pointer && forehead.touch(forehead.side)) assistedHold = 1250;
+  } else if (desired === "idle" && active === "idle" && intent === "idle") {
+    beginForehead(nextBrowSide);
+  } else care("pat");
+}
+function describeForehead() {
+  const phase = forehead.phase;
+  let title = "想贴贴", note = actions[forehead.clip][2];
+  if (phase === "touch") {
+    title = "碰到了";
+    note = "她抬眼看着停在额边的手指。";
+  } else if (phase === "nuzzle" || phase === "rest") {
+    title = "贴贴";
+    note = "你的手停在那里。她自己蹭过来，轻轻靠住。";
+  } else if (phase.startsWith("look")) {
+    title = "在这边呀";
+    note = "手在另一边。她先转动眼睛，朝那边瞄了一眼。";
+  } else if (phase === "joining" || phase === "brushReady") {
+    title = "顺毛";
+    note = "她顺着手指移动的方向，把刘海轻轻送过来。";
+  } else if (phase === "tidy") {
+    title = "理理头发";
+    note = "她把翘起来的那绺刘海压平，又坐好了。";
+  } else if (["away", "unwind", "unjoin", "retract"].includes(phase)) {
+    title = "收好啦";
+    note = "她慢慢抬起脸，把身子坐正。";
+  }
+  if (browCaption !== title) {
+    browCaption = title;
+    $("state-chip").textContent = title;
+    speak(note);
+  }
+  const button = $("pat-label").parentElement;
+  const busy = Boolean(forehead.touchSide) || (phase !== "offer" && phase !== "wait");
+  if (button.disabled !== busy) button.disabled = busy;
+}
+function palmsAt(clip, index) {
+  const [lx, ly, rx, ry] = clip.palms[index];
+  return [
+    lcd.facePoint(view, clip, index, lx, ly),
+    lcd.facePoint(view, clip, index, rx, ry),
+  ];
+}
+function stopStar() {
+  const id = starGame.finger,
+    canvas = $("badge");
+  starGame.stop();
+  if (id != null && canvas.hasPointerCapture(id))
+    canvas.releasePointerCapture(id);
+}
+function inviteStar(quiet = 0) {
+  quietBeforeInvite = quiet;
+  wantsRematch = false;
+  if (quiet) forehead.skipOffer();
+  starGame.start();
+  if (!quiet) {
+    const canvas = $("badge");
+    canvas.focus({ preventScroll: true });
+    const box = canvas.getBoundingClientRect();
+    if (box.top < 0 || box.bottom > window.innerHeight)
+      canvas.scrollIntoView({ block: "nearest", behavior: "instant" });
+  }
+  switchClip("starWatch");
+}
+function cancelStarDrag() {
+  const id = starGame.finger;
+  starGame.cancelDrag();
+  if (id != null && $("badge").hasPointerCapture(id))
+    $("badge").releasePointerCapture(id);
+}
 function refreshSceneControl() {
   let icon = "nap",
     label = "打个盹",
-    hint = "轻点两颊，或按住刘海慢慢划。";
-  if (sleepingClip(intent)) {
+    hint = "按住脸颊来回轻揉，或沿着刘海往返摸两趟。";
+  if (intent === "starWatch") {
+    hint = "把发亮的星萤拖到一只手心再松开，也可以直接点手心。";
+    label = "收起星萤";
+  } else if (sleepingClip(intent)) {
     label = intent === "doze" ? "轻轻叫她" : "再叫一声";
-    hint = "轻碰圆屏叫她。她偷看时，再碰一下就会伸懒腰。";
+    hint = "轻碰她叫醒她。她偷看时，再碰一下就会伸懒腰。";
   } else if (desired === "reading") {
     icon = "book";
     label = "翻一页";
@@ -201,8 +342,16 @@ function refreshSceneControl() {
     icon = "brush";
     label = "顺顺毛";
   }
+  const hand = browClip(intent) ? "把手给她" : intent === "idle" ? "伸手等她" : "摸摸头";
+  $("pat-label").textContent = hand;
+  $("pat-label").parentElement.disabled = false;
+  if (browClip(intent)) {
+    const side = forehead.side < 0 ? "左" : "右";
+    hint = "把指尖停在她送出的" + side + "侧额头，或沿着刘海轻轻移动。";
+  }
   $("scene-label").textContent = label;
   $("gesture-hint").textContent = hint;
+  $("star-label").textContent = intent === "starWatch" ? "送到手心" : "逗星萤";
   for (const canvas of document.querySelectorAll("[data-scene-icon]"))
     canvas.hidden = canvas.dataset.sceneIcon !== icon;
 }
@@ -229,6 +378,19 @@ function setBubble(flag) {
   }
 }
 async function switchClip(id) {
+  if (!starClip(id) && starGame.phase !== "off") stopStar();
+  if (sleepingClip(intent) && (id === "idle" || id.startsWith("wake")))
+    forehead.rearm();
+  if (!browClip(id)) {
+    browCaption = "";
+    assistedHold = 0;
+    heldBrowKey = "";
+    if (forehead.phase !== "off") forehead.cancel();
+    if (gestures.pointer?.part === "offeredHead") {
+      gestures.release();
+      gestures.contact = null;
+    }
+  }
   const request = ++ticket;
   intent = id;
   setBubble(false);
@@ -285,6 +447,13 @@ async function switchClip(id) {
     ]);
     if (request !== ticket) return;
     if (active === base && id !== base) savedTime = elapsed;
+    if (
+      id === base &&
+      desired === "reading" &&
+      (bookClip(active) || active.startsWith("glance"))
+    )
+      savedTime = 0; // After settling a page, read the new chart from its first star.
+    if (id === "idle" && actions[active]) savedTime = 0;
     pausedHands = paper
       ? {
           sheet: handSheet,
@@ -307,9 +476,10 @@ async function switchClip(id) {
         }
       : null;
     elapsed = id === base ? savedTime : 0;
-    frame =
-      gestures.sample(id, elapsed, 0, motion.matches) ??
-      (id === base ? jobFrame(id, clip, elapsed) : 0);
+    frame = browClip(id)
+      ? forehead.frame
+      : gestures.sample(id, elapsed, 0, motion.matches) ??
+        (id === base ? jobFrame(id, clip, elapsed) : 0);
     dirty = true;
     previous = null;
     $("badge").dataset.clip = id;
@@ -329,14 +499,26 @@ async function switchClip(id) {
               ? "pat"
               : id;
       button.classList.toggle("active", button.dataset.action === key);
+      if (button.dataset.action === "play" && starClip(id))
+        button.classList.add("active");
     }
-    if (!bookClip(id) || gestures.page?.phase === "drag")
+    if (browClip(id)) describeForehead();
+    else if (id === "starWatch" && quietBeforeInvite)
+      speak(
+        (starGame.lastHand < 0 ? "上回是左手接到的。" : "上回是右手接到的。") +
+          "星萤又从另一边飞回来，她悄悄把手摊开了。",
+      );
+    else if (!bookClip(id) || gestures.page?.phase === "drag")
       speak(actions[id]?.[2] || baseNote());
     render();
   } catch {
     if (request !== ticket) return;
     intent = active;
+    if (starClip(id)) stopStar();
+    if (browClip(id)) forehead.cancel();
     gestures.cancelContact();
+    if (browClip(active) && forehead.phase === "off" && id !== baseClip())
+      switchClip(baseClip());
     refreshSceneControl();
     speak("动作图集读取失败。请确认 assets 文件夹与本页放在一起。");
   }
@@ -348,10 +530,16 @@ function state(id, note = "", newSession = false) {
   overrideNote = note;
   stateControl.value = id;
   if (changed) {
+    lastNose = -Infinity;
+    if (newSession) wantsRematch = false;
+    if (browClip(intent)) forehead.cancel();
+    forehead.rearm();
     savedTime = 0;
     gestures.moon = false;
     const interrupted =
       newSession ||
+      starClip(intent) ||
+      browClip(intent) ||
       gestures.pointer ||
       gestures.brush ||
       gestures.page ||
@@ -380,6 +568,16 @@ function care(id) {
     return;
   }
   gestures.interrupt();
+  if (id === "play") {
+    if (intent === "starWatch" && starGame.available()) {
+      starGame.land(starGame.hand);
+      return;
+    }
+    if (starGame.phase === "caught") stopStar();
+    if (starGame.phase !== "off") return;
+    inviteStar();
+    return;
+  }
   if (id === "nose") {
     const now = performance.now();
     if (now - lastNose < 900 && (active === "nose" || intent === "nose"))
@@ -404,10 +602,14 @@ function synchronizeSettings(write) {
   render();
 }
 for (const b of document.querySelectorAll("[data-action]"))
-  b.addEventListener("click", () => care(b.dataset.action));
+  b.addEventListener("click", () => b.dataset.action === "pat" ? offerHand() : care(b.dataset.action));
 for (const b of document.querySelectorAll("[data-view]"))
   b.addEventListener("click", () => {
-    if (view !== b.dataset.view) gestures.cancelContact();
+    if (view !== b.dataset.view) {
+      gestures.cancelContact();
+      cancelStarDrag();
+      if (heldBrowKey || assistedHold) cancelForehead();
+    }
     view = b.dataset.view;
     synchronizeSettings(true);
   });
@@ -422,7 +624,8 @@ $("cheek-button").addEventListener("click", () =>
     : gestures.poke(gestures.nextSide),
 );
 $("scene-button").addEventListener("click", () => {
-  if (workTouch[desired]) care(workTouch[desired][0]);
+  if (intent === "starWatch") switchClip(baseClip());
+  else if (workTouch[desired]) care(workTouch[desired][0]);
   else gestures.sceneButton();
 });
 
@@ -450,6 +653,12 @@ function render() {
   const sparks = motion.matches ? [] : gestures.brush?.sparks || [];
   const sparkleBeat = sparks.length ? Math.floor(elapsed / 80) : -1;
   const displayedFrame = move ? transferFrame(move, transfer.age) : frame;
+  const contact = gestures.contact;
+  const toy =
+    !move && starGame.phase !== "off" && starClip(active) && clip?.palms
+      ? starGame
+      : null;
+  if (toy) toy.place(palmsAt(clip, frame), active === "starWatch" ? 0 : frame);
   const key = [
     move?.id,
     active,
@@ -459,6 +668,20 @@ function render() {
     minute,
     twinkle,
     sparkleBeat,
+    contact?.sx,
+    contact?.sy,
+    contact?.part,
+    contact?.phase,
+    contact ? Math.min(6, Math.floor(contact.age / 40)) : -1,
+    toy
+      ? [
+          toy.phase,
+          Math.round(toy.pos.sx),
+          Math.round(toy.pos.sy),
+          toy.glow,
+          motion.matches ? 0 : Math.floor(toy.clock / 80),
+        ]
+      : "",
   ].join("/");
   if (!dirty && key === lastDraw) return;
   lastDraw = key;
@@ -473,6 +696,8 @@ function render() {
     code: (actions[active] || states[desired])[1],
     action: move ? move.id : active,
     sparks,
+    contact,
+    starToy: toy,
     telemetry,
     tick: elapsed,
     motion: !motion.matches,
@@ -494,6 +719,26 @@ function jobFrame(id, clip, time) {
   }
   return sample % last;
 }
+function updateForehead(dt) {
+  // A failed replacement sheet leaves the last valid drawing on screen.
+  if (forehead.phase === "off") return;
+  const joining = forehead.phase === "joining" || forehead.phase === "unjoin";
+  forehead.tick(joining ? Math.min(browJoinMs, dt) : dt);
+  if (assistedHold > 0 && forehead.phase !== "offer") {
+    assistedHold = Math.max(0, assistedHold - dt);
+    if (!assistedHold) forehead.release();
+  }
+  if (forehead.phase === "brushReady") {
+    frame = forehead.frame;
+    gestures.joinBrush(forehead.brushFrame);
+  } else if (forehead.phase === "off") {
+    gestures.quiet = forehead.quietSpent;
+    switchClip(baseClip());
+  } else {
+    frame = forehead.frame;
+    describeForehead();
+  }
+}
 function update(now) {
   if (document.hidden) return;
   const dt = previous === null ? 0 : Math.min(now - previous, 160);
@@ -514,9 +759,37 @@ function update(now) {
   } else if (clip && active === intent) {
     elapsed += dt;
     gestures.idleTime(active, dt);
+    if (
+      active === "idle" &&
+      active === intent &&
+      desired === "idle" &&
+      !motion.matches &&
+      !gestures.pointer
+    ) {
+      if (wantsRematch) {
+        if (gestures.quiet >= 11500) inviteStar(gestures.quiet);
+      } else if (forehead.canOffer(gestures.quiet)) {
+        beginForehead(nextBrowSide, gestures.quiet);
+      }
+    }
     const sample = Math.floor((elapsed * clip.fps) / 1000);
     const driven = gestures.sample(active, elapsed, dt, motion.matches);
-    if (driven !== null) {
+    if (browClip(active) && active === intent) {
+      updateForehead(dt);
+    } else if (active === "starWatch" && starGame.phase !== "off") {
+      const palms = palmsAt(clip, frame);
+      starGame.update(dt, palms, motion.matches);
+      // A fixed neutral landmark avoids opposite gaze samples tugging the target back and forth.
+      const [fx, fy, nx, ny] = clip.anchors[13];
+      const eyes = lcd.facePoint(
+        view,
+        clip,
+        13,
+        (fx + nx) / 2,
+        fy + (ny - fy) * 0.72,
+      );
+      frame = starGame.watchFrame(eyes, palmsAt(clip, 13));
+    } else if (driven !== null) {
       frame = driven;
     } else if (actions[active]) {
       const reducedFrame =
@@ -538,7 +811,11 @@ function update(now) {
 }
 function resume() {
   cancelAnimationFrame(raf);
-  if (document.hidden) gestures.cancelContact();
+  if (document.hidden) {
+    gestures.cancelContact();
+    cancelStarDrag();
+    cancelForehead();
+  }
   previous = null;
   dirty = true;
   if (!document.hidden) raf = requestAnimationFrame(update);
@@ -572,6 +849,7 @@ function hitAt(e, unbounded = false) {
   const fx = at[2] - at[0],
     fy = at[3] - at[1];
   const scale = Math.hypot(fx, fy) / 132;
+  hit.hairOffset = Math.max(-1, Math.min(1, (x - at[0]) / (95 * scale)));
   const cheekX = at[2] + hit.side * fy * 0.52,
     cheekY = at[3] - hit.side * fx * 0.52;
   if (oval(at[2], at[3], 19, 17)) hit.part = "nose";
@@ -584,12 +862,24 @@ function hitAt(e, unbounded = false) {
     oval(at[2], at[3], 63, 40)
   ) {
     hit.part = "head";
-    hit.side = x < at[0] ? -1 : 1;
+    // Keep the central fringe reachable when a fingertip covers the parting.
+    hit.side = browClip(active) && Math.abs(x - at[0]) <= 22 * scale
+      ? forehead.side : x < at[0] ? -1 : 1;
   }
+  // The dress is a valid wake-up touch; the sky between the wings stays quiet.
+  if (
+    !hit.part &&
+    sleepingClip(intent) &&
+    oval((at[4] + at[6]) / 2, (at[5] + at[7]) / 2 + 11, 54, 61)
+  )
+    hit.part = "body";
   return hit;
 }
 function activateBadge() {
-  if (sleepingClip(intent)) gestures.rouse(-1);
+  if (browClip(intent)) offerHand();
+  else if (active === "starWatch" && !transfer && starGame.available())
+    starGame.land(starGame.hand);
+  else if (sleepingClip(intent)) gestures.rouse(-1);
   else if (bubbleOffered) care("bubblePop");
   else if (desired === "reading") gestures.sceneButton();
   else if (workTouch[desired]) care(workTouch[desired][0]);
@@ -599,6 +889,32 @@ $("badge").addEventListener("click", (e) => {
   if (e.detail === 0) activateBadge();
 });
 $("badge").addEventListener("keydown", (e) => {
+  if (browClip(intent)) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      cancelForehead();
+      return;
+    }
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      if (!e.repeat && !heldBrowKey && !gestures.pointer && forehead.touch(forehead.side))
+        heldBrowKey = e.key;
+      return;
+    }
+  }
+  if (active === "starWatch" && !transfer && starGame.phase !== "off") {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      switchClip(baseClip());
+      return;
+    }
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      if (!e.repeat)
+        starGame.aim(e.key === "ArrowLeft" ? -1 : 1, palmsAt(take, frame));
+      return;
+    }
+  }
   if (e.key === " " || e.key === "Enter") {
     e.preventDefault();
     if (!e.repeat) activateBadge();
@@ -614,9 +930,65 @@ $("badge").addEventListener("keydown", (e) => {
   }
 });
 $("badge").addEventListener("keyup", (e) => {
+  if (e.key === heldBrowKey) {
+    heldBrowKey = "";
+    forehead.release();
+  }
   if (e.key === "ArrowLeft" || e.key === "ArrowRight") gestures.finishBrush();
 });
-$("badge").addEventListener("blur", () => gestures.cancelContact());
+$("badge").addEventListener("blur", () => {
+  gestures.cancelContact();
+  cancelStarDrag();
+  if (heldBrowKey) cancelForehead();
+});
+for (const type of [
+  "pointerdown",
+  "pointermove",
+  "pointerup",
+  "pointercancel",
+  "lostpointercapture",
+]) {
+  $("badge").addEventListener(
+    type,
+    (event) => {
+      if (
+        !event.isPrimary ||
+        active !== "starWatch" ||
+        active !== intent ||
+        transfer ||
+        !take?.palms
+      )
+        return;
+      const canvas = $("badge");
+      const point = lcd.sourcePoint(event, view, take, frame, true);
+      const palms = palmsAt(take, frame);
+      if (type === "pointerdown") {
+        if (
+          event.button !== 0 ||
+          !starGame.down(event.pointerId, point, palms, event.timeStamp)
+        )
+          return;
+        quietBeforeInvite = 0;
+        canvas.focus({ preventScroll: true });
+        canvas.setPointerCapture(event.pointerId);
+      } else {
+        if (starGame.finger !== event.pointerId) return;
+        if (type === "pointermove")
+          starGame.move(point, palms, event.timeStamp);
+        else if (type === "pointerup") {
+          starGame.up(point, palms, event.timeStamp);
+          if (canvas.hasPointerCapture(event.pointerId))
+            canvas.releasePointerCapture(event.pointerId);
+        } else cancelStarDrag();
+      }
+      event.stopImmediatePropagation();
+      if (event.cancelable) event.preventDefault();
+      dirty = true;
+      render();
+    },
+    { capture: true },
+  );
+}
 new ResizeObserver(() => {
   lcd.resize($("workmat").clientWidth);
   dirty = true;
@@ -624,6 +996,7 @@ new ResizeObserver(() => {
 }).observe($("workmat"));
 document.addEventListener("visibilitychange", resume);
 motion.addEventListener("change", () => {
+  cancelForehead();
   dirty = true;
   render();
 });

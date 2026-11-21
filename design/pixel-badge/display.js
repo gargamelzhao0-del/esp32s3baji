@@ -1,9 +1,6 @@
 "use strict";
 
 window.PixelBadge = (() => {
-  const side = 216,
-    center = 108,
-    radius = 96;
   const faceSide = 184,
     faceCenter = 92,
     faceRadius = 82,
@@ -17,9 +14,8 @@ window.PixelBadge = (() => {
     c.height = h;
     return c;
   };
-  const plate = blank(side, side),
-    shell = blank(side, side),
-    sky = plate.getContext("2d");
+  const facePlate = blank(faceSide, faceSide);
+  const faceShell = blank(faceSide, faceSide);
   function rect(ctx, x, y, w, h, color) {
     ctx.fillStyle = color;
     ctx.fillRect(x, y, w, h);
@@ -28,156 +24,271 @@ window.PixelBadge = (() => {
     rect(ctx, x, y - size, 1, 2 * size + 1, color);
     rect(ctx, x - size, y, 2 * size + 1, 1, color);
   }
-  function staircase(ctx, points, bottom, color) {
+  function ridge(ctx, points, bottom, color) {
+    ctx.fillStyle = color;
     for (let i = 1; i < points.length; i++) {
       const [a, b] = points[i - 1],
         [x, y] = points[i];
-      for (let u = a; u < x; u++) {
-        const h = Math.round((b + ((u - a) * (y - b)) / (x - a)) / 2) * 2;
-        rect(ctx, u, h, 1, bottom - h, color);
+      for (let col = a; col < x; col++) {
+        const top = Math.round(b + ((y - b) * (col - a)) / (x - a));
+        ctx.fillRect(col, top, 1, bottom - top);
       }
     }
   }
-  function pine(x, y, n, color) {
-    rect(sky, x, y - 2 * n, 1, 2 * n, color);
-    for (let i = 1; i <= n; i++) {
-      const h = Math.ceil(i * 0.55);
-      rect(sky, x - h, y - 2 * n + 2 * i - 2, h * 2 + 1, 2, color);
+  function pine(ctx, x, base, h, shade, light) {
+    const top = base - h;
+    rect(ctx, x, top, 1, h, shade);
+    for (let tier = 1; tier <= 4; tier++) {
+      const end = Math.round(h * (0.09 + 0.2 * tier));
+      const length = Math.round(h * (0.13 + 0.04 * tier));
+      for (let row = 0; row < length; row++) {
+        const half = Math.floor((row + 1) * (0.45 + 0.075 * tier));
+        rect(ctx, x - half, top + end - length + row, half * 2 + 1, 1, shade);
+      }
+      if (h > 16) rect(ctx, x - 1, top + end - length + 2, 1, 2, light);
     }
   }
   function buildLandscape() {
-    // A quiet night ridge leaves the silhouette and the instrument panel legible.
-    for (const [y, color] of [
-      [0, "#111c29"],
-      [57, "#192837"],
-      [94, "#243847"],
-      [124, "#304851"],
-    ])
-      rect(sky, 0, y, side, side - y, color);
-    let seed = 141;
-    const random = () =>
-      (seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296;
-    for (let i = 0; i < 83; i++)
-      rect(
-        sky,
-        Math.floor(random() * side),
-        Math.floor(random() * 130),
-        1,
-        1,
-        i % 3 ? "#5d777e" : "#95aca8",
-      );
-    for (const [x, y] of [
-      [45, 73],
-      [65, 39],
-      [168, 86],
-    ])
-      shine(sky, x, y, "#b2c9bc", 2);
-    for (let y = -7; y <= 7; y++)
-      for (let x = -7; x <= 7; x++)
-        if (x * x + y * y <= 49 && (x - 3) ** 2 + (y + 2) ** 2 > 39)
-          rect(sky, 165 + x, 61 + y, 1, 1, y > 3 ? "#c7a794" : "#efd9b1");
-    staircase(
-      sky,
-      [
-        [0, 135],
-        [28, 122],
-        [44, 126],
-        [65, 109],
-        [87, 126],
-        [105, 118],
-        [131, 128],
-        [159, 108],
-        [176, 120],
-        [191, 116],
-        [216, 130],
-      ],
-      173,
-      "#344654",
-    );
-    staircase(
-      sky,
-      [
-        [0, 139],
-        [33, 148],
-        [59, 127],
-        [82, 138],
-        [113, 145],
-        [143, 130],
-        [167, 140],
-        [192, 126],
-        [216, 139],
-      ],
-      176,
-      "#263644",
-    );
-    rect(sky, 0, 154, side, 62, "#26353f");
-    for (let i = 0; i < 42; i++)
-      rect(
-        sky,
-        Math.floor(random() * side),
-        156 + Math.floor(random() * 24),
-        2 + Math.floor(random() * 8),
-        1,
-        i % 4 ? "#31454a" : "#53686c",
-      );
-    for (const [x, y, n] of [
-      [25, 159, 9],
-      [33, 157, 6],
-      [12, 161, 12],
-      [178, 157, 5],
-      [190, 160, 10],
-      [198, 160, 13],
-    ])
-      pine(x, y, n, "#192730");
-    const world = sky.getImageData(0, 0, side, side),
-      rim = shell.getContext("2d").createImageData(side, side);
-    const colors = [
-      "142029",
-      "43545b",
-      "76858b",
-      "a9b9b8",
-      "c5d3cf",
-      "e2e8de",
-      "526167",
-      "647578",
-      "222f37",
-      "9aacae",
-    ].map((h) => [1, 3, 5].map((i) => parseInt(("#" + h).slice(i, i + 2), 16)));
-    for (let y = 0; y < side; y++)
-      for (let x = 0; x < side; x++) {
-        const dx = x + 0.5 - center,
-          dy = y + 0.5 - center,
-          d = Math.hypot(dx, dy),
-          j = (y * side + x) * 4;
-        if (d < radius) continue;
-        world.data[j + 3] = 0;
-        if (d > 105) continue;
-        const light = dx * 0.48 + dy * 0.82;
-        let k;
-        if (d > 103.5) k = 0;
-        else if (d > 101.5) k = light < 0 ? 4 : 1;
-        else if (d > 98.5) k = light < -34 ? 5 : light < 15 ? 3 : 2;
-        else if (d > 97) k = light < -30 ? 2 : 7;
-        else k = 8;
-        const c = colors[k];
-        rim.data[j] = c[0];
-        rim.data[j + 1] = c[1];
-        rim.data[j + 2] = c[2];
-        rim.data[j + 3] = 255;
+    const ctx = facePlate.getContext("2d");
+    // A few stepped bands between the indigo zenith and the rose horizon.
+    const stops = [
+      [0, "25223c"],
+      [38, "302943"],
+      [66, "48405e"],
+      [84, "705773"],
+      [100, "bd8493"],
+      [117, "deaaab"],
+    ];
+    for (let band = 1; band < stops.length; band++) {
+      const [y0, low] = stops[band - 1],
+        [y1, high] = stops[band];
+      const rgb = [0, 2, 4].map((i) => [
+        parseInt(low.slice(i, i + 2), 16),
+        parseInt(high.slice(i, i + 2), 16),
+      ]);
+      for (let y = y0; y < y1; y++) {
+        const t = (Math.floor((y - y0) / 3) * 3) / (y1 - y0);
+        const color = rgb.map(([a, b]) => Math.round(a + (b - a) * t));
+        rect(ctx, 0, y, faceSide, 1, "rgb(" + color.join(",") + ")");
       }
-    sky.putImageData(world, 0, 0);
-    shell.getContext("2d").putImageData(rim, 0, 0);
+    }
+    let seed = 8041;
+    const random = () =>
+      (seed = (Math.imul(1664525, seed) + 1013904223) >>> 0) / 4294967296;
+    for (let i = 0; i < 104; i++) {
+      const x = Math.floor(random() * faceSide),
+        y = 11 + Math.floor(random() * 82);
+      if (y < 23 && Math.abs(x - faceCenter) < 35) continue;
+      rect(ctx, x, y, 1, 1, ["#94839e", "#be9fab", "#cec1cc"][i % 3]);
+    }
+    for (const [x, y] of [
+      [42, 43],
+      [32, 65],
+      [148, 76],
+      [124, 33],
+    ])
+      shine(ctx, x, y, "#e8c9ce", 1);
+    // The moon has a lit limb and a darker underside, all on the display grid.
+    for (let dy = -8; dy <= 8; dy++)
+      for (let dx = -8; dx <= 8; dx++) {
+        if (dx * dx + dy * dy <= 67 && (dx - 3) ** 2 + (dy + 3) ** 2 >= 60)
+          rect(
+            ctx,
+            149 + dx,
+            58 + dy,
+            1,
+            1,
+            dy > 5 ? "#dbab99" : dx < -6 ? "#f2c59f" : "#f7dfb3",
+          );
+      }
+    for (const [x, y, w] of [
+      [11, 81, 31],
+      [24, 78, 12],
+      [141, 83, 25],
+      [153, 80, 16],
+      [11, 89, 14],
+      [130, 88, 14],
+    ]) {
+      rect(ctx, x, y, w, 1, "#ad8498");
+      rect(ctx, x + 3, y + 2, Math.ceil(w / 2), 1, "#906f88");
+    }
+    ridge(
+      ctx,
+      [
+        [0, 97],
+        [16, 93],
+        [23, 96],
+        [42, 80],
+        [55, 90],
+        [66, 83],
+        [88, 100],
+        [104, 89],
+        [119, 97],
+        [145, 79],
+        [162, 94],
+        [173, 88],
+        [184, 91],
+      ],
+      119,
+      "#736080",
+    );
+    ridge(
+      ctx,
+      [
+        [0, 109],
+        [17, 103],
+        [28, 106],
+        [49, 93],
+        [67, 105],
+        [82, 102],
+        [99, 112],
+        [123, 96],
+        [138, 100],
+        [150, 89],
+        [169, 105],
+        [184, 98],
+      ],
+      122,
+      "#544660",
+    );
+    // The little dome and its two lit windows remain visible left of the dragon.
+    rect(ctx, 22, 93, 16, 12, "#40384e");
+    rect(ctx, 23, 89, 14, 5, "#5d4b67");
+    rect(ctx, 25, 86, 10, 4, "#756179");
+    rect(ctx, 27, 85, 6, 2, "#a58490");
+    rect(ctx, 29, 82, 1, 3, "#c3a0a0");
+    rect(ctx, 31, 87, 2, 5, "#453c55");
+    rect(ctx, 20, 94, 20, 2, "#9c7885");
+    rect(ctx, 24, 99, 2, 3, "#e4b596");
+    rect(ctx, 33, 99, 2, 3, "#e4b596");
+    ridge(
+      ctx,
+      [
+        [0, 112],
+        [19, 103],
+        [33, 105],
+        [48, 101],
+        [72, 116],
+        [99, 110],
+        [126, 113],
+        [152, 106],
+        [166, 100],
+        [184, 106],
+      ],
+      121,
+      "#473e57",
+    );
+    rect(ctx, 0, 115, faceSide, 28, "#745f78");
+    rect(ctx, 0, 118, faceSide, 5, "#826a80");
+    for (let i = 0; i < 89; i++) {
+      const x = Math.floor(random() * faceSide),
+        y = 116 + Math.floor(random() * 19);
+      rect(
+        ctx,
+        x,
+        y,
+        2 + Math.floor(random() * 7),
+        1,
+        i % 3 ? "#6a5874" : "#ab8391",
+      );
+    }
+    for (const [x, y, h] of [
+      [10, 127, 23],
+      [18, 128, 16],
+      [23, 123, 12],
+      [34, 119, 9],
+      [159, 119, 10],
+      [168, 124, 17],
+      [176, 128, 24],
+    ])
+      pine(ctx, x, y, h, "#3d374e", "#57475b");
+    ridge(
+      ctx,
+      [
+        [0, 122],
+        [15, 126],
+        [35, 128],
+        [55, 135],
+        [75, 138],
+        [104, 139],
+        [135, 135],
+        [150, 129],
+        [163, 129],
+        [184, 119],
+      ],
+      177,
+      "#4b3e54",
+    );
+    ridge(
+      ctx,
+      [
+        [0, 132],
+        [12, 129],
+        [28, 135],
+        [48, 139],
+        [80, 144],
+        [112, 143],
+        [143, 137],
+        [169, 133],
+        [184, 129],
+      ],
+      180,
+      "#393246",
+    );
+    for (const [x, y, h] of [
+      [12, 139, 22],
+      [23, 136, 12],
+      [29, 132, 9],
+      [151, 131, 10],
+      [163, 137, 14],
+      [172, 139, 20],
+    ])
+      pine(ctx, x, y, h, "#322e42", "#534155");
+    for (const [x, y] of [
+      [36, 135],
+      [40, 137],
+      [144, 134],
+      [150, 132],
+    ]) {
+      rect(ctx, x, y, 1, 3, "#786674");
+      rect(ctx, x, y - 1, 2, 1, "#d2a0a4");
+    }
+    // Small stepped contact shadow where the skirt meets the near bank.
+    rect(ctx, 76, 143, 33, 1, "#3e3247");
+    rect(ctx, 69, 144, 45, 1, "#342c41");
+    rect(ctx, 75, 145, 34, 1, "#2e283b");
+    const rimCtx = faceShell.getContext("2d");
+    const rim = rimCtx.createImageData(faceSide, faceSide);
+    const enamel = [
+      "342d41",
+      "66546d",
+      "95869a",
+      "bba9bb",
+      "dbccce",
+      "f5e4db",
+      "876e88",
+      "44384c",
+    ].map((hex) => [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)));
+    for (let y = 0; y < faceSide; y++)
+      for (let x = 0; x < faceSide; x++) {
+        const dx = x + 0.5 - faceCenter,
+          dy = y + 0.5 - faceCenter,
+          d = Math.hypot(dx, dy);
+        if (d < faceRadius || d > 89.5) continue;
+        const light = 0.48 * dx + 0.82 * dy;
+        let tone;
+        if (d > 88.5) tone = 0;
+        else if (d > 86.9) tone = light < 0 ? 4 : 1;
+        else if (d > 84.2) tone = light < -28 ? 5 : light < 18 ? 3 : 2;
+        else if (d > 83) tone = light < -24 ? 2 : 6;
+        else tone = 7;
+        const k = (y * faceSide + x) * 4;
+        rim.data.set(enamel[tone], k);
+        rim.data[k + 3] = 255;
+      }
+    rimCtx.putImageData(rim, 0, 0);
   }
   buildLandscape();
-  function atFaceResolution(image) {
-    const result = blank(faceSide, faceSide),
-      ctx = result.getContext("2d");
-    ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(image, 0, 0, faceSide, faceSide);
-    return result;
-  }
-  const facePlate = atFaceResolution(plate),
-    faceShell = atFaceResolution(shell);
   const disc = blank(faceSide, faceSide),
     mask = disc.getContext("2d");
   for (let y = 0; y < faceSide; y++)
@@ -275,9 +386,9 @@ window.PixelBadge = (() => {
       16,
       "#c7dbd4",
     );
-    rect(ctx, 0, 149, faceSide, 35, "#15222b");
-    rect(ctx, 31, 149, 122, 1, "#50616a");
-    rect(ctx, 92, 152, 1, 13, "#344650");
+    rect(ctx, 0, 149, faceSide, 35, "#252331");
+    rect(ctx, 31, 149, 122, 1, "#615266");
+    rect(ctx, 92, 152, 1, 13, "#494151");
     function meter(word, x, numberX, barX, value, color) {
       const left = x - word.length * 6;
       for (let i = 0; i < word.length; i++) {
@@ -492,12 +603,15 @@ window.PixelBadge = (() => {
       this.canvas.width = this.canvas.height = faceSide * zoom;
       const layer = blank(faceSide * zoom, faceSide * zoom),
         g = layer.getContext("2d");
-      const strength = zoom <= 2 ? 0.14 : zoom === 3 ? 0.19 : 0.24;
-      g.fillStyle = `rgba(75,91,101,${strength})`;
+      const strength = zoom <= 2 ? 0.15 : zoom === 3 ? 0.18 : 0.21;
+      g.fillStyle = `rgba(149,129,155,${strength})`;
+      // Paint the mesh once so the intersections do not stamp dark dots into the eyes.
+      g.beginPath();
       for (let n = 0; n < faceSide * zoom; n += zoom) {
-        g.fillRect(n, 0, 1, faceSide * zoom);
-        g.fillRect(0, n, faceSide * zoom, 1);
+        g.rect(n, 0, 1, faceSide * zoom);
+        g.rect(0, n, faceSide * zoom, 1);
       }
+      g.fill();
       g.globalCompositeOperation = "destination-in";
       g.imageSmoothingEnabled = false;
       g.drawImage(disc, 0, 0, layer.width, layer.height);
@@ -518,6 +632,8 @@ window.PixelBadge = (() => {
       motion,
       action,
       sparks,
+      starToy,
+      contact,
     }) {
       if (!this.zoom) return;
       const ctx = this.paint;
@@ -526,7 +642,7 @@ window.PixelBadge = (() => {
       if (motion) {
         const phase = Math.floor(tick / 420) % 8;
         if (phase === 1 || phase === 2)
-          shine(ctx, 45, 40, "#dcbed9", phase === 1 ? 1 : 2);
+          shine(ctx, 42, 43, "#eed1d3", phase === 1 ? 1 : 2);
       }
       if (sheet) {
         const tile = frame + (clip.offset || 0);
@@ -563,6 +679,15 @@ window.PixelBadge = (() => {
         }
         this.expression(ctx, clip, frame, view, action, motion, sparks);
       }
+      if (starToy || contact) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 23, faceSide, 126);
+        ctx.clip();
+        starToy?.draw(ctx);
+        if (contact) this.contactMark(ctx, contact, motion);
+        ctx.restore();
+      }
       instrument(ctx, telemetry, code);
       ctx.globalCompositeOperation = "destination-in";
       ctx.drawImage(disc, 0, 0);
@@ -577,20 +702,66 @@ window.PixelBadge = (() => {
         this.canvas.width,
         this.canvas.height,
       );
-      if (grid) this.ctx.drawImage(this.overlay, 0, 0);
+      if (grid) {
+        this.ctx.globalCompositeOperation = "multiply";
+        this.ctx.drawImage(this.overlay, 0, 0);
+        this.ctx.globalCompositeOperation = "source-over";
+      }
     }
-    expression(ctx, clip, frame, view, id, motion, sparks) {
+    facePoint(view, clip, frame, x, y) {
       const [ox, oy] =
         view === "full" ? [28, 12] : clip.closeOrigin || [113, 34.5];
       const step = view === "full" ? 4 : 2.75;
-      const at = (x, y) => [
-        Math.round(
+      return {
+        sx:
           originX +
-            (x - ox) / step -
-            (view === "close" ? clip.closePan?.[frame] || 0 : 0),
-        ),
-        Math.round(originY(view) + (y - oy) / step),
-      ];
+          (x - ox) / step -
+          (view === "close" ? clip.closePan?.[frame] || 0 : 0),
+        sy: originY(view) + (y - oy) / step,
+      };
+    }
+    contactMark(ctx, { sx, sy, part, age, phase }, motion) {
+      if (
+        !Number.isFinite(sx) ||
+        !Number.isFinite(sy) ||
+        !part ||
+        part === "outside"
+      )
+        return;
+      const x = Math.round(sx),
+        y = Math.round(sy);
+      const pressed = phase === "down";
+      if (!pressed && (age >= 260 || !motion)) return;
+      // Marks start on the touched pixel. Leave the middle clear for the feature being touched.
+      const advance = motion ? Math.min(3, Math.floor(age / 55)) : 0;
+      const r = pressed ? (advance ? 3 : 4) : 3 + advance;
+      const tool = [
+        "book",
+        "palmTap",
+        "keyChime",
+        "lensFind",
+        "bubblePop",
+      ].includes(part);
+      const light = tool ? "#d9efd5" : "#ffe0cf";
+      const ink = tool ? "#536e70" : "#8a576d";
+      if (pressed) {
+        rect(ctx, x - r - 1, y, 2, 1, ink);
+        rect(ctx, x - r, y - 1, 1, 1, light);
+        rect(ctx, x + r, y, 2, 1, ink);
+        rect(ctx, x + r, y - 1, 1, 1, light);
+      } else {
+        for (const sign of [-1, 1]) {
+          rect(ctx, x + sign * r, y - 1 - advance, 1, 1, light);
+          if (advance < 3)
+            rect(ctx, x + sign * (r + 1), y - advance, 1, 1, ink);
+        }
+      }
+    }
+    expression(ctx, clip, frame, view, id, motion, sparks) {
+      const at = (x, y) => {
+        const pos = this.facePoint(view, clip, frame, x, y);
+        return [Math.round(pos.sx), Math.round(pos.sy)];
+      };
       const a = clip.anchors[frame];
       if (id.startsWith("cheek") && frame >= 5 && frame <= 17) {
         const side = id === "cheekLeft" ? -1 : 1;
@@ -675,9 +846,11 @@ window.PixelBadge = (() => {
       if (!inside && !unbounded) return null;
       const [ox, oy] = clip.closeOrigin || [113, 34.5];
       const pan = clip.closePan?.[frame] || 0;
-      return view === "full"
-        ? { x: 28 + x * 4, y: 12 + y * 4, inside }
-        : { x: ox + (x + pan) * 2.75, y: oy + y * 2.75, inside };
+      const point =
+        view === "full"
+          ? { x: 28 + x * 4, y: 12 + y * 4 }
+          : { x: ox + (x + pan) * 2.75, y: oy + y * 2.75 };
+      return { ...point, sx: screenX, sy: screenY, inside };
     }
   }
   return Display;

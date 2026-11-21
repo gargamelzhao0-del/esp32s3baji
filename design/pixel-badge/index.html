@@ -9,8 +9,10 @@
     <link rel="stylesheet" href="style.css" />
     <script defer src="clips.js"></script>
     <script defer src="gesture-clips.js"></script>
+    <script defer src="forehead-invite.js"></script>
     <script defer src="display.js"></script>
     <script defer src="gestures.js"></script>
+    <script defer src="star-game.js"></script>
     <script defer src="telemetry.js"></script>
     <script defer src="app.js"></script>
   </head>
@@ -41,8 +43,8 @@
             height="432"
             tabindex="0"
             role="button"
-            aria-label="和白龙娘互动的圆屏。按空格或回车摸头、叫醒、翻页或回应工作道具，按住左右方向键顺毛。"
-            aria-keyshortcuts="Space Enter ArrowLeft ArrowRight"
+            aria-label="和白龙娘互动的圆屏。空格或回车回应当前场景，送额头时可以按住再松开。左右方向键顺毛。逗星萤时左右选手，回车送出。Escape 收起邀请。"
+            aria-keyshortcuts="Space Enter ArrowLeft ArrowRight Escape"
             aria-describedby="gesture-hint metrics-description"
           ></canvas>
         </div>
@@ -70,7 +72,7 @@
           <h2 id="interact-title">陪她玩</h2>
           <div class="actions">
             <button type="button" data-action="pat">
-              <canvas data-icon="hand" width="16" height="16"></canvas>摸摸头
+              <canvas data-icon="hand" width="16" height="16"></canvas><span id="pat-label">伸手等她</span>
             </button>
             <button type="button" data-action="feed">
               <canvas data-icon="candy" width="16" height="16"></canvas>喂星糖
@@ -79,7 +81,8 @@
               <canvas data-icon="nose" width="16" height="16"></canvas>碰鼻尖
             </button>
             <button type="button" data-action="play">
-              <canvas data-icon="comet" width="16" height="16"></canvas>抛颗星
+              <canvas data-icon="comet" width="16" height="16"></canvas
+              ><span id="star-label">逗星萤</span>
             </button>
             <button type="button" id="cheek-button">
               <canvas data-icon="cheek" width="16" height="16"></canvas>戳脸颊
@@ -129,7 +132,7 @@
               <span id="scene-label">打个盹</span>
             </button>
           </div>
-          <p id="gesture-hint">轻点两颊，或按住刘海慢慢划。</p>
+          <p id="gesture-hint">按住脸颊来回轻揉，或沿着刘海往返摸两趟。</p>
         </section>
         <section class="settings" aria-label="像素吧唧控制">
           <div class="setting">
@@ -159,7 +162,8 @@
     </main>
     <footer>
       <span>白龙娘设定 <b>ZipZipPipe</b> · 动画立绘 <b>CrossPet</b></span
-      ><a href="credits.html">素材与许可 ↗</a>
+      ><a id="observation-link" href="?observe=1">只看圆屏</a>
+      <a href="credits.html">素材与许可 ↗</a>
     </footer>
   </body>
 </html>

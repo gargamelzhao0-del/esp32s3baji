@@ -7,7 +7,7 @@
 }
 :root {
   --ink: #253237;
-  --paper: #f3f3ed;
+  --paper: #f6f1e9;
   --plum: #315d54;
   --soft: #d6dfdb;
   --muted: #576664;
@@ -24,7 +24,7 @@ body {
   color: var(--ink);
   font: 16px/1.55 var(--display);
   background-color: var(--paper);
-  background-image: radial-gradient(#d8dcd4 0.8px, transparent 0.9px);
+  background-image: radial-gradient(#dbd5cc 0.8px, transparent 0.9px);
   background-size: 10px 10px;
 }
 button,
@@ -113,8 +113,8 @@ main {
 }
 .device-card {
   border: 2px solid var(--ink);
-  background: #e0e6df;
-  box-shadow: 6px 6px 0 #c5cdc5;
+  background: #e8dfeb;
+  box-shadow: 6px 6px 0 #cbbfcd;
   min-width: 0;
 }
 .card-bar,
@@ -128,7 +128,7 @@ main {
 }
 .card-bar {
   border-bottom: 2px solid var(--ink);
-  background: #dbe4dc;
+  background: #e6dbea;
 }
 .bar-label {
   display: flex;
@@ -148,10 +148,10 @@ main {
   display: grid;
   place-items: center;
   overflow: hidden;
-  background-color: #172228;
+  background-color: #332e48;
   background-image:
-    linear-gradient(#26353a 1px, transparent 1px),
-    linear-gradient(90deg, #26353a 1px, transparent 1px);
+    linear-gradient(#493f58 1px, transparent 1px),
+    linear-gradient(90deg, #493f58 1px, transparent 1px);
   background-size: 24px 24px;
   padding: 24px 12px;
 }
@@ -159,7 +159,7 @@ main {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(#455958 1px, transparent 1.2px);
+  background-image: radial-gradient(#796c83 1px, transparent 1.2px);
   background-size: 24px 24px;
   pointer-events: none;
 }
@@ -177,7 +177,7 @@ main {
   position: absolute;
   width: 13px;
   height: 13px;
-  border: solid #91a79e;
+  border: solid #b3a1b9;
   opacity: 0.8;
   pointer-events: none;
 }
@@ -226,7 +226,7 @@ main {
 }
 .device-foot {
   border-top: 2px solid var(--ink);
-  background: #e3ebe4;
+  background: #eee6ef;
   font-size: 13px;
 }
 .model {
@@ -352,7 +352,7 @@ select {
   gap: 10px;
   justify-content: space-between;
   min-height: 46px;
-  border-bottom: 1px solid #c1ccc1;
+  border-bottom: 1px solid #c9c2c9;
   font-size: 15px;
 }
 .setting select {
@@ -484,7 +484,7 @@ a {
     flex-wrap: wrap;
   }
   .device-card {
-    box-shadow: 4px 4px #c5cdc5;
+    box-shadow: 4px 4px #cbbfcd;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -495,6 +495,13 @@ a {
 .credits {
   max-width: 700px;
   margin: 44px auto 70px;
+}
+.observe main {
+  grid-template-columns: minmax(0, 600px);
+  justify-content: center;
+}
+.observe .side {
+  display: none;
 }
 .credits h1 {
   font-size: 40px;
