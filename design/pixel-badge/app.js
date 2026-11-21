@@ -106,6 +106,35 @@ const saved = readSettings();
 let view = saved.view === "close" ? "close" : "full",
   grid = saved.grid !== false;
 const motion = matchMedia("(prefers-reduced-motion: reduce)");
+const motionParam = new URLSearchParams(location.search).get("motion");
+const useDirector = motionParam !== "legacy";
+const motionStorage = (() => {
+  try {
+    return localStorage;
+  } catch {
+    return null;
+  }
+})();
+const director = useDirector
+  ? new BadgeMotion({
+      reduced: motion.matches,
+      storage: motionStorage,
+      hasClip: (id) => Boolean(window.PIXEL_CLIPS?.[id]),
+    })
+  : null;
+let activeRange = null;
+let microMeta = null;
+let statusLock = false;
+let lastPointerAttention = -Infinity;
+let brushCounted = false;
+let heartCounted = false;
+let lastMoon = false;
+const bondNames = ["初见", "好奇", "亲近", "黏人", "默契"];
+function refreshBond() {
+  const note = $("bond-note");
+  if (!note) return;
+  note.textContent = director ? bondNames[director.bondLevel()] : "—";
+}
 const previewUrl = new URL(location.href);
 if (previewUrl.searchParams.get("observe") === "1") {
   document.documentElement.classList.add("observe");
@@ -211,6 +240,11 @@ const gestures = new BadgeGestures($("badge"), {
   show: switchClip,
   care,
   note: speak,
+  poke: (id, side) => {
+    director?.interact(id, { side, now: performance.now() });
+    refreshBond();
+    dirty = true;
+  },
   restore: () => switchClip(baseClip()),
   invalidate: () => {
     dirty = true;
@@ -222,6 +256,11 @@ let quietBeforeInvite = 0;
 const starGame = new BadgeStarGame({
   catchStar: (side) => {
     wantsRematch = true;
+    director?.interact(side < 0 ? "starCatchLeft" : "starCatchRight", {
+      side,
+      now: performance.now(),
+    });
+    refreshBond();
     switchClip(side < 0 ? "starCatchLeft" : "starCatchRight");
   },
   leave: () => {
@@ -243,7 +282,13 @@ function acceptForehead(side) {
   if (motion.matches && active === "idle" && intent === "idle" && desired === "idle")
     beginForehead(side);
   if (intent !== forehead.clip || !browClip(intent)) return false;
-  return forehead.touch(side);
+  const touched = forehead.touch(side);
+  if (touched) {
+    director?.interact("forehead", { side, now: performance.now() });
+    refreshBond();
+    dirty = true;
+  }
+  return touched;
 }
 function cancelForehead() {
   if (forehead.phase === "off") return;
@@ -377,7 +422,18 @@ function setBubble(flag) {
     speak("糖泡泡慢慢散开了。");
   }
 }
-async function switchClip(id) {
+async function switchClip(id, range = null, meta = null) {
+  if (!range) {
+    activeRange = null;
+    microMeta = null;
+    director?.microEnded();
+  } else {
+    activeRange = {
+      from: range.from ?? 0,
+      to: range.to ?? (PIXEL_CLIPS[id]?.frames ?? 1) - 1,
+    };
+    microMeta = meta;
+  }
   if (!starClip(id) && starGame.phase !== "off") stopStar();
   if (sleepingClip(intent) && (id === "idle" || id.startsWith("wake")))
     forehead.rearm();
@@ -476,15 +532,22 @@ async function switchClip(id) {
         }
       : null;
     elapsed = id === base ? savedTime : 0;
-    frame = browClip(id)
-      ? forehead.frame
-      : gestures.sample(id, elapsed, 0, motion.matches) ??
-        (id === base ? jobFrame(id, clip, elapsed) : 0);
+    frame = activeRange
+      ? activeRange.from
+      : browClip(id)
+        ? forehead.frame
+        : gestures.sample(id, elapsed, 0, motion.matches) ??
+          (id === base ? jobFrame(id, clip, elapsed) : 0);
     dirty = true;
     previous = null;
     $("badge").dataset.clip = id;
-    $("state-chip").textContent = (actions[id] ||
-      states[id === "readingMoon" ? "reading" : id])[0];
+    const label =
+      statusLock && id !== base
+        ? states[desired][0]
+        : microMeta?.title ||
+          (actions[id] || states[id === "readingMoon" ? "reading" : id])?.[0] ||
+          states[desired][0];
+    $("state-chip").textContent = label;
     $("cheek-button").classList.toggle(
       "active",
       id.startsWith("cheek") || id === "tickle",
@@ -509,10 +572,15 @@ async function switchClip(id) {
           "星萤又从另一边飞回来，她悄悄把手摊开了。",
       );
     else if (!bookClip(id) || gestures.page?.phase === "drag")
-      speak(actions[id]?.[2] || baseNote());
+      speak(microMeta?.note || actions[id]?.[2] || baseNote());
     render();
   } catch {
     if (request !== ticket) return;
+    if (activeRange) {
+      activeRange = null;
+      microMeta = null;
+      director?.microEnded();
+    }
     intent = active;
     if (starClip(id)) stopStar();
     if (browClip(id)) forehead.cancel();
@@ -525,6 +593,10 @@ async function switchClip(id) {
 }
 function state(id, note = "", newSession = false) {
   if (!states[id]) return;
+  const cue = director?.setState(id, { newSession, now: performance.now() });
+  statusLock = ["waiting", "error", "limited"].includes(id);
+  if (cue?.emote) dirty = true;
+  refreshBond();
   const changed = desired !== id || newSession;
   desired = id;
   overrideNote = note;
@@ -536,6 +608,7 @@ function state(id, note = "", newSession = false) {
     forehead.rearm();
     savedTime = 0;
     gestures.moon = false;
+    lastMoon = false;
     const interrupted =
       newSession ||
       starClip(intent) ||
@@ -575,6 +648,8 @@ function care(id) {
     }
     if (starGame.phase === "caught") stopStar();
     if (starGame.phase !== "off") return;
+    director?.interact("play", { now: performance.now() });
+    refreshBond();
     inviteStar();
     return;
   }
@@ -585,6 +660,9 @@ function care(id) {
     lastNose = now;
   }
   if (id === "feed" && bubbleOffered) id = "bubblePop";
+  const side = id.endsWith("Left") ? -1 : 1;
+  director?.interact(id, { side, now: performance.now() });
+  refreshBond();
   switchClip(id);
 }
 function synchronizeSettings(write) {
@@ -598,6 +676,7 @@ function synchronizeSettings(write) {
       localStorage.setItem(settingsKey, JSON.stringify({ view, grid }));
     } catch {}
   }
+  refreshBond();
   dirty = true;
   render();
 }
@@ -654,6 +733,15 @@ function render() {
   const sparkleBeat = sparks.length ? Math.floor(elapsed / 80) : -1;
   const displayedFrame = move ? transferFrame(move, transfer.age) : frame;
   const contact = gestures.contact;
+  const emotes = director?.activeEmotes(performance.now()) || [];
+  const bob =
+    director &&
+    !motion.matches &&
+    !transfer &&
+    !gestures.pointer &&
+    (active === "idle" || active === "waiting")
+      ? Math.round((Math.sin(elapsed / 414) + 1) / 2)
+      : 0;
   const toy =
     !move && starGame.phase !== "off" && starClip(active) && clip?.palms
       ? starGame
@@ -673,6 +761,8 @@ function render() {
     contact?.part,
     contact?.phase,
     contact ? Math.min(6, Math.floor(contact.age / 40)) : -1,
+    emotes.map((e) => e.kind + e.zone + e.side + Math.floor(e.age / 80)).join(","),
+    bob,
     toy
       ? [
           toy.phase,
@@ -693,10 +783,12 @@ function render() {
     frame: displayedFrame,
     view,
     grid,
-    code: (actions[active] || states[desired])[1],
+    code: actions[active]?.[1] || states[desired]?.[1] || "IDLE",
     action: move ? move.id : active,
     sparks,
     contact,
+    emotes,
+    bob,
     starToy: toy,
     telemetry,
     tick: elapsed,
@@ -744,6 +836,42 @@ function update(now) {
   const dt = previous === null ? 0 : Math.min(now - previous, 160);
   previous = now;
   const clip = take;
+  const microBase = baseClip();
+  const micro = director?.tick(dt, {
+    state: desired,
+    base: microBase,
+    active,
+    intent,
+    quiet: gestures.quiet,
+    pointer: Boolean(gestures.pointer),
+    forehead: forehead.phase !== "off",
+    star: starGame.phase !== "off",
+    sleeping: sleepingClip(intent),
+    transfer: Boolean(transfer),
+    now: performance.now(),
+  });
+  if (
+    micro &&
+    active === intent &&
+    active === microBase &&
+    desired === "idle" &&
+    !gestures.pointer &&
+    forehead.phase === "off" &&
+    starGame.phase === "off" &&
+    !transfer &&
+    !sleepingClip(intent)
+  ) {
+    switchClip(
+      micro.clip,
+      {
+        from: micro.from ?? 0,
+        to: micro.to ?? (PIXEL_CLIPS[micro.clip]?.frames ?? 1) - 1,
+      },
+      { title: micro.title, note: micro.note },
+    );
+  } else if (micro) {
+    director?.microEnded();
+  }
   if (transfer && active === intent) {
     transfer.age += dt;
     const m = transfer.moves[0];
@@ -774,7 +902,16 @@ function update(now) {
     }
     const sample = Math.floor((elapsed * clip.fps) / 1000);
     const driven = gestures.sample(active, elapsed, dt, motion.matches);
-    if (browClip(active) && active === intent) {
+    if (activeRange && active === intent) {
+      const span = activeRange.to - activeRange.from + 1;
+      frame = Math.min(activeRange.to, activeRange.from + sample);
+      if (sample >= span) {
+        activeRange = null;
+        microMeta = null;
+        director?.microEnded();
+        if (intent === active) switchClip(baseClip());
+      }
+    } else if (browClip(active) && active === intent) {
       updateForehead(dt);
     } else if (active === "starWatch" && starGame.phase !== "off") {
       const palms = palmsAt(clip, frame);
@@ -804,6 +941,27 @@ function update(now) {
       if (sample >= clip.frames && intent === active) switchClip(baseClip());
     } else {
       frame = jobFrame(active, clip, elapsed);
+    }
+    if (active === "brush" && gestures.brush?.stroked) {
+      if (!brushCounted) {
+        director?.interact("brush");
+        refreshBond();
+        brushCounted = true;
+      }
+    } else if (active !== "brush") brushCounted = false;
+    if (active === "heartHug") {
+      if (!heartCounted) {
+        director?.interact("heartHug");
+        refreshBond();
+        heartCounted = true;
+      }
+    } else heartCounted = false;
+    if (gestures.moon !== lastMoon) {
+      if (active.startsWith("turn") || active.startsWith("reading")) {
+        director?.interact("page");
+        refreshBond();
+      }
+      lastMoon = gestures.moon;
     }
   }
   render();
@@ -994,9 +1152,30 @@ new ResizeObserver(() => {
   dirty = true;
   render();
 }).observe($("workmat"));
+$("badge").addEventListener(
+  "pointermove",
+  (event) => {
+    if (!director || gestures.pointer || transfer) return;
+    const now = performance.now();
+    if (now - lastPointerAttention < 1200) return;
+    lastPointerAttention = now;
+    const box = $("badge").getBoundingClientRect();
+    const x = (event.clientX - box.left) / box.width - 0.5;
+    director.pointerAttention(x < 0 ? -1 : 1, now);
+  },
+  { passive: true },
+);
 document.addEventListener("visibilitychange", resume);
 motion.addEventListener("change", () => {
   cancelForehead();
+  director?.setReduced(motion.matches);
+  const wasMicro = Boolean(microMeta);
+  if (motion.matches) {
+    activeRange = null;
+    microMeta = null;
+    director?.microEnded();
+  }
+  if (wasMicro) switchClip(baseClip());
   dirty = true;
   render();
 });
@@ -1009,6 +1188,7 @@ resume();
 if (linked) {
   $("connection-label").textContent = "等待桥接";
   let session = "";
+  let lastLink = "";
   async function poll() {
     if (!document.hidden) {
       try {
@@ -1046,6 +1226,20 @@ if (linked) {
           "off",
           offline || connecting || !gpt,
         );
+        const link = offline
+          ? "offline"
+          : connecting
+            ? "connecting"
+            : data.has_session
+              ? "online"
+              : "session";
+        if (link !== lastLink) {
+          if (link !== "online") {
+            director?.emote("question", { zone: "head", life: 1400 });
+            dirty = true;
+          }
+          lastLink = link;
+        }
         const currentSession =
           gpt && !offline && !connecting ? data.stream + "/" + data.scope : "";
         state(
@@ -1058,6 +1252,11 @@ if (linked) {
         refreshTelemetry(badgeTelemetry(null));
         $("connection-label").textContent = "桥接未连接";
         $("connection-light").classList.add("off");
+        if (lastLink !== "offline") {
+          director?.emote("question", { zone: "head", life: 1400 });
+          dirty = true;
+          lastLink = "offline";
+        }
         state(
           "idle",
           "还没收到电脑的状态，你仍然可以陪她玩。",

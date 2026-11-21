@@ -339,6 +339,11 @@ window.PixelBadge = (() => {
     8: "010101010101010",
     9: "010101011001110",
     ":": "000010000010000",
+    "?": "010101001010000",
+    "!": "010010010000010",
+    ".": "000000000000010",
+    "+": "000010111010000",
+    ",": "000000000010100",
     " ": "000000000000000",
   };
   function label(ctx, word, cx, y, color) {
@@ -634,6 +639,8 @@ window.PixelBadge = (() => {
       sparks,
       starToy,
       contact,
+      emotes = [],
+      bob = 0,
     }) {
       if (!this.zoom) return;
       const ctx = this.paint;
@@ -657,7 +664,7 @@ window.PixelBadge = (() => {
           W,
           H,
           originX,
-          originY(view),
+          originY(view) + bob,
           W,
           H,
         );
@@ -672,12 +679,13 @@ window.PixelBadge = (() => {
             W,
             H,
             originX,
-            originY(view),
+            originY(view) + bob,
             W,
             H,
           );
         }
-        this.expression(ctx, clip, frame, view, action, motion, sparks);
+        this.expression(ctx, clip, frame, view, action, motion, sparks, bob);
+        this.emotes(ctx, clip, frame, view, emotes, bob, motion);
       }
       if (starToy || contact) {
         ctx.save();
@@ -757,10 +765,10 @@ window.PixelBadge = (() => {
         }
       }
     }
-    expression(ctx, clip, frame, view, id, motion, sparks) {
+    expression(ctx, clip, frame, view, id, motion, sparks, bob = 0) {
       const at = (x, y) => {
         const pos = this.facePoint(view, clip, frame, x, y);
-        return [Math.round(pos.sx), Math.round(pos.sy)];
+        return [Math.round(pos.sx), Math.round(pos.sy) + bob];
       };
       const a = clip.anchors[frame];
       if (id.startsWith("cheek") && frame >= 5 && frame <= 17) {
@@ -829,6 +837,152 @@ window.PixelBadge = (() => {
         }
       }
     }
+    emotes(ctx, clip, frame, view, events, bob, motion) {
+      if (!events?.length || !clip?.anchors?.[frame]) return;
+      const a = clip.anchors[frame];
+      const at = (x, y) => {
+        const pos = this.facePoint(view, clip, frame, x, y);
+        return [Math.round(pos.sx), Math.round(pos.sy) + bob];
+      };
+      for (const e of events) {
+        const age = e.age || 0,
+          life = e.life || 900;
+        if (age >= life) continue;
+        const side = e.side || 1;
+        let x = a[0] + side * 38,
+          y = a[1] - 14;
+        if (e.kind === "heart") {
+          x = a[0] + side * 22;
+          y = a[1] - 28;
+        } else if (e.kind === "sparkle") {
+          x = a[0] + side * 30;
+          y = a[1] - 24;
+        } else if (e.kind === "ellipsis") {
+          x = a[0] + side * 40;
+          y = a[1] - 12;
+        } else if (e.kind === "dots") {
+          x = a[0] + side * 30;
+          y = a[1] - 28;
+        }
+        if (e.bubble) {
+          x = a[0] + side * 46;
+          y = a[1] - 30;
+        }
+        if (e.zone === "cheek") {
+          x = a[2] + side * 24;
+          y = a[3] - 8;
+        } else if (e.zone === "wing") {
+          const left = side < 0;
+          x = left ? a[4] : a[6];
+          y = (left ? a[5] : a[7]) - 22;
+        } else if (e.zone === "tail") {
+          x = a[8];
+          y = a[9] - 24;
+        } else if (e.zone === "nose") {
+          x = a[2];
+          y = a[3] - 14;
+        } else if (e.zone === "hand") {
+          const palms = clip.palms?.[frame];
+          if (palms) {
+            const left = side < 0;
+            x = left ? palms[0] : palms[2];
+            y = (left ? palms[1] : palms[3]) - 16;
+          } else {
+            x = a[2] + side * 32;
+            y = a[3] + 14;
+          }
+        } else if (e.zone === "book") {
+          const book = clip.book?.[frame];
+          if (book) {
+            [x, y] = book;
+            y -= 12;
+          } else {
+            x = a[2];
+            y = a[3] + 18;
+          }
+        } else if (e.zone === "lens") {
+          const target = clip.target?.[frame];
+          if (target) {
+            [x, y] = target;
+            y -= 16;
+          } else {
+            x = a[6];
+            y = a[7] - 20;
+          }
+        }
+        let [sx, sy] = at(x, y);
+        sx = Math.max(20, Math.min(164, sx));
+        sy = Math.max(25, Math.min(145, sy));
+        sy -= motion ? Math.min(4, Math.floor(age / 110)) : 0;
+        ctx.save();
+        ctx.globalAlpha = motion
+          ? Math.max(0, Math.min(1, Math.min(age / 120, (life - age) / 180)))
+          : 1;
+        this.drawEmote(ctx, e.kind, sx, sy, e);
+        ctx.restore();
+      }
+    }
+
+    drawEmote(ctx, kind, x, y, event) {
+      if (event?.bubble) {
+        rect(ctx, x - 1, y - 1, 13, 13, "#dfd4e7");
+        rect(ctx, x, y, 11, 11, "#352f41");
+        if (kind === "question") label(ctx, "?", x + 4, y + 3, "#ffe9a6");
+        else if (kind === "exclaim") label(ctx, "!", x + 4, y + 3, "#ffd4d5");
+        else {
+          rect(ctx, x + 3, y + 5, 1, 1, "#e1d1f2");
+          rect(ctx, x + 5, y + 5, 1, 1, "#e1d1f2");
+          rect(ctx, x + 7, y + 5, 1, 1, "#e1d1f2");
+        }
+        return;
+      }
+      if (kind === "heart") {
+        const pattern = [".o.o.", "owogo", "ogggg", ".ogo."];
+        const colors = { o: "#6f4a62", w: "#fff2e8", g: "#e8849b" };
+        pattern.forEach((row, dy) =>
+          [...row].forEach((ink, dx) => {
+            if (colors[ink])
+              rect(ctx, x + dx - 2, y + dy - 2, 1, 1, colors[ink]);
+          }),
+        );
+      } else if (kind === "sparkle") {
+        shine(ctx, x, y, "#ffe9a6", 2);
+        shine(ctx, x + 5, y - 3, "#d6a8c3", 1);
+      } else if (kind === "question") {
+        label(ctx, "?", x + 1, y + 1, "#352f41");
+        label(ctx, "?", x, y, "#ffe9a6");
+      } else if (kind === "exclaim") {
+        label(ctx, "!", x + 1, y + 1, "#352f41");
+        label(ctx, "!", x, y, "#ffd4d5");
+      } else if (kind === "ellipsis") {
+        rect(ctx, x + 1, y + 1, 1, 1, "#352f41");
+        rect(ctx, x + 4, y + 1, 1, 1, "#352f41");
+        rect(ctx, x + 7, y + 1, 1, 1, "#352f41");
+        rect(ctx, x, y, 1, 1, "#e1d1f2");
+        rect(ctx, x + 3, y, 1, 1, "#e1d1f2");
+        rect(ctx, x + 6, y, 1, 1, "#e1d1f2");
+      } else if (kind === "sweat") {
+        rect(ctx, x, y, 2, 4, "#9bcbbd");
+        rect(ctx, x + 1, y - 1, 1, 2, "#c5e7d4");
+        rect(ctx, x, y + 3, 2, 1, "#587b90");
+      } else if (kind === "note") {
+        rect(ctx, x, y, 1, 5, "#cec3e8");
+        rect(ctx, x - 2, y + 4, 3, 2, "#cec3e8");
+        rect(ctx, x + 3, y + 1, 1, 4, "#a095ac");
+        rect(ctx, x + 2, y + 4, 2, 1, "#a095ac");
+      } else if (kind === "blush") {
+        rect(ctx, x - 2, y, 4, 1, "#efbfce");
+        rect(ctx, x - 1, y + 1, 3, 1, "#e7acbf");
+      } else if (kind === "dots") {
+        rect(ctx, x - 2, y + 1, 1, 1, "#352f41");
+        rect(ctx, x + 1, y, 1, 1, "#352f41");
+        rect(ctx, x + 4, y + 1, 1, 1, "#352f41");
+        rect(ctx, x - 3, y, 1, 1, "#e1d1f2");
+        rect(ctx, x, y - 1, 1, 1, "#e1d1f2");
+        rect(ctx, x + 3, y, 1, 1, "#e1d1f2");
+      }
+    }
+
     sourcePoint(event, view, clip, frame, unbounded = false) {
       const box = this.canvas.getBoundingClientRect();
       const screenX = ((event.clientX - box.left) / box.width) * faceSide,

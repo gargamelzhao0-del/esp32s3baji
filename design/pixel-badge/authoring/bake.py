@@ -42,6 +42,13 @@ TOOL_ACTIONS = {"keyChime":"running","lensFind":"searching","palmTap":"waiting"}
 TAKES.update({name:(16,27) for name in TOOL_ACTIONS})
 TAKES.update({"heartHug":(16,39),"starWatch":(12,27),"starCatchLeft":(16,32),"starCatchRight":(16,32)})
 TAKES.update({"browInviteLeft": (16,89), "browInviteRight": (16,89)})
+# Idle micro-actions are standalone takes: they start and end on the base pose
+# so the runtime can interrupt them at any frame and return to the idle loop.
+TAKES.update({
+    "idleLookLeft": (12,10), "idleLookRight": (12,10),
+    "idleGroomLeft": (12,16), "idleGroomRight": (12,16),
+    "idleStretch": (12,18), "idleHum": (12,14), "idleYawn": (10,18),
+})
 SETTLE = {name:TAKES[name][1]-1 for name in ("writing","compact","succeeded","ended","error","limited","cancelled")}
 for name in SETTLE:
     fps, length = TAKES[name]
@@ -185,7 +192,12 @@ def save_sheet(name,pixels):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--chrome",help="Path to a local Chromium or Chrome executable")
+    parser.add_argument("--only",nargs="+",help="Bake only these takes and merge the metadata")
     args = parser.parse_args()
+    selected = set(args.only) if args.only else set(TAKES)
+    unknown = selected - set(TAKES)
+    if unknown:
+        parser.error("Unknown take(s): " + ", ".join(sorted(unknown)))
     lookup = np.full(1<<24,-1,dtype=np.int16)
     with sync_playwright() as pw:
         browser = pw.chromium.launch(executable_path=args.chrome)
@@ -199,39 +211,47 @@ def main():
         page.add_script_tag(content=arms)
         page.add_script_tag(content=book_art())
         takes = {}
-        for name,(fps,count) in TAKES.items():
+        if args.only:
+            # Keep every existing take, replace only the requested ones.
+            raw = (BADGE/"gesture-clips.js").read_text(encoding="utf-8")
+            takes = json.loads(raw[raw.find("{"):raw.rfind("}")+1])
+        for name in TAKES:
+            if name not in selected:
+                continue
+            fps,count = TAKES[name]
             scene = TOOL_ACTIONS.get(name, name if name in JOBS else "idle")
             takes[name], sheet = bake(page,name,fps,count,lookup,scene)
             save_sheet(name,sheet)
             print(name,count,flush=True)
-        contact_scenes = (*WORK_SCENES,"writingDone","compactDone")
-        for scene in contact_scenes:
-            name = "stow-"+scene
-            takes[name],sheet = bake(page,name,24,8,lookup,scene)
-            save_sheet(name,sheet)
-        props = ("reading","readingMoon","running","searching","writing","compact")
-        bundles = [(scene,"touch-",REACTIONS) for scene in WORK_SCENES]
-        for scene in props:
-            bundles.extend([
-                (scene,"touch-face-",("pat","patLeft","nose","sneeze")),
-                (scene,"touch-limb-",("wing","wingLeft","tail")),
-            ])
-        for scene,prefix,reactions in bundles:
-            front,close = [],[]
-            atlas = prefix+scene
-            offset = 0
-            for name in reactions:
-                metadata,sheet = bake(page,name,*TAKES[name],lookup,scene=scene)
-                first,second = np.split(sheet,2)
-                front.append(first)
-                close.append(second)
-                metadata.update(atlas=atlas,offset=offset,paired=True)
-                if scene in ("writing","compact"):
-                    metadata["gear"] = scene
-                takes[name].setdefault("scenes",{})[scene] = metadata
-                offset += 8*(first.shape[0]//132)
-            save_sheet(atlas,np.concatenate([np.concatenate(front),np.concatenate(close)],axis=1))
-            print(atlas,flush=True)
+        if not args.only:
+            contact_scenes = (*WORK_SCENES,"writingDone","compactDone")
+            for scene in contact_scenes:
+                name = "stow-"+scene
+                takes[name],sheet = bake(page,name,24,8,lookup,scene)
+                save_sheet(name,sheet)
+            props = ("reading","readingMoon","running","searching","writing","compact")
+            bundles = [(scene,"touch-",REACTIONS) for scene in WORK_SCENES]
+            for scene in props:
+                bundles.extend([
+                    (scene,"touch-face-",("pat","patLeft","nose","sneeze")),
+                    (scene,"touch-limb-",("wing","wingLeft","tail")),
+                ])
+            for scene,prefix,reactions in bundles:
+                front,close = [],[]
+                atlas = prefix+scene
+                offset = 0
+                for name in reactions:
+                    metadata,sheet = bake(page,name,*TAKES[name],lookup,scene=scene)
+                    first,second = np.split(sheet,2)
+                    front.append(first)
+                    close.append(second)
+                    metadata.update(atlas=atlas,offset=offset,paired=True)
+                    if scene in ("writing","compact"):
+                        metadata["gear"] = scene
+                    takes[name].setdefault("scenes",{})[scene] = metadata
+                    offset += 8*(first.shape[0]//132)
+                save_sheet(atlas,np.concatenate([np.concatenate(front),np.concatenate(close)],axis=1))
+                print(atlas,flush=True)
         browser.close()
     data = json.dumps(takes,separators=(",",":"))
     (BADGE/"gesture-clips.js").write_text("Object.assign(window.PIXEL_CLIPS,"+data+");\n",encoding="utf-8")

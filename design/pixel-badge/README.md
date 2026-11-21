@@ -20,6 +20,14 @@
 | 接过星萤后让她歇一会儿 | 安静约 11.5 秒后，她会从上次接星的另一侧再邀请一次。继续让她休息，星萤会自行离开，她按原来的安静时间入睡。减少动态效果模式由你主动邀玩 |
 | 待机约 28 秒，或点「打个盹」 | 哈欠、收翅、入睡。在哈欠中碰她，她会沿当前姿势回应。熟睡后轻碰会睁一只眼，趁她偷看再碰一次才会伸懒腰 |
 
+## 动作导演 v2
+
+待机不再只是一条循环：她会看左/看右、理刘海、伸懒腰、哼歌、打哈欠、抖翅膀、摇尾巴、皱鼻子。微动作每 3.8–7.2 秒挑一次，被打断、被按住、需要你确认或打盹时会停下；每次互动后也会先安静一会儿，再把注意力放回你身上。状态切换会冒出问号、感叹号或省略号气泡；摸头、顺毛、戳脸、击掌、接星会飘心、星屑、汗滴或音符。设置里的「她记得你」记录本机亲密度：初见、好奇、亲近、黏人、默契。
+
+- `index.html?motion=legacy`：一键回到旧行为，用于回滚或对比。
+- 减少动效：关闭微动作和漂浮表情，保留状态文案与静态反馈。
+- 导演逻辑在 [`motion.js`](motion.js)，完整设计见 [`MOTION-V2.md`](MOTION-V2.md)。
+
 ## 陪她工作
 
 用「Agent 状态」切换工作。在圆屏上直接点道具，也可以使用「陪她玩」下方随状态变化的按钮。
@@ -49,6 +57,22 @@
 python tools/agent_preview.py --replay protocol/fixtures/codex-flow.jsonl --step 2
 ```
 
+## 验证
+
+```sh
+node --test authoring/motion.test.cjs authoring/gestures.test.cjs authoring/forehead-invite.test.cjs authoring/star-game.test.cjs
+```
+
+`motion.test.cjs` 覆盖微动作调度、亲密度、状态表情和减少动效；其余三项覆盖手势、额头邀请和星萤。Chrome 冒烟需要在本机打开 `index.html`，检查待机微动作、等待状态胶囊、亲密度和 `?motion=legacy`。
+
 ## 素材与制作
 
 角色和字体署名见[素材与许可](credits.html)。[姿态脚本](authoring/poses.js)使用原版白龙娘的骨架、手臂和绘制层。[导出器](authoring/bake.py)把两种取景分别光栅化为索引色帧。现场播放按需读取图集，笔迹与纸签有单独的双手前景层。制作工具依赖 Python、NumPy、Numba、Pillow、Playwright 和 Chromium，浏览器预览直接读取导出成品。
+
+新增或修改待机微动作后，只烘焙指定片段并合并元数据，不重写旧素材：
+
+```sh
+python authoring/bake.py --chrome "C:/Program Files/Google/Chrome/Application/chrome.exe" \
+  --only idleLookLeft idleLookRight idleGroomLeft idleGroomRight idleStretch idleHum idleYawn
+```
+

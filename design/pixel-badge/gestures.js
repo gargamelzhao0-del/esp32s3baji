@@ -82,9 +82,13 @@ class BadgeGestures {
     this.release();
     this.page = this.brush = this.cheek = this.contact = null;
     this.quiet = 0;
-    this.io.show(
-      this.registerTap() ? "tickle" : side < 0 ? "cheekLeft" : "cheekRight",
-    );
+    const clip = this.registerTap()
+      ? "tickle"
+      : side < 0
+        ? "cheekLeft"
+        : "cheekRight";
+    this.io.show(clip);
+    this.io.poke?.(clip, side);
     this.nextSide = -side;
   }
 
@@ -295,6 +299,7 @@ class BadgeGestures {
       this.page = this.brush = null;
       this.cheek = { clip, held: true, age: 0 };
       this.io.show(clip);
+      this.io.poke?.(clip, hit.side);
     }
     if (part === "head") {
       if (this.io.acceptForehead?.(hit.side)) {
@@ -440,6 +445,7 @@ class BadgeGestures {
       ) {
         this.cheek = null;
         this.io.show("tickle");
+        this.io.poke?.("tickle", touch.side);
       }
       this.nextSide = -touch.side;
     } else if (touch.part === "book" && this.page) {

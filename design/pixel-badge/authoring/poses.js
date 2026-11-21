@@ -546,6 +546,95 @@ window.startBadgeTake = async function ({ name, scene }) {
         p.tassel -= 13 * settle;
         p.blush += 0.48 * settle;
       }
+    } else if (name === "idleLookLeft" || name === "idleLookRight") {
+      // Eyes lead, head and fringe follow; the whole pose returns to baseline
+      // so the clip can be interrupted at any frame.
+      const look = Math.sin(Math.PI * u);
+      p.gazeX -= side * 0.95 * look;
+      p.gazeY += 0.12 * look;
+      p.head -= side * 3.2 * look;
+      p.headX -= side * 4.5 * look;
+      p.tuft -= side * 5 * look;
+      p.tassel -= side * 3 * look;
+      p.lean -= side * 1.8 * look;
+      p.nod += 1.2 * look;
+      p.tailTip += side * 6 * look;
+      p.tailLift += 2 * look;
+      p.smile += 0.18 * look;
+      p.blush += 0.08 * look;
+      p.blink = 0.9 * pulse(u, 0.54, 0.62, 0.72);
+    } else if (name.startsWith("idleGroom")) {
+      // A quick, self-conscious hair tidy: paw up, comb the side lock, settle.
+      const comb = held(u, 0, 0.22, 0.58, 0.86);
+      const settle = held(u, 0.5, 0.7, 0.85, 1);
+      const hand = side < 0 ? "left" : "right";
+      const other = side < 0 ? "right" : "left";
+      p[hand + "Y"] -= 170 * comb;
+      p[hand + "X"] += side * (20 * comb - 14 * settle);
+      p.palmOpen = { [hand]: 0.96 * comb, [other]: 0 };
+      p.head += side * 4.2 * comb;
+      p.headX += side * 5 * comb;
+      p.gazeX += side * 0.55 * comb;
+      p.gazeY -= 0.18 * comb;
+      p.hair += side * 3.5 * comb - side * 2 * settle;
+      p.tuft += side * (7 * comb - 4 * settle);
+      p.tassel -= side * 3 * comb;
+      p.nod += 2 * comb;
+      p.smile += 0.24 * comb;
+      p.blush += 0.2 * comb;
+      p[other + "Y"] -= 4 * comb;
+      p.tailTip -= 4 * comb;
+      p.blink = 0.9 * pulse(u, 0.62, 0.7, 0.8);
+    } else if (name === "idleStretch") {
+      // Both paws up, wings open, a small yawn, then everything settles.
+      const up = held(u, 0, 0.25, 0.62, 0.92);
+      p.leftY -= 92 * up;
+      p.rightY -= 88 * up;
+      p.leftX += 17 * up;
+      p.rightX -= 17 * up;
+      p.leftWing += 20 * up;
+      p.rightWing += 18 * up;
+      p.nod -= 7 * up;
+      p.head += 1.5 * up;
+      p.lid *= 1 - 0.55 * up;
+      p.jaw += 0.35 * pulse(u, 0.05, 0.25, 0.45);
+      p.tailLift += 10 * up;
+      p.tailTip += 6 * up;
+      p.smile += 0.45 * up;
+      p.blush += 0.15 * up;
+      p.breath += 1.5 * Math.sin(Math.PI * u);
+      p.blink = 0.92 * pulse(u, 0.58, 0.66, 0.76);
+    } else if (name === "idleHum") {
+      // Eyes closed, a tiny sway, the tail keeps the beat.
+      const hum = Math.sin(Math.PI * u);
+      const sway = Math.sin(u * Math.PI * 2);
+      p.lid *= 1 - 0.78 * hum;
+      p.smile += 0.85 * hum;
+      p.blush += 0.3 * hum;
+      p.head += 2.6 * sway * hum;
+      p.headX += 1.6 * sway * hum;
+      p.nod += 1.5 * sway;
+      p.breath += 2.2 * sway;
+      p.tailTip += 7 * Math.sin(u * Math.PI * 2 - 0.4);
+      p.tailLift += 3 * hum;
+      p.leftWing += 3 * hum;
+      p.rightWing += 2.5 * hum;
+    } else if (name === "idleYawn") {
+      // A full yawn that returns to the open-eyed idle pose.
+      const open = held(u, 0, 0.18, 0.55, 0.9);
+      const wake = pulse(u, 0.62, 0.78, 1);
+      p.jaw += 1.05 * open;
+      p.lid *= 1 - 0.9 * open;
+      p.nod += 8 * open;
+      p.head += 3 * open;
+      p.leftWing -= 8 * open;
+      p.rightWing -= 7 * open;
+      p.tailLift -= 10 * open;
+      p.blush += 0.2 * open;
+      p.smile += 0.2 * wake;
+      p.nod -= 4 * wake;
+      p.tuft += 4 * wake;
+      p.blink = 0.9 * pulse(u, 0.58, 0.65, 0.74);
     } else if (name === "doze") {
       const depth = ease(i / 15),
         phase = (Math.max(0, i - 15) * Math.PI * 2) / 20;
