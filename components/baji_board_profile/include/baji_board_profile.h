@@ -1,0 +1,21 @@
+// Waveshare ESP32-S3-Touch-AMOLED-1.75C, BSP 3.0.0.
+#pragma once
+
+#define BAJI_LCD_HOST   SPI2_HOST
+#define BAJI_LCD_CS     GPIO_NUM_12
+#define BAJI_LCD_SCLK   GPIO_NUM_38
+#define BAJI_LCD_D0     GPIO_NUM_4
+#define BAJI_LCD_D1     GPIO_NUM_5
+#define BAJI_LCD_D2     GPIO_NUM_6
+#define BAJI_LCD_D3     GPIO_NUM_7
+#define BAJI_LCD_RST    GPIO_NUM_1
+#define BAJI_LCD_X_GAP  6
+#define BAJI_LCD_Y_GAP  0
+#define BAJI_LCD_WIDTH  466
+#define BAJI_LCD_HEIGHT 466
+
+#define BAJI_I2C_PORT   I2C_NUM_1
+#define BAJI_I2C_SDA    GPIO_NUM_15
+#define BAJI_I2C_SCL    GPIO_NUM_14
+#define BAJI_TOUCH_RST  GPIO_NUM_2
+#define BAJI_TOUCH_INT  GPIO_NUM_11

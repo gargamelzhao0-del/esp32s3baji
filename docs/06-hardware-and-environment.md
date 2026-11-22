@@ -1,59 +1,38 @@
-# 板卡、环境与依赖基线
+# 1.75C 板卡驱动与 MotoNav 移植记录
 
-## 已核实与仍需上板核实
+目标板为 Waveshare ESP32-S3-Touch-AMOLED-1.75C。官方资料和 MotoNav 同型号设备记录一致，芯片为双核 ESP32-S3R8，外接 32 MiB Flash，封装内有 8 MiB PSRAM。C 型 BSP 标记 `BSP_CAPS_SDCARD=0`。角色资源应以现有板载 Flash 为基础规划；此版采用标准 factory 应用分区。带电池和不带电池是两种销售配置，电量由 PMIC 现场上报。[微雪板卡页](https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/)
 
-Waveshare 官方资料说明此板为 ESP32-S3、466 × 466 AMOLED、CO5300 QSPI、CST9217 触摸，具备 PSRAM、SD、PMIC 与 IMU，适合本地角色显示。AMOLED 亮度应由屏幕控制命令管理，不能套普通 LCD 背光 PWM。I2C 共享、USB 引脚占用和 SD 1-bit 接法以该板官方原理图与 BSP 为准。[板卡文档](https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75/)、[硬件参考](https://github.com/waveshareteam/ESP32-S3-Touch-AMOLED-1.75/blob/main/HARDWARE_REFERENCE.md)
+## 参考工程读到的实际链路
 
-| 项目 | 基线 / 待确认 |
+本次对照本地 `motonav/moto_esp32` 的 0.3.18 源码、`dependencies.lock`、1.75C 原理图文件及同型号硬件测试记录。MotoNav 使用 ESP-IDF 5.5.4、1.75C BSP 3.0.0、CO5300 2.2.0、CST9217 2.0.0 和 LVGL 9.5.0。电子吧唧用 IDF 5.5.4 的公开驱动 API 实现下表中的端口，可以独立构建。
+
+| MotoNav 来源 | 与电子吧唧有关的行为 | 本工程落点 |
+| --- | --- | --- |
+| `main/app/navigation_app.cpp`、`motonav_platform/platform.cpp` | 原应用依次初始化 NVS、导航服务、显示、LVGL 触摸与无线服务；设备名、重启策略和导航数据属于其应用生命周期。 | `main/app_main.c` 只负责启动、日志和退出清理。业务状态仍在可单独测试的 `baji_core`。 |
+| `motonav_display/qspi_panel.cpp`、`strip_stream.h` | 40 MHz QSPI 的命令、地址、颜色数据在一次事务内发送。连续同列的条带用 RAMWRC 续写，最后一次 DMA 回收决定何时可重用缓冲区。 | `baji_display` 管面板时序、边界、窗口、亮度和 DMA；`baji_board` 管两块缓冲以及脏区扩边。 |
+| `motonav_display/display.cpp`、`pixel_pack.cpp`、`pixel_pack_s3.S` | 参考工程还含 LVGL 调度、导航性能计数及可选 RGB332 压缩。地图跑分取决于传输色深、每帧覆盖面积和计算负载。 | 圆屏接口接收 RGB565 大端像素，应用可填充像素画和小范围变化，后续 UI 可通过相同接口提交。 |
+| `motonav_touch/touch.cpp` 与锁定的触摸组件 | 双轴镜像，CST9217 的寄存器读取分发送地址、STOP 等待、接收数据三步。原应用随后注册 LVGL 输入设备。 | `baji_peripherals` 输出单指坐标或释放，支持 GPIO 中断等待。按住期间定时取样，坏帧保留上次有效样本。 |
+| 1.75C BSP、`motonav_ble`、`motonav_graphics`、`motonav_ui` | BSP 提供音频接口；MotoNav 的蓝牙特征和重连状态服务于导航协议，图形库处理地图。参考启动链没有电池遥测。 | 本版新增 AXP2101 只读遥测。音频、IMU、RTC 和宿主通信属于后续独立功能；首版上电运行显示、触摸、电量诊断。 |
+
+## 硬件连接
+
+| 端口 | 板级配置 |
 | --- | --- |
-| SoC / 内存 | ESP32-S3R8，标称 8 MB PSRAM + 16 MB Flash；G1 读芯片实际值 |
-| 屏幕 | 466 × 466，QSPI；旋转方向、颜色顺序、可用 DMA 模式上板验证 |
-| 触摸 | CST9217，共用 I2C；多点能力存在，首版只使用单指 |
-| SD | 1-bit SDMMC，首版 FAT32；卡容量/品牌/读取时延实测 |
-| 电源 | AXP2101；是否装电池、容量、保护与极性仍需实物确认 |
-| 版本 | 标准 / B 外壳 / G GPS；首版不启用 GPS，不能凭网页猜所购 SKU |
-| USB | 原生 USB；业务先用 USB Serial/JTAG，不同时用 OTG 功能占用同一控制资源 |
-| 按键 | PWR 保留电源职责；BOOT 为下载绑定位，不随意复用 |
-| 音频 / IMU | 首版不启用；减少总线和功耗变量 |
+| CO5300 显示 | SPI2，CS 12，SCLK 38，D0–D3 为 4、5、6、7，面板复位 1。可见区域 466 × 466，显存列起点偏移 6。亮度经寄存器 `0x51` 设置。 |
+| CST9217 触摸 | I²C1 共线，SDA 15、SCL 14、400 kHz，7 位地址 `0x5a`，触摸复位 2，低有效中断 11。识别芯片 ID 和分辨率后，两个方向按 `465 - 原始坐标` 变换。 |
+| AXP2101 电源 | 同一总线，7 位地址 `0x34`。启动读取芯片 ID，采样电池连接、USB 有效供电、充电与剩余电量。无电池或无效百分比显示为 unknown，0% 是有效读数。寄存器位定义与 XPowers 对照。[AXP2101 状态实现](https://github.com/lewisxhe/XPowersLib/blob/master/src/XPowersAXP2101.hpp) |
+| 存储与控制台 | QIO Flash、80 MHz 八线 PSRAM、USB Serial/JTAG。启动日志读取实际物理 Flash 容量和已初始化的 PSRAM 容量。 |
 
-固件不在核心层硬编码引脚。G1 只从同一版本 BSP 导入 board definitions，核对原理图后再配置。屏幕 reset 与触摸 reset 不可混用；SD 的 D3/CS 不可当作机械插卡检测脚。
+## 性能与所有权
 
-## 本机环境事实
+全屏 RGB565 需要 434,312 字节。本版用两块内部 DMA 缓冲，每块 466 × 32 × 2 = 29,824 字节，两块共 59,648 字节。单次条带小于 32 KiB，整屏拆成 15 段，条带之间可交叠计算和传输。绘制回调直接填当前可写缓冲；提交下一段时回收上段，最终等待最后一次 DMA。超时保留尚在使用的缓冲。面板的偶数像素对齐由板级层处理，回调填满扩边后的矩形，避免相邻像素残留。[板级 API](../components/baji_board/include/baji_board.h)
 
-2026-11-18 只读检查：
+窄区域按实际宽度分配条带高度。例如从第 1 行起刷新最右一列的 465 个像素，扩边后为 2 × 466，整列只提交一次 DMA。显示从初始化到释放由同一个任务拥有。触摸和电量使用同一总线实例与互斥锁，IRQ 只发信号，在任务上下文读取 I²C。诊断页在静止时停止显示刷新，首次全屏绘制并完成 DMA 后才提亮。触摸移动时就近合并标记的旧、新矩形，远距离移动只更新两块局部区域。
 
-- VS Code 的 `idf.currentSetup` 指向 `D:\.espressif\v6.1.1\esp-idf`，`IDF_TARGET=esp32s3`。
-- 本地 SDK 的 `tools/cmake/version.cmake` 为 6.1.1。
-- 工具在 `C:\Espressif\tools`；IDF Python 位于 `python\v6.1.1\venv\Scripts\python.exe`，已有 idf_component_manager、pyserial、jsonschema。
-- 系统 Python 3.12 是另一个环境，未安装上面这些库。不要把“命令找不到”误认为 SDK 没有安装。
-- 当前 PowerShell 未激活 IDF；工程内构建脚本临时设置所需环境，退出时恢复，不修改机器全局 PATH。
-- Windows 中文工程路径遇到了实际 GCC specs 文件路径错误；仅设置 PYTHONUTF8=1 不能解决。脚本保留原目录，临时映射空闲英文盘符，以 CMake / Ninja 直接构建，结束后校验目标并清理映射。
-- 可枚举的 COM 口不能直接确认设备身份；当前没有打开串口或进行烧录。
+40 MHz 四线的像素数据理论上限为 20 MB/s，整幅 RGB565 的理想传输时间约 21.7 ms。此下限未计命令、等待、渲染或面板扫描。MotoNav 的历史 RGB332 地图结果不作为电子吧唧的帧率。
 
-原 `.vscode` 配置保留。`.devcontainer` 仍是模板，使用浮动 latest 镜像和 QEMU，暂不作为本项目可靠构建基线；没有测试 Docker USB 转发。后续启用时应锁定镜像 digest 并移除“QEMU 能验证真实屏幕”的误解。
+## 复验
 
-## BSP 候选锁定
+在项目根目录运行 `tools/build.ps1` 编译固件，运行 `python tests/display/run.py` 执行驱动回归。构建脚本使用临时 ASCII 盘符，固件、bootloader、分区表与烧录参数均位于脚本输出的 `build-firmware-*` 目录。每个构建目录独立生成 sdkconfig，配置源为仓库中的 `sdkconfig.defaults`。
 
-本次查阅的 registry 版本为 `waveshare/esp32_s3_touch_amoled_1_75 3.0.1`。依赖声明包括 IDF ≥5.5、LVGL ≥8,<10 与 esp_lvgl_adapter ~0.6。这个范围允许尝试本机 6.1.1，但不等于该组合已经验证。候选清单保存在 `../config/idf_component.display.yml.example`，尚未加入默认构建。[BSP 版本](https://components.espressif.com/components/waveshare/esp32_s3_touch_amoled_1_75/versions/3.0.1)、[依赖](https://components.espressif.com/components/waveshare/esp32_s3_touch_amoled_1_75/versions/3.0.1/dependencies)
-
-registry 给出的代码链接固定到 `bfeb6e6d5737178cdde78b630c8118074da0a657`。G1 使用这一来源核对 API，再生成真正的 dependencies.lock；禁止混用官方整机应用里的私有 fork 与组件仓库的另一套头文件。[对应 BSP 源码](https://github.com/waveshareteam/Waveshare-ESP32-components/tree/bfeb6e6d5737178cdde78b630c8118074da0a657/bsp/esp32_s3_touch_amoled_1_75)
-
-方案优先保留用户 6.1.1。若 G1 出现明确不兼容，再开独立构建目录验证官方示例标注的版本，记录差异，不静默替换用户 SDK。完整 package 下载/依赖解析、BSP 编译和实机驱动验证尚未完成。
-
-## 构建与上板分开
-
-当前默认应用只验证核心可以进入 ESP-IDF 工程；不启动屏幕、PSRAM、SD 和真实串口业务。使用 `tools/build-preparation.ps1` 构建；它禁用组件管理器，因为当前没有外部依赖，避免无意联网更新。接入 BSP 时另用正常 IDF 环境启用组件管理器，不沿用这个开关。
-
-本机已完成准备工程编译，产物在 `build-preparation-z`。普通的 `idf.py build` 在此中文路径下仍会失败：idf.py 会把临时盘符 realpath 回中文路径。因此工程脚本先检查 IDF Python 依赖，再执行等价的 CMake 配置与 Ninja 构建步骤；源文件没有迁移，也没有修改 SDK。之后开发完整固件应沿用路径处理方式，启用所需的组件管理器。
-
-如果换电脑，修改脚本参数与工具版本目录。脚本选择 Z: 至 R: 中空闲盘符，按盘符隔离构建目录；不占用已有盘符。脚本异常结束时先检查其明确打印的映射，只清理属于本工程的映射。常规构建成功后已验证没有遗留 Z:。
-
-G1 在明确设备端口后顺序验证：芯片/Flash → PSRAM → PMIC → 屏幕色条 → 触摸定位 → SD → UI。先保存设备原有固件的恢复方式及厂商下载地址。不要把多个外设同时失败的问题混在一起定位。
-
-Flash 分区先用 IDF 的准备构建默认布局。产品布局候选为双 3 MiB OTA app + NVS/OTA data + 内置保底资源，其余空间按实测固件尺寸规划；素材主要放 SD。当前没有提交或烧写自定义分区表，避免过早改变设备数据布局。
-
-## 电池与结构准备
-
-USB 桌面阶段无需假设电池已安装。佩戴阶段确认真实电池容量、接头极性、固定方式与充电参数；背壳避免压屏和遮挡 USB/按键。续航以实测电流计算：可用容量 ÷ 平均电流，再留转换损耗与余量。未测电流前不承诺续航小时数。
-
-需要准备一条数据 USB 线、可用的 FAT32 microSD、板卡购买型号/版本信息。温升、低电和插拔必须在外壳装好后复测，不能只在裸板上验收。
+上板后，观察启动日志中的内存容量、触摸/电源识别结果及首帧 CPU 绘制至最后一次 DMA 完成的微秒数。圆屏中央从左到右应为红、绿、蓝，上方有金色方向刻度。触摸时白色十字应跟随指尖、松手应擦除；再验证四个方向、连续拖动、USB 单独供电和装入电池后的读数。该页可独立验证驱动，角色动画及 Agent 传输在后续阶段接入。

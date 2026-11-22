@@ -12,7 +12,7 @@ flowchart LR
   N --> S
   S --> P[完整快照与串口帧]
   P --> E[ESP32 接收 / 校验 / 状态投影]
-  SD[本地 SD 角色包] --> U[LVGL 显示]
+  RES[板载 Flash 角色包] --> U[角色 UI / 圆屏]
   E --> U
   T[触摸与电源] --> U
   T --> I[少量会话操作意图]

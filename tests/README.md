@@ -1,4 +1,6 @@
-# 状态核心测试
+# 固件与状态核心测试
+
+从根目录运行 `python tests/display/run.py`，使用宿主 GCC 或 Clang 编译真实驱动。用例覆盖 QSPI 指令、连续条带、脏区扩边、双缓冲超时与释放、触摸启动重试、坐标镜像及电量边界。ESP32-S3 目标编译和实板核验方法见[板卡记录](../docs/06-hardware-and-environment.md)。
 
 浏览器逐帧检查使用 Python Playwright 和 Chromium。在项目根目录执行 `python tools/audit_pet_motion.py --out motion-review --check`，也可以用 `--browser` 指定已安装的 Chrome，用 `--case cart` 单独回放搬桌。每段使用固定随机种子，以每秒 30 步推进实际渲染器。输出包含关键帧 PNG 和每帧一行的 CSV。检查模式会报告脸部像素消失、身体网格翻面、握紧后手掌脱离把手或笔杆的具体帧。[逐帧检查入口](../tools/audit_pet_motion.py)
 
@@ -10,7 +12,7 @@ CSV 的 `max_stretch` 是原画上不透明三角形局部变换的最大奇异�
 
 `core_state_test.c` 是不依赖 FreeRTOS / LVGL 的 C 断言用例，覆盖重复帧不延长在线状态、跳号快照恢复、指标过期、零与未知、非法状态、本轮结束不自动成功、成功动效不被周期快照重复触发及重新建连。
 
-需要 **宿主机 C 编译器**，不能使用默认生成 Xtensa / RISC-V ELF 的交叉编译器生成 .exe 后在 Windows 直接执行。本轮已进行核心的 ESP32-S3 工程编译，未执行此断言程序。
+这组断言使用宿主机 C 编译器构建。本轮已用 Windows 上的 GCC 实际运行通过。
 
 在具备本机 cc 的环境中，可按以下命令编译运行（输出目录先创建）：
 
