@@ -57,7 +57,7 @@ class BadgeStarGame {
     this.change(onStar ? "held" : "hand");
     this.path = [{ ...this.pos, time }];
     this.offset = { sx: this.pos.sx - point.sx, sy: this.pos.sy - point.sy };
-    if (!onStar) this.hand = palm;
+    if (!onStar) this.hand = this.glow = palm;
     this.events.note(
       onStar
         ? "她盯住你手里的星萤。把它带到一只掌心，再松手。"
@@ -67,6 +67,10 @@ class BadgeStarGame {
   }
 
   move(point, palms, time) {
+    if (this.phase === "hand") {
+      this.glow = point.inside && this.handAt(point, palms, 12) === this.hand ? this.hand : 0;
+      return;
+    }
     if (this.phase !== "held") return;
     const sx = point.sx + this.offset.sx;
     const sy = Math.max(31, Math.min(144, point.sy + this.offset.sy));
@@ -132,15 +136,20 @@ class BadgeStarGame {
   cancelDrag() {
     this.finger = null;
     this.glow = 0;
-    if (this.phase === "held" || this.phase === "hand") this.change("return");
+    if (this.phase === "held" || this.phase === "hand") {
+      this.change("return");
+      this.returnLane = undefined;
+    }
   }
 
   aim(side, palms) {
     if (!this.available()) return;
+    if (this.phase === "aim" && this.hand === side) return;
     this.hand = this.glow = side;
     this.change("aim");
     const p = palms[side < 0 ? 0 : 1];
-    this.pos = { sx: p.sx + side * 3, sy: p.sy - 10 };
+    const distance = Math.hypot(p.sx + side * 3 - this.pos.sx, p.sy - 10 - this.pos.sy);
+    this.aimDuration = Math.max(160, Math.min(470, distance * 5));
     this.events.note(
       side < 0
         ? "她摊开左边的小爪，按回车送给她。"
@@ -165,36 +174,73 @@ class BadgeStarGame {
       sx: this.home.sx + (reduced ? 0 : 3 * Math.sin(this.clock / 520)),
       sy: this.home.sy + (reduced ? 0 : 3 * Math.sin(this.clock / 340)),
     };
-    const travel = (goal, duration, arc) => {
+    const travel = (goal, duration, arc, carry = false) => {
       const u = Math.min(1, this.age / duration);
-      const ease = u * u * (3 - 2 * u);
+      const ease = (t) => t * t * (3 - 2 * t);
+      const middle = (palms[0].sx + palms[1].sx) / 2;
+      // When a chosen palm is across the portrait, descend along the near
+      // sleeve before crossing at hand height. Keep her eye line clear.
+      const skirtFace = carry && this.from.sy < goal.sy - 18 &&
+        (this.from.sx - middle) * (goal.sx - middle) < 0;
+      const along = ease(skirtFace ? u * u : u);
+      const down = ease(skirtFace ? 1 - (1-u) ** 2 : u);
+      const lift = skirtFace ? -Math.min(2, arc) : arc;
       this.pos = {
-        sx: this.from.sx + (goal.sx - this.from.sx) * ease,
+        sx: this.from.sx + (goal.sx - this.from.sx) * along,
         sy:
           this.from.sy +
-          (goal.sy - this.from.sy) * ease -
-          (reduced ? 0 : arc * 4 * u * (1 - u)),
+          (goal.sy - this.from.sy) * down -
+          (reduced ? 0 : lift * 4 * u * (1 - u)),
       };
       return u === 1;
     };
     if (this.phase === "invite") {
       this.pos = home;
       if (this.age >= 14000) this.change("depart");
+    } else if (this.phase === "aim") {
+      const palm = palms[this.hand < 0 ? 0 : 1];
+      travel({ sx: palm.sx + this.hand * 3, sy: palm.sy - 10 }, reduced ? 1 : this.aimDuration, 3, true);
     } else if (this.phase === "return") {
-      if (travel(home, reduced ? 1 : 360, 6)) this.change("invite");
+      const distance = Math.hypot(this.from.sx - this.home.sx, this.from.sy - this.home.sy);
+      if (this.returnLane === undefined) {
+        const middle = (palms[0].sx + palms[1].sx) / 2;
+        this.returnLane = null;
+        // A miss at the far cuff comes home below her face. A miss high in
+        // the hair comes back over the fringe. Both paths meet the same hover.
+        if ((this.from.sx - middle) * (this.home.sx - middle) < 0) {
+          const palmY = (palms[0].sy + palms[1].sy) / 2;
+          this.returnLane = this.from.sy > (palmY + this.home.sy) / 2
+            ? palmY + 4 : Math.max(36, Math.min(this.home.sy, this.from.sy) - 10);
+        }
+      }
+      if (!reduced && this.returnLane !== null) {
+        const u = Math.min(1, this.age / Math.min(620, 220 + distance * 3));
+        const v = 1 - u;
+        this.pos = {
+          sx: this.from.sx + (home.sx - this.from.sx) * u * u * (3 - 2 * u),
+          sy: v ** 3 * this.from.sy + 3 * u * v * this.returnLane + u ** 3 * home.sy,
+        };
+        if (u === 1) this.change("invite");
+      } else if (travel(home, reduced ? 1 : Math.min(360, 70 + distance * 5), Math.min(6, distance / 5))) {
+        this.change("invite");
+      }
     } else if (this.phase === "landing") {
-      if (
-        travel(
-          palms[this.hand < 0 ? 0 : 1],
-          reduced ? 1 : this.thrown ? 410 : 290,
-          this.thrown ? 13 : 5,
-        )
-      ) {
+      const palm = palms[this.hand < 0 ? 0 : 1];
+      const gap = Math.hypot(palm.sx - this.from.sx, palm.sy - this.from.sy);
+      // A hand-off at the palm is already a catch. Only flight through air
+      // needs an arc; a nearby drop settles the remaining distance directly.
+      const arc = this.thrown
+        ? Math.min(13, gap / 3)
+        : Math.min(5, Math.max(0, gap - 12) / 6);
+      const duration = reduced || gap <= 1
+        ? 1
+        : Math.min(this.thrown ? 410 : 290, 50 + 5 * gap);
+      if (travel(palm, duration, arc, !this.thrown)) {
         this.change("caught");
         this.events.catchStar(this.hand);
       }
     } else if (this.phase === "depart") {
-      if (travel({ sx: 92 + this.hand * 43, sy: 36 }, reduced ? 1 : 580, 4)) {
+      if (travel({ sx: 92 + Math.sign(this.home.sx - 92) * 43, sy: 36 }, reduced ? 1 : 580, 4)) {
         this.stop();
         this.events.leave();
       }
@@ -214,10 +260,14 @@ class BadgeStarGame {
     return row * 9 + col;
   }
 
-  place(palms, catchFrame) {
+  place(palms, catchFrame, releasePalms = palms) {
     this.palms = palms;
     this.catchFrame = catchFrame;
-    if (this.phase === "caught") this.pos = { ...palms[this.hand < 0 ? 0 : 1] };
+    if (this.phase === "caught") {
+      const hand = this.hand < 0 ? 0 : 1;
+      this.pos = { ...palms[hand] };
+      this.afterglow = releasePalms[hand];
+    }
   }
 
   draw(ctx) {
@@ -245,9 +295,11 @@ class BadgeStarGame {
     // She closes her fingers on the light; two glints escape before the hands relax.
     if (phase === "caught" && this.catchFrame >= 20) {
       const lift = this.catchFrame - 20;
-      if (lift < 8 && !still) {
-        dot(x - 3 - lift, y - 3 - lift, 1, 2, gold);
-        dot(x + 2 + lift, y - 4 - lift, 1, 1, mint);
+      if (lift < 6 && !still) {
+        // Detached glints drift from where the fingers met even as the arm lowers.
+        const at = this.afterglow;
+        dot(at.sx - 1 - lift, at.sy + 2 - lift, 1, 2, gold);
+        dot(at.sx + 1 + lift, at.sy + 1 - lift, 1, 1, mint);
       }
       return;
     }
@@ -260,6 +312,19 @@ class BadgeStarGame {
       dot(x + 3, y - 2 - wing, 3, 2, outline);
       dot(x - 5, y - 3 - wing, 2, 2, mint);
       dot(x + 4, y - 3 - wing, 2, 2, mint);
+    }
+    if (phase === "caught" && this.catchFrame >= 17) {
+      const inset = this.catchFrame - 16;
+      const glintY = y + inset;
+      if (this.catchFrame === 17) {
+        dot(x - 2, glintY - 1, 5, 2, outline);
+        dot(x - 1, glintY - 2, 2, 4, gold);
+        dot(x - 1, glintY, 3, 1, "#fff8df");
+      } else if (this.catchFrame === 18) {
+        dot(x - 1, glintY - 1, 3, 2, gold);
+        dot(x, glintY - 1, 1, 1, "#fff8df");
+      } else dot(x, glintY - 1, 1, 1, gold);
+      return;
     }
     dot(x - 1, y - 4, 2, 8, outline);
     dot(x - 4, y - 1, 8, 3, outline);

@@ -10,6 +10,7 @@
     <script defer src="clips.js"></script>
     <script defer src="gesture-clips.js"></script>
     <script defer src="forehead-invite.js"></script>
+    <script defer src="nap-prop.js"></script>
     <script defer src="display.js"></script>
     <script defer src="gestures.js"></script>
     <script defer src="star-game.js"></script>
@@ -73,63 +74,23 @@
           <h2 id="interact-title">陪她玩</h2>
           <div class="actions">
             <button type="button" data-action="pat">
-              <canvas data-icon="hand" width="16" height="16"></canvas><span id="pat-label">伸手等她</span>
+              <canvas aria-hidden="true" data-icon="hand" width="16" height="16"></canvas><span id="pat-label">伸手等她</span>
             </button>
             <button type="button" data-action="feed">
-              <canvas data-icon="candy" width="16" height="16"></canvas>喂星糖
+              <canvas aria-hidden="true" data-icon="candy" width="16" height="16"></canvas><span id="feed-label">喂星糖</span>
             </button>
             <button type="button" data-action="nose">
-              <canvas data-icon="nose" width="16" height="16"></canvas>碰鼻尖
+              <canvas aria-hidden="true" data-icon="nose" width="16" height="16"></canvas>碰鼻尖
             </button>
             <button type="button" data-action="play">
-              <canvas data-icon="comet" width="16" height="16"></canvas
+              <canvas aria-hidden="true" data-icon="firefly" width="16" height="16"></canvas
               ><span id="star-label">逗星萤</span>
             </button>
             <button type="button" id="cheek-button">
-              <canvas data-icon="cheek" width="16" height="16"></canvas>戳脸颊
+              <canvas aria-hidden="true" data-icon="cheek" width="16" height="16"></canvas>戳脸颊
             </button>
             <button type="button" id="scene-button">
-              <canvas
-                data-scene-icon="nap"
-                data-icon="moon"
-                width="16"
-                height="16"
-              ></canvas>
-              <canvas
-                data-scene-icon="book"
-                data-icon="book"
-                width="16"
-                height="16"
-                hidden
-              ></canvas>
-              <canvas
-                data-scene-icon="brush"
-                data-icon="hand"
-                width="16"
-                height="16"
-                hidden
-              ></canvas>
-              <canvas
-                data-scene-icon="keys"
-                data-icon="keys"
-                width="16"
-                height="16"
-                hidden
-              ></canvas>
-              <canvas
-                data-scene-icon="lens"
-                data-icon="lens"
-                width="16"
-                height="16"
-                hidden
-              ></canvas>
-              <canvas
-                data-scene-icon="hand"
-                data-icon="hand"
-                width="16"
-                height="16"
-                hidden
-              ></canvas>
+              <canvas aria-hidden="true" data-icon="pillow" width="16" height="16"></canvas>
               <span id="scene-label">打个盹</span>
             </button>
           </div>

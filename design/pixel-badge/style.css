@@ -191,9 +191,6 @@ main {
   line-height: 1.45;
   margin: 12px 0 0;
 }
-[data-scene-icon][hidden] {
-  display: none;
-}
 .tl {
   top: 10px;
   left: 10px;
@@ -328,8 +325,9 @@ select {
   box-shadow: 2px 3px #bdc9bf;
 }
 .actions canvas {
-  width: 25px;
-  height: 25px;
+  width: 32px;
+  height: 32px;
+  flex: none;
   image-rendering: pixelated;
 }
 .actions button:hover,

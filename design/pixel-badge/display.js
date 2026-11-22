@@ -356,6 +356,63 @@ window.PixelBadge = (() => {
       x += 4;
     }
   }
+  // Native-grid props for states whose hands are free. Ink, main fabric,
+  // shade and a sewn highlight keep their silhouettes readable on the dusk sky.
+  const agentMarks = {
+    working: { color: "#f0c573", shade: "#ac795e", rows: [
+      ".....kkk.....", "...kkhhakk...", "..kahhaaask..", "..khaaaaask..",
+      "..kaakakask..", "...kaakask...", "...kskkksk...",
+      "....ksssk....", "....khhhk....", "....ksssk....", ".....kkk.....",
+    ] },
+    waiting: { color: "#b1dfd4", shade: "#68a29e", rows: [
+      "..kkkkkkkkk..", ".kahhhhhaaak.", "kaaaaaaaahask", "kaaaakaaakask",
+      "kaaakkaaakask", "kaakkkkkkkask", "kaaakkaaaaask", ".kssaksssssk.",
+      "..kkasskkkk..", "...kask......", "...ksk.......", "...kk........",
+    ] },
+    succeeded: { color: "#9ed7ab", shade: "#629385", rows: [
+      "....kkkkk....", "...khaahhk...", "..khaaaaakk..", ".khaaaaakkssk",
+      ".kakaaakkassk", ".kakkakkaassk", "..kakkkaassk.", "..kaakaaassk.",
+      "...kassssk...", "...kskkksk...", "..kaak.ksak..", "..kkk...kkk..",
+    ] },
+    ended: { color: "#cbb8df", shade: "#9484ae", rows: [
+      "..kk.........", "..khkkkk.....", "..khaaaakkk..", "..khaahaaask.",
+      "..khaaaahask.", "..khkkkaassk.", "..khk..kkkk..", "..khk........",
+      "..khk........", "..khk........", ".ksssk.......", ".kkkkk.......",
+    ] },
+    limited: { color: "#ffd994", shade: "#b18870", rows: [
+      ".............", ".kkkkkkkkkkk.", "khhaassaaassk", "kaassaaassaak",
+      "kassaaassaaak", ".kkkkkkkkkkk.", "...ksk.ksk...", "...ksk.ksk...",
+      "...ksk.ksk...", "..ksssksssk..", "..kkkkkkkkk..",
+    ] },
+    cancelled: { color: "#e7a49a", shade: "#ad767f", rows: [
+      "....kkkkk....", "...kahhhak...", "..kaaaaaask..", ".kaaaaaaaask.",
+      ".kaakkkkaask.", ".kaakhhkaask.", ".kaakhhkaask.", ".kaakkkkaask.",
+      "..kaaaaassk..", "...kassssk...", "....kkkkk....",
+    ] },
+    error: { color: "#ffb2a2", shade: "#c48185", rows: [
+      "......k......", ".....khk.....", ".....kak.....", "....kaask....",
+      "....kaksk....", "...kaakask...", "...kaakask...", "..kaaaaassk..",
+      "..kaaakaask..", ".kaaaaaaassk.", ".kkkkkkkkkkk.",
+    ] },
+  };
+  function agentMark(ctx, state, view, clip, lit) {
+    const mark = agentMarks[state];
+    if (!mark) return;
+    // The bubble camera tracks to the right and carries her hair across
+    // the usual left margin. Use the clear sky above the bubble for this shot.
+    let x = 32, y = 47;
+    if (view === "close") {
+      x = clip?.closePan ? 137 : 15;
+      y = clip?.closePan ? 36 : 75;
+    }
+    const colors = { k: "#453848", a: mark.color, s: mark.shade, h: lit ? "#fff8dc" : "#f3e7df" };
+    mark.rows.forEach((row, j) => {
+      for (let i = 0; i < row.length; i++) {
+        if (row[i] !== ".") rect(ctx, x+i, y+j, 1, 1, colors[row[i]]);
+      }
+    });
+  }
+
   // Native 12px Fusion Pixel glyphs, under the same OFL as the bundled font.
   const han = {
     剩: [1151, 1288, 1407, 1322, 1387, 1322, 1387, 1304, 1068, 1099, 1544],
@@ -429,166 +486,217 @@ window.PixelBadge = (() => {
     meter("剩余额度", 68, 77, 49, telemetry.quota, mint);
     meter("上下文", 114, 107, 98, telemetry.context, lilac);
   }
+  const iconInk = {
+    o: "#45384c", d: "#51465f", n: "#32465a", v: "#aa92bc",
+    m: "#69a6a8", t: "#bce3d5", w: "#fff1de", g: "#e4ad62",
+    p: "#efc5b6", r: "#d98196", b: "#a4c9df", s: "#829ab9", c: "#c8e0e8",
+  };
   const icons = {
     keys: [
-      "..............",
-      "..oooooooooo..",
-      ".ovvvvvvvvvvo.",
-      ".owovvvvvvvvo.",
-      ".ovwovvvvvvvo.",
-      ".owovvvggvgvo.",
-      ".ovvvvvvvvvvo.",
-      "..oooooooooo..",
+      "..ooooooooooo.",
+      ".ottmtttttttmo",
+      ".ondnnnnnnnndo",
+      ".onwnnnnnnnndo",
+      ".onnwntggnnndo",
+      ".onwnnnnnnnndo",
+      ".ondnnnnnnnndo",
+      ".ommmmmmmmmmmo",
+      "..omomoowgmoo.",
+      "...ooooooooo..",
     ],
     lens: [
-      "....oooo......",
-      "..oowwwwoo....",
-      "..owwvvvwo....",
-      ".owwvvvvvwo...",
-      ".owvvvvvvwo...",
-      "..owvvvvwo....",
-      "..oowwwwoo....",
-      "....ooooopo...",
-      ".........oppo.",
-      "..........ooo.",
+      "....ooooo.....",
+      "..oogwwwgoo...",
+      ".ogwtmmmtwgo..",
+      ".owtwtttmwgo..",
+      ".ogtmtttmtgo..",
+      ".ogtmmmmtwgo..",
+      "..ogwtttwgo...",
+      "...oogggoodo..",
+      ".....oooodrdo.",
+      ".........odpdo",
+      "..........odro",
+      "...........oo.",
     ],
     cheek: [
-      "....oooooo....",
-      "..oowwwwwwoo..",
-      ".owwwwwwwwwwo.",
-      ".owwowwwowwwo.",
-      ".owwpwwwwppwo.",
-      "..owwwowwwwo..",
-      "...ooowwooo...",
-      "..............",
-      "..........oo..",
-      ".........oppo.",
-      "......oooppo..",
-      ".....oppppo...",
-      "......oooo....",
+      "...ooooooo.....",
+      "..owwwwwpwo....",
+      ".owwwwwwwpwo...",
+      ".owonwwonwwo...",
+      ".owrrwwwwrro...",
+      "..opwwwwwwo..oo",
+      "...ooooooo..opo",
+      ".........oooppo",
+      "........oppppo.",
+      ".........oooo..",
     ],
-    moon: [
-      "......ooo.....",
-      "....ogwgo.....",
-      "...ogwgo......",
-      "..ogwgo.......",
-      "..ogwgo....g..",
-      "..owwgo...gwg.",
-      "..owwwgo...g..",
-      "..ogwwwoo.....",
-      "...ogwwwwwooo.",
-      "....ogwwwwwgo.",
-      ".....ooggggo..",
-      ".......oooo...",
+    pillow: [
+      "..........ooo..",
+      "...ooo...occco.",
+      "..occco.ooccbo.",
+      ".occbccoobggbbo",
+      "occbbbbbbgbbbbo",
+      "obbbbbbbbggbsso",
+      ".osbbbbbbbssso.",
+      "..osssbbbssso..",
+      "...ooossssoo...",
+      "......oooo.....",
+    ],
+    wake: [
+      ".....oggo.....",
+      "....ogwwgo....",
+      "...ogwwgggo...",
+      "..ogwwwgggo..m",
+      "..ogwwwgggo..t",
+      "..owwwggggo...",
+      ".ogggggggggo..",
+      ".ooooooooooo..",
+      ".....oggo.....",
+      "......oo......",
     ],
     book: [
-      ".oooo..oooo...",
-      ".owwwoowggwo..",
-      ".owwwowgwwwo..",
-      ".owwwowwwgwo..",
-      ".owggowgwwwo..",
-      ".owwwowwwgwo..",
-      ".owggowgwwwo..",
-      ".owwwowwwwwo..",
-      ".oooowwooooo..",
-      ".ovvvoovvvvo..",
-      "..ooooooooo...",
-    ],
-    star: [
-      "......w.......",
-      ".....wvw......",
-      ".....vvv......",
-      "....vvwvv.....",
-      "...vwwwwvv....",
-      ".vvwwvvwwwvv..",
-      "vvwwvggvwwwvv.",
-      "..vvwggwwvv...",
-      "...vvwwvv.....",
-      "....vvwv......",
-      ".....vv.......",
-      ".....v........",
+      ".ooooo..ooooo.",
+      "odwwwwoodgggvo",
+      "odwwwwwowgggvo",
+      "odwvvwwowggwvo",
+      "odwwwwwowvwgvo",
+      "odwvvwwowgggvo",
+      "odwwwwwowwwgvo",
+      "odwwwwwowwwvvo",
+      "odooowwowooovo",
+      ".ommmooovvvvo.",
+      "..oooo.ooooo..",
     ],
     hand: [
       ".....oo.......",
-      "....opp.o.....",
-      "....oppopo....",
-      "...ooppopo.o..",
-      "..opoppoppopo.",
-      "..oppwppppopo.",
+      "....oppoo.....",
+      "....opoppo....",
+      "..ooopoppooo..",
+      ".opopppppoppo.",
+      ".opopwppppppo.",
+      "..opppppppppo.",
+      "oo.oppppppppo.",
+      "opoopppppppo..",
+      ".opppppppppo..",
+      "..opppppppo...",
+      "...otmmmmo....",
+      "...ooooooo....",
+    ],
+    brush: [
+      "..ttt...m.....",
+      ".m...t........",
+      ".....oo..oo...",
+      "....oppooppo..",
+      "...oppooppo...",
+      "..opppoppopo..",
+      ".opppppppoppo.",
+      ".opwppppppppo.",
       "..oppppppppo..",
-      "o.oppppppppo..",
-      "opoppppppppo..",
-      ".oppppppppo...",
-      ".oppppppppo...",
-      "..oppppppo....",
-      "...ovvvvo.....",
-      "...ovvvvo.....",
-      "....oooo......",
+      "...oppppppo...",
+      "....otmmmo....",
+      ".....oooo.....",
     ],
     candy: [
-      "..oo......oo..",
-      ".ovvo....ovvo.",
-      ".ovwvo..ovwvo.",
-      "..ovvoooovvo..",
-      "...oowwwwoo...",
-      "...ovwwwvvvo..",
-      "..ovwwvvvvvo..",
-      "..ovwvvwwvvo..",
-      "..ovvvwwvvvo..",
-      "...ovvvvvvo...",
-      "...oovvvoo....",
-      "..ovvoooovvo..",
-      ".ovwvo..ovwvo.",
-      "..ooo....ooo..",
+      "oo.........oo",
+      "omoo.....oomo",
+      "omwvooooomtmo",
+      ".otowgwwgowto",
+      "..owggwgggo..",
+      "..ogggggpgo..",
+      "..ogggwpgoo..",
+      ".omovggoovtmo",
+      "omwmooooomwmo",
+      "omoo.....oomo",
+      "oo.........oo",
+    ],
+    bubble: [
+      "....ooooo....",
+      "..ootwwtmoo..",
+      ".otwwttvvvvo.",
+      ".owwttvvvvto.",
+      "otwvvvvvvvpto",
+      "otvvvvggvvvpo",
+      "omvvvggwgvvpo",
+      "omvvvvggvvvpo",
+      ".ovvvvvvvpto.",
+      ".ovvvvvvptto.",
+      "..oomtttmoo..",
+      "....ooooo....",
     ],
     nose: [
-      ".......ooo....",
-      "......opppo...",
-      ".....oppppo...",
-      ".....opppo....",
-      "....oppppo....",
-      ".ooooppppo....",
-      "opppopppoooo..",
-      ".oppppppppppo.",
-      "..opppppppppo.",
-      "..opppppppppo.",
-      "...opppppppo..",
-      "....ovvvvvo...",
+      ".....ooooo....",
+      "...oowwwwwoo..",
+      "..owwwwwwwwwo.",
+      ".owwdowwwodwwo",
+      ".owwrrwwwrrwwo",
+      "..owwwogowwwo.",
+      "...oowwwwwwo..",
+      ".....oooooo...",
+      ".........t....",
+      "........twt...",
+      ".........t....",
+    ],
+    firefly: [
+      ".oo.......oo.",
+      "omto..g..otmo",
+      "otwoggwggoowo",
+      ".ooogwwwgoo..",
+      "....ggwgg....",
+      "...ggwwwgg...",
+      "..ogwwwwwgo..",
+      "...ogwwwgo...",
+      "....ogwgo....",
+      ".....ogo.....",
+      "......o......",
+    ],
+    catch: [
+      "......g.......",
+      "....ggwgg.....",
+      ".....gwg......",
+      "......g.......",
+      ".oo........oo.",
+      ".opo......opo.",
+      ".oppo....oppo.",
+      "..oppooooppo..",
+      "..opppwppppo..",
+      "...oppppppo...",
+      "....otmmmo....",
       "....oooooo....",
     ],
-    comet: [
-      ".........g....",
-      "........gwg...",
-      "......ggwwwgg.",
-      ".....gwwwgwwwg",
-      "......ggwwwgg.",
-      "...v....gwg...",
-      "..vwv....g....",
-      ".vwv....v.....",
-      "..v..v.v......",
-      "....vwv.......",
-      "...vwv........",
-      "....v.........",
+    recall: [
+      ".......g......",
+      ".....ggwgg....",
+      "......gwg.....",
+      "...oo..g......",
+      "..ommo........",
+      ".ommmo......o.",
+      "ommmmmo....omo",
+      "..ommo....otmo",
+      "...ommooootmo.",
+      "....otttttmo..",
+      ".....oooooo...",
     ],
   };
-  for (const ico of document.querySelectorAll("[data-icon]")) {
-    const ctx = ico.getContext("2d"),
-      pattern = icons[ico.dataset.icon],
-      inks = {
-        o: "#47364e",
-        v: "#9976b2",
-        w: "#fff0d4",
-        p: "#e7b69d",
-        g: "#ac7b55",
-      };
-    pattern.forEach((row, y) =>
-      [...row].forEach((s, x) => {
-        if (inks[s]) rect(ctx, x, y, 1, 1, inks[s]);
-      }),
-    );
+
+  function paintIcon(canvas, name) {
+    const rows = icons[name];
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const left = Math.floor((canvas.width - Math.max(...rows.map(row => row.length))) / 2);
+    const top = Math.floor((canvas.height - rows.length) / 2);
+    rows.forEach((row, y) => [...row].forEach((pixel, x) => {
+      if (iconInk[pixel]) rect(ctx, left+x, top+y, 1, 1, iconInk[pixel]);
+    }));
+    canvas.dataset.icon = name;
   }
+  for (const canvas of document.querySelectorAll("[data-icon]"))
+    paintIcon(canvas, canvas.dataset.icon);
 
   class Display {
+    static setButtonIcon(canvas, name) {
+      if (canvas.dataset.icon !== name) paintIcon(canvas, name);
+    }
+
     constructor(canvas) {
       this.canvas = canvas;
       this.ctx = canvas.getContext("2d");
@@ -632,6 +740,7 @@ window.PixelBadge = (() => {
       view,
       grid,
       code,
+      agentState,
       telemetry,
       tick,
       motion,
@@ -639,8 +748,10 @@ window.PixelBadge = (() => {
       sparks,
       starToy,
       contact,
+      offeredFringe = 0,
+      offeredBubble = false,
+      burstOrigin = null,
       emotes = [],
-      bob = 0,
     }) {
       if (!this.zoom) return;
       const ctx = this.paint;
@@ -650,6 +761,10 @@ window.PixelBadge = (() => {
         const phase = Math.floor(tick / 420) % 8;
         if (phase === 1 || phase === 2)
           shine(ctx, 42, 43, "#eed1d3", phase === 1 ? 1 : 2);
+      }
+      if (telemetry.mode !== "OFF" && telemetry.mode !== "SYNC") {
+        const lit = motion && emotes.some(e => e.zone === "status" && e.kind === agentState && e.age < 480);
+        agentMark(ctx, agentState, view, clip, lit);
       }
       if (sheet) {
         const tile = frame + (clip.offset || 0);
@@ -664,7 +779,7 @@ window.PixelBadge = (() => {
           W,
           H,
           originX,
-          originY(view) + bob,
+          originY(view),
           W,
           H,
         );
@@ -679,13 +794,23 @@ window.PixelBadge = (() => {
             W,
             H,
             originX,
-            originY(view) + bob,
+            originY(view),
             W,
             H,
           );
         }
-        this.expression(ctx, clip, frame, view, action, motion, sparks, bob);
-        this.emotes(ctx, clip, frame, view, emotes, bob, motion);
+        const cushion = NapProp.position(this, clip, frame, view, action);
+        if (cushion) {
+          NapProp.pillow(ctx, cushion, contact, motion);
+          // Keep the resting hands and lower cheek in front of the cushion.
+          ctx.drawImage(sheet,(column+8)*W,r*H,W,H,originX,originY(view),W,H);
+        }
+        NapProp.sleepMarks(ctx, action, frame, view, motion);
+        if (burstOrigin) this.sugarBurst(ctx, clip, frame, view, burstOrigin);
+        this.expression(ctx, clip, frame, view, action, motion, sparks);
+        if (offeredFringe || offeredBubble)
+          this.offerMark(ctx, clip, frame, view, offeredFringe, offeredBubble, motion ? Math.floor(tick/420)%4 : 0);
+        this.emotes(ctx, clip, frame, view, action, emotes, motion);
       }
       if (starToy || contact) {
         ctx.save();
@@ -733,7 +858,7 @@ window.PixelBadge = (() => {
         !Number.isFinite(sx) ||
         !Number.isFinite(sy) ||
         !part ||
-        part === "outside"
+        part === "outside" || part === "pillow"
       )
         return;
       const x = Math.round(sx),
@@ -765,10 +890,64 @@ window.PixelBadge = (() => {
         }
       }
     }
-    expression(ctx, clip, frame, view, id, motion, sparks, bob = 0) {
+    offerMark(ctx, clip, frame, view, fringe, bubble, beat) {
+      if (bubble && clip.bubbles?.[frame]) {
+        const [bx, by, r] = clip.bubbles[frame];
+        // Follow the moving sugar shell in source space, including the close camera pan.
+        const {sx, sy} = this.facePoint(view, clip, frame, bx-r*.68, by-r*.70);
+        const x=Math.round(sx), y=Math.round(sy);
+        rect(ctx,x-1,y-1,4,2,"#61516e");
+        rect(ctx,x-2,y,2,3,"#61516e");
+        rect(ctx,x,y-1,3,1,"#ffedae");
+        rect(ctx,x-1,y,2,1,"#fff7df");
+        if (beat === 1 || beat === 2) rect(ctx,x-2,y+1,1,2,"#bfe8df");
+      } else if (fringe) {
+        const [fx,fy,nx,ny] = clip.anchors[frame];
+        // Two small contact strokes on the offered lock, above the eyes.
+        const {sx,sy}=this.facePoint(view,clip,frame,fx+fringe*(ny-fy)*.48,fy-fringe*(nx-fx)*.48);
+        const x=Math.round(sx), y=Math.round(sy);
+        rect(ctx,x-1,y-1,3,1,"#68556e");
+        rect(ctx,x-1,y,2,1,"#f6d58f");
+        const dx=fringe*(beat===1 ? 4 : 3);
+        rect(ctx,x+dx,y-3,1,2,"#68556e");
+        rect(ctx,x+dx+fringe,y-4,1,2,"#ffeabc");
+      }
+    }
+    sugarBurst(ctx, clip, frame, view, [cx, cy, radius]) {
+      if (frame > 19) return;
+      const paint = (x, y) => this.facePoint(view, clip, frame, x, y);
+      const shell = paint(cx, cy);
+      const r = radius / (view === "close" ? 2.75 : 4);
+      // Short tangents read as pieces of one rim before they fly apart.
+      if (frame < 7) {
+        const chips = [[-.8,-.6],[.3,-.95],[.96,-.28],[.72,.69],[-.2,.98],[-.96,.28]];
+        for (const [i, [dx, dy]] of chips.entries()) {
+          if (frame > 4 + i % 3) continue;
+          const reach = r + frame * (view === "close" ? 1.25 : .85);
+          const x = Math.round(shell.sx + dx*reach), y = Math.round(shell.sy + dy*reach + frame*frame*.08);
+          const w = Math.abs(dx) < .8 && frame < 4 ? 3 : 1;
+          const h = w === 1 && frame < 4 ? 2 : 1;
+          rect(ctx,x,y+1,w,h,"#83677f");
+          rect(ctx,x,y,w,h,["#ffe6b4","#bce9e0","#ffd1df"][i%3]);
+        }
+      }
+      const [, , noseX, noseY] = clip.anchors[frame];
+      // Drop outside her cheek first. The last few steps track her moving nose.
+      const t = Math.min(1, Math.max(0, (frame-1)/10)), u = 1-t;
+      const endX = noseX + 3, endY = noseY - 3;
+      const star = paint(u*u*u*cx + 3*u*u*t*(cx+16) + 3*u*t*t*(cx-12) + t*t*t*endX,
+        u*u*u*cy + 3*u*u*t*(cy-17) + 3*u*t*t*(endY+32) + t*t*t*endY);
+      const x = Math.round(star.sx), y = Math.round(star.sy);
+      const size = frame < 11 && view === "close" ? 3 : frame < 17 ? 2 : 1;
+      shine(ctx,x,y,"#896477",size);
+      if (size === 3) rect(ctx,x-1,y-1,3,3,"#e7aa70");
+      shine(ctx,x,y,"#f5ca78",size-1);
+      rect(ctx,x,y,1,1,"#fff5cb");
+    }
+    expression(ctx, clip, frame, view, id, motion, sparks) {
       const at = (x, y) => {
         const pos = this.facePoint(view, clip, frame, x, y);
-        return [Math.round(pos.sx), Math.round(pos.sy) + bob];
+        return [Math.round(pos.sx), Math.round(pos.sy)];
       };
       const a = clip.anchors[frame];
       if (id.startsWith("cheek") && frame >= 5 && frame <= 17) {
@@ -782,10 +961,24 @@ window.PixelBadge = (() => {
         rect(ctx, x, y + 1, 5, 1, "#efbfce");
         rect(ctx, x + 1, y + 2, 3, 1, "#e7acbf");
         rect(ctx, x + 2, y + 3, 1, 1, "#c389a9");
-      } else if (id === "doze" && frame >= 15) {
-        const lift = motion ? Math.floor((frame - 15) / 5) : 1;
-        const [x, y] = at(a[0] + 78 + lift * 2, a[1] - 36 - lift * 4);
-        label(ctx, "Z", x, y, "#cebddf");
+      } else if (id === "sneeze" && frame >= 14 && frame <= 20) {
+        // A small breath leaves on the closed-eye beat. Keep its origin on
+        // the release drawing so the puff separates as her head rebounds.
+        const age = frame - 14;
+        const [, , noseX, noseY] = clip.anchors[14];
+        const [x, y] = at(noseX, noseY);
+        const puffX = x + (view === "close" ? 6 : 4) + 2 * age;
+        const puffY = y + (view === "close" ? 5 : 3) + Math.floor(age / 2);
+        const shade = "#888093", light = "#fff2de";
+        if (age >= 1 && age <= 4) {
+          rect(ctx, puffX, puffY - 1, 3, 1, shade);
+          rect(ctx, puffX - 1, puffY, 5, 2, shade);
+          rect(ctx, puffX, puffY + 2, 3, 1, shade);
+          rect(ctx, puffX, puffY, 3, 2, light);
+          rect(ctx, puffX + 1, puffY - 1, 1, 1, light);
+        } else rect(ctx, puffX, puffY, 2, 1, shade);
+        if (age > 1 && age < 6)
+          rect(ctx, puffX - 3, puffY - 2, 2, 1, "#ad9ead");
       } else if (id === "brush") {
         for (const spark of sparks) {
           const [x, y] = at(spark.x, spark.y);
@@ -807,18 +1000,28 @@ window.PixelBadge = (() => {
       ) {
         const [x, y] = at(...clip.target[frame]);
         if (id === "keyChime") {
-          for (const beat of [4, 14]) {
+          for (const beat of clip.strikes ?? [5, 14]) {
             const rise = frame - beat;
             if (rise < 0 || rise > 8) continue;
             rect(ctx, x + 5, y - 4 - rise, 1, 3, "#a5e6ce");
             rect(ctx, x + 6, y - 4 - rise, 2, 1, "#a5e6ce");
             rect(ctx, x + 3, y - 2 - rise, 2, 2, "#ffe6aa");
           }
-        } else if (id === "lensFind" && frame >= 7 && frame < 23) {
-          const lift = Math.floor((frame - 7) / 3);
-          shine(ctx, x + 4 + lift, y - 4 - lift, "#ffe7aa", frame < 18 ? 2 : 1);
-          if (frame > 11 && frame < 18)
-            rect(ctx, x + 3, y - 7 - lift, 1, 1, "#e0cfed");
+        } else if (id === "lensFind" && frame >= 9 && frame <= 22) {
+          // The pupil settles behind the lens on F8. Catch light on the brass
+          // rim at 45 degrees, then let the star leave as the hand lowers.
+          const [cx, cy] = clip.target[Math.min(frame, 12)];
+          const flight = Math.max(0, frame - 12);
+          const [sx, sy] = at(cx + 16.5 + 2 * flight, cy - 16.5 - 2.5 * flight);
+          const rays = frame < 11 || frame > 18 ? 1 : frame < 13 || frame > 16 ? 2 : 3;
+          if (frame < 21) {
+            shine(ctx, sx, sy, "#594b60", rays);
+            if (rays >= 2) rect(ctx, sx - 1, sy - 1, 3, 3, "#594b60");
+            shine(ctx, sx, sy, "#f0c573", rays - 1);
+          }
+          rect(ctx, sx, sy, 1, 1, "#ffe7aa");
+          if (frame >= 13 && frame <= 18)
+            rect(ctx, sx - 2, sy + 2, 1, 1, "#e0cfed");
         } else if (id === "palmTap" && frame >= 5 && frame < 12) {
           const step = Math.floor((frame - 5) / 2);
           for (const [dx, dy] of [
@@ -837,40 +1040,22 @@ window.PixelBadge = (() => {
         }
       }
     }
-    emotes(ctx, clip, frame, view, events, bob, motion) {
+    emotes(ctx, clip, frame, view, action, events, motion) {
       if (!events?.length || !clip?.anchors?.[frame]) return;
       const a = clip.anchors[frame];
       const at = (x, y) => {
         const pos = this.facePoint(view, clip, frame, x, y);
-        return [Math.round(pos.sx), Math.round(pos.sy) + bob];
+        return [Math.round(pos.sx), Math.round(pos.sy)];
       };
       for (const e of events) {
         const age = e.age || 0,
           life = e.life || 900;
-        if (age >= life) continue;
+        if (e.zone === "status" || age >= life || (e.clip && e.clip !== action)) continue;
         const side = e.side || 1;
-        let x = a[0] + side * 38,
-          y = a[1] - 14;
-        if (e.kind === "heart") {
-          x = a[0] + side * 22;
-          y = a[1] - 28;
-        } else if (e.kind === "sparkle") {
-          x = a[0] + side * 30;
-          y = a[1] - 24;
-        } else if (e.kind === "ellipsis") {
-          x = a[0] + side * 40;
-          y = a[1] - 12;
-        } else if (e.kind === "dots") {
-          x = a[0] + side * 30;
-          y = a[1] - 28;
-        }
-        if (e.bubble) {
-          x = a[0] + side * 46;
-          y = a[1] - 30;
-        }
+        let x = a[0] + side * 143, y = a[1] - 52;
         if (e.zone === "cheek") {
-          x = a[2] + side * 24;
-          y = a[3] - 8;
+          x = a[2] + side * (a[3] - a[1]) * 0.52;
+          y = a[3] - side * (a[2] - a[0]) * 0.52;
         } else if (e.zone === "wing") {
           const left = side < 0;
           x = left ? a[4] : a[6];
@@ -879,63 +1064,41 @@ window.PixelBadge = (() => {
           x = a[8];
           y = a[9] - 24;
         } else if (e.zone === "nose") {
-          x = a[2];
-          y = a[3] - 14;
+          // Leave the nose and eyes visible while she scrunches her face.
+          y = a[3] - 40;
         } else if (e.zone === "hand") {
           const palms = clip.palms?.[frame];
-          if (palms) {
-            const left = side < 0;
-            x = left ? palms[0] : palms[2];
-            y = (left ? palms[1] : palms[3]) - 16;
-          } else {
-            x = a[2] + side * 32;
-            y = a[3] + 14;
-          }
+          if (!palms) continue;
+          const hand = side < 0 ? 0 : 2;
+          x = palms[hand] + side * 15;
+          y = palms[hand + 1] - 23;
         } else if (e.zone === "book") {
           const book = clip.book?.[frame];
-          if (book) {
-            [x, y] = book;
-            y -= 12;
-          } else {
-            x = a[2];
-            y = a[3] + 18;
-          }
+          if (!book) continue;
+          [x, y] = book;
+          y -= 12;
         } else if (e.zone === "lens") {
           const target = clip.target?.[frame];
-          if (target) {
-            [x, y] = target;
-            y -= 16;
-          } else {
-            x = a[6];
-            y = a[7] - 20;
-          }
+          if (!target) continue;
+          [x, y] = target;
+          y -= 16;
         }
         let [sx, sy] = at(x, y);
         sx = Math.max(20, Math.min(164, sx));
         sy = Math.max(25, Math.min(145, sy));
-        sy -= motion ? Math.min(4, Math.floor(age / 110)) : 0;
+        if (motion && e.zone !== "cheek") {
+          sy -= Math.min(4, Math.floor(age / 110));
+        }
         ctx.save();
         ctx.globalAlpha = motion
           ? Math.max(0, Math.min(1, Math.min(age / 120, (life - age) / 180)))
           : 1;
-        this.drawEmote(ctx, e.kind, sx, sy, e);
+        this.drawEmote(ctx, e.kind, sx, sy);
         ctx.restore();
       }
     }
 
-    drawEmote(ctx, kind, x, y, event) {
-      if (event?.bubble) {
-        rect(ctx, x - 1, y - 1, 13, 13, "#dfd4e7");
-        rect(ctx, x, y, 11, 11, "#352f41");
-        if (kind === "question") label(ctx, "?", x + 4, y + 3, "#ffe9a6");
-        else if (kind === "exclaim") label(ctx, "!", x + 4, y + 3, "#ffd4d5");
-        else {
-          rect(ctx, x + 3, y + 5, 1, 1, "#e1d1f2");
-          rect(ctx, x + 5, y + 5, 1, 1, "#e1d1f2");
-          rect(ctx, x + 7, y + 5, 1, 1, "#e1d1f2");
-        }
-        return;
-      }
+    drawEmote(ctx, kind, x, y) {
       if (kind === "heart") {
         const pattern = [".o.o.", "owogo", "ogggg", ".ogo."];
         const colors = { o: "#6f4a62", w: "#fff2e8", g: "#e8849b" };
@@ -973,13 +1136,6 @@ window.PixelBadge = (() => {
       } else if (kind === "blush") {
         rect(ctx, x - 2, y, 4, 1, "#efbfce");
         rect(ctx, x - 1, y + 1, 3, 1, "#e7acbf");
-      } else if (kind === "dots") {
-        rect(ctx, x - 2, y + 1, 1, 1, "#352f41");
-        rect(ctx, x + 1, y, 1, 1, "#352f41");
-        rect(ctx, x + 4, y + 1, 1, 1, "#352f41");
-        rect(ctx, x - 3, y, 1, 1, "#e1d1f2");
-        rect(ctx, x, y - 1, 1, 1, "#e1d1f2");
-        rect(ctx, x + 3, y, 1, 1, "#e1d1f2");
       }
     }
 

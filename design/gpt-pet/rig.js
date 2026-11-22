@@ -222,6 +222,11 @@
             mask.addColorStop(0,"transparent");mask.addColorStop(1,"#000");this.edge=mask;
         }
 
+        addLandmark(name,x,y){
+            this.landmarks[name]=bindPoint(x,y);
+            this.anchors[name]={x:0,y:0};
+        }
+
         pin(hand,x,y,amount){
             if(amount<=.003)return;
             const at=this.anchors[hand],w=Math.min(1,amount);
@@ -282,6 +287,13 @@
                 this.pin("right",this.anchors.mouth.x+8*s.scale,this.anchors.mouth.y+9*s.scale,bite);
             }
             for(const [hand,side] of [["left",-1],["right",1]]){
+                // Both hands can follow facial landmarks; a tool's right grip
+                // additionally sees the already solved left support.
+                const contact=p[hand+"Grip"];
+                if(contact){
+                    const grip=contact(this.anchors);
+                    this.pin(hand,grip.x,grip.y,grip.weight);
+                }
                 const at=this.anchors[hand];
                 const arm=window.DragonArms.solve(this.anchors[hand+"Shoulder"],at,side,s.scale);
                 this.arms.hands[hand]=arm;at.x=arm.x;at.y=arm.y;

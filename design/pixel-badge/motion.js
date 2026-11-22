@@ -37,26 +37,27 @@
   const INTERACTIONS = {
     pat: { bond: 2, emote: "heart", zone: "head", affection: 0.08, energy: 0.02 },
     patLeft: { bond: 2, emote: "heart", zone: "head", side: -1, affection: 0.08, energy: 0.02 },
-    brush: { bond: 3, emote: "sparkle", zone: "head", affection: 0.1 },
+    brush: { bond: 3, affection: 0.1 },
     cheekLeft: { bond: 1, emote: "blush", zone: "cheek", side: -1, curiosity: 0.04 },
     cheekRight: { bond: 1, emote: "blush", zone: "cheek", side: 1, curiosity: 0.04 },
     tickle: { bond: 3, emote: "note", zone: "head", energy: 0.08, affection: 0.06 },
     nose: { bond: 1, emote: "question", zone: "nose", curiosity: 0.04 },
-    sneeze: { bond: 1, emote: "exclaim", zone: "head", energy: 0.03 },
+    sneeze: { bond: 1, energy: 0.03 },
     wing: { bond: 1, emote: "sparkle", zone: "wing", side: 1 },
     wingLeft: { bond: 1, emote: "sparkle", zone: "wing", side: -1 },
     tail: { bond: 1, emote: "sparkle", zone: "tail" },
-    feed: { bond: 2, emote: "sparkle", zone: "hand", energy: 0.06, affection: 0.05 },
-    bubblePop: { bond: 1, emote: "sparkle", zone: "nose", energy: 0.03 },
+    feed: { bond: 2, energy: 0.06, affection: 0.05 },
+    bubblePop: { bond: 1, energy: 0.03 },
     play: { bond: 1, emote: "sparkle", zone: "head", curiosity: 0.06 },
     starCatchLeft: { bond: 3, emote: "heart", zone: "hand", side: -1, affection: 0.1, energy: 0.06 },
     starCatchRight: { bond: 3, emote: "heart", zone: "hand", side: 1, affection: 0.1, energy: 0.06 },
-    heartHug: { bond: 4, emote: "heart", zone: "head", affection: 0.14 },
-    palmTap: { bond: 2, emote: "sparkle", zone: "hand", affection: 0.06 },
-    keyChime: { bond: 1, emote: "note", zone: "hand", energy: 0.03 },
-    lensFind: { bond: 1, emote: "sparkle", zone: "lens", curiosity: 0.05 },
-    page: { bond: 1, emote: "sparkle", zone: "book", curiosity: 0.03 },
-    forehead: { bond: 3, emote: "blush", zone: "head", affection: 0.12 },
+    // Their atlas or frame-timed contact effect already shows the exact result.
+    heartHug: { bond: 4, affection: 0.14 },
+    palmTap: { bond: 2, affection: 0.06 },
+    keyChime: { bond: 1, energy: 0.03 },
+    lensFind: { bond: 1, curiosity: 0.05 },
+    page: { bond: 1, curiosity: 0.03 },
+    forehead: { bond: 3, affection: 0.12 },
     default: { bond: 1, emote: null },
   };
 
@@ -76,14 +77,9 @@
     cancelled: { energy: -0.04 },
   };
 
-  const STATE_CUE = {
-    waiting: { kind: "question", zone: "head", life: 1200, bubble: true },
-    error: { kind: "exclaim", zone: "head", life: 900, bubble: true },
-    succeeded: { kind: "sparkle", zone: "head", life: 1200 },
-    limited: { kind: "ellipsis", zone: "head", life: 1600, bubble: true },
-    ended: { kind: "ellipsis", zone: "head", life: 1000, bubble: true },
-    cancelled: { kind: "ellipsis", zone: "head", life: 900, bubble: true },
-  };
+  const MARKED_STATES = new Set([
+    "working", "waiting", "succeeded", "ended", "limited", "cancelled", "error",
+  ]);
 
   const MICROS = [
     {
@@ -110,8 +106,8 @@
       id: "groomLeft",
       clip: "idleGroomLeft",
       from: 0,
-      to: 15,
-      duration: 1400,
+      to: 29,
+      duration: 1667,
       weight: 1.6,
       title: "理理头发",
       note: "她抬爪拨了拨刘海，假装只是路过。",
@@ -120,8 +116,8 @@
       id: "groomRight",
       clip: "idleGroomRight",
       from: 0,
-      to: 15,
-      duration: 1400,
+      to: 29,
+      duration: 1667,
       weight: 1.6,
       title: "理理头发",
       note: "她把翘起来的那绺发梢压平，又坐好了。",
@@ -130,8 +126,8 @@
       id: "stretch",
       clip: "idleStretch",
       from: 0,
-      to: 17,
-      duration: 1500,
+      to: 27,
+      duration: 1750,
       weight: 1.2,
       title: "伸个懒腰",
       note: "她举起双爪，翅膀也跟着舒展开。",
@@ -154,8 +150,8 @@
       id: "yawn",
       clip: "idleYawn",
       from: 0,
-      to: 17,
-      duration: 1800,
+      to: 23,
+      duration: 1714,
       weight: 0.8,
       title: "打哈欠",
       note: "她打了个小哈欠，尾巴尖都跟着发懒。",
@@ -221,7 +217,6 @@
       weight: 0.3,
       title: "打喷嚏",
       note: "阿嚏！她缩起肩膀，甩了甩头发。",
-      emote: "exclaim",
     },
     {
       id: "heart",
@@ -232,8 +227,6 @@
       weight: 0.2,
       title: "送给你",
       note: "她捧起一颗小星心，悄悄递给你。",
-      emote: "heart",
-      life: 1400,
       requires: (now, m) => m.bond >= 25,
     },
   ];
@@ -253,12 +246,13 @@
       now = defaultNow,
       storage = null,
       hasClip = () => true,
+      getClip = hasClip,
     } = {}) {
       this.reduced = Boolean(reduced);
       this.random = random;
       this.now = now;
       this.storage = storage;
-      this.hasClip = hasClip;
+      this.getClip = getClip;
       this.bond = 0;
       this.visits = 0;
       this.state = "idle";
@@ -332,6 +326,8 @@
       }
       this.state = id;
       this.stateSince = now;
+      this.emotes.length = 0;
+      this.periodicAt = now + 2600;
       this.micro = null;
       this.mood = this.mood || { energy: 0.6, affection: 0.5, curiosity: 0.6 };
       this.mood = moodAfter(this.mood, STATE_MOOD[id] || {});
@@ -342,15 +338,10 @@
             : 1600 + this.random() * 1400
           : 2600 + this.random() * 1800;
       this.microAt = now + wait;
-      const cue = STATE_CUE[id];
-      const emote = cue
-        ? this.emote(cue.kind, {
-            zone: cue.zone,
-            side: 1,
-            life: cue.life,
-            bubble: cue.bubble,
-            now,
-          })
+      // Briefly light the new state emblem. Its silhouette is drawn from
+      // the current Agent state for as long as that state remains active.
+      const emote = MARKED_STATES.has(id)
+        ? this.emote(id, { zone: "status", life: 800, now })
         : null;
       return { changed: true, emote };
     }
@@ -364,9 +355,11 @@
       this.lastInteraction = now;
       this.micro = null;
       this.microAt = now + 2600 + this.random() * 1800;
+      this.emotes.length = 0;
       const emote = info.emote
         ? this.emote(info.emote, {
             zone: info.zone || zone || "head",
+            clip: action === "play" ? "starWatch" : action,
             side: resolvedSide,
             life: info.life || 900,
             now,
@@ -389,25 +382,22 @@
     tick(dt, ctx = {}) {
       const now = ctx.now ?? this.now();
       this.emotes = this.emotes.filter((e) => now - e.born < e.life);
-      if (now >= this.periodicAt) {
+      const available = ctx.active === ctx.intent && ctx.intent === ctx.base &&
+        !ctx.pointer && !ctx.forehead && !ctx.star && !ctx.sleeping && !ctx.transfer;
+      if (now >= this.periodicAt && available && !this.reduced) {
         this.periodic(now, ctx);
         this.periodicAt = now + 2600;
       }
       if (this.reduced) return null;
       if (this.micro) return null;
-      if (ctx.active !== ctx.intent || ctx.intent !== ctx.base) return null;
+      if (!available) return null;
       if (ctx.state !== "idle" || ctx.base !== "idle") return null;
-      if (
-        ctx.pointer ||
-        ctx.forehead ||
-        ctx.star ||
-        ctx.sleeping ||
-        ctx.transfer
-      )
-        return null;
-      if ((ctx.quiet || 0) >= 6500) return null;
+      // A long cuddle may outlast its scheduling cooldown. Let her sit down
+      // again before starting an overdue gesture on the very next frame.
+      if (ctx.quiet < 2600) return null;
       if (now < this.microAt) return null;
-      const pick = this.pick(now);
+      const remaining = (ctx.nextQuietAt ?? 7000) - (ctx.quiet || 0);
+      const pick = this.pick(now, remaining);
       if (!pick) return null;
       this.micro = pick;
       this.lastMicroId = pick.id;
@@ -416,6 +406,7 @@
       if (pick.emote)
         this.emote(pick.emote, {
           zone: pick.zone || "head",
+          clip: pick.clip,
           side: pick.side || 1,
           life: pick.life || 900,
           now,
@@ -427,10 +418,14 @@
       this.micro = null;
     }
 
-    pick(now) {
+    pick(now, remaining) {
       const items = [];
       const consider = (candidate) => {
-        if (!this.hasClip(candidate.clip)) return;
+        const reel = this.getClip(candidate.clip);
+        if (!reel) return;
+        const to = reel.frames ? reel.frames - 1 : candidate.to;
+        const duration = reel.fps ? 1000 * (to + 1) / reel.fps : candidate.duration;
+        if (duration + 180 > remaining) return;
         if (candidate.requires && !candidate.requires(now, this)) return;
         let weight =
           typeof candidate.weight === "function"
@@ -439,7 +434,7 @@
         if (candidate.id === this.lastMicroId) weight *= 0.3;
         if (now - (this.recent[candidate.id] ?? -Infinity) < 8000)
           weight *= 0.5;
-        if (weight > 0) items.push({ candidate, weight });
+        if (weight > 0) items.push({ candidate: { ...candidate, to, duration }, weight });
       };
       for (const candidate of MICROS) consider(candidate);
       if (now - this.attentionAt < 1600) {
@@ -469,25 +464,19 @@
       const state = ctx.state || this.state;
       const fresh = (kind, within = 2000) =>
         !this.emotes.some((e) => e.kind === kind && now - e.born < within);
-      if (state === "working" && this.random() < 0.45 && fresh("dots"))
-        this.emote("dots", { zone: "head", life: 900, now });
-      else if (state === "waiting" && this.random() < 0.7 && fresh("question"))
-        this.emote("question", { zone: "head", life: 1200, now });
-      else if (state === "limited" && this.random() < 0.35 && fresh("ellipsis"))
-        this.emote("ellipsis", { zone: "head", life: 1200, now });
+      if (state === "working" && this.random() < 0.45 && fresh(state))
+        this.emote(state, { zone: "status", life: 800, now });
       else if (state === "reading" && this.random() < 0.22 && fresh("sparkle"))
-        this.emote("sparkle", { zone: "book", life: 800, now });
+        this.emote("sparkle", { zone: "book", clip: ctx.active, life: 800, now });
       else if (state === "searching" && this.random() < 0.3 && fresh("sparkle"))
         this.emote("sparkle", { zone: "lens", life: 800, now });
-      else if (state === "running" && this.random() < 0.22 && fresh("note"))
-        this.emote("note", { zone: "hand", life: 700, now });
       else if (state === "error" && this.random() < 0.18 && fresh("sweat"))
         this.emote("sweat", { zone: "head", life: 900, now });
     }
 
-    emote(kind, { zone = "head", side = 1, life = 900, bubble = false, now = this.now() } = {}) {
+    emote(kind, { zone = "head", side = 1, life = 900, clip = this.state, now = this.now() } = {}) {
       if (!kind) return null;
-      const event = { kind, zone, side, born: now, life, bubble };
+      const event = { kind, zone, side, born: now, life, clip };
       this.emotes.push(event);
       if (this.emotes.length > 8) this.emotes.shift();
       return event;

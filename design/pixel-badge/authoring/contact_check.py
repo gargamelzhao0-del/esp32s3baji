@@ -1,5 +1,7 @@
 """Replay real mouse and touch input against the standalone pixel badge."""
 import argparse
+import subprocess
+import sys
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
@@ -76,17 +78,29 @@ def check_waking(page, finger):
     print("First changed drawing after each wake contact (ms):",delays)
 
 
-def check_invitations(browser):
-    page = browser.new_page()
+def install_pet_clock(page):
+    # The director reads performance.now(), while the sprite player uses rAF.
+    # Let an actual image decode complete before advancing the next visible frame.
     page.add_init_script("""{
         let pending=new Map(), uid=0, t=0;
         window.requestAnimationFrame=f=>{pending.set(++uid,f);return uid};
         window.cancelAnimationFrame=id=>pending.delete(id);
-        window.advancePet=ms=>{for(let n=0;n<ms;n+=20){
-            const callbacks=pending;pending=new Map();t+=20;
+        Object.defineProperty(performance,'now',{value:()=>t});
+        Math.random=()=>0.1;
+        window.advancePet=async ms=>{for(let n=0;n<ms;n+=20){
+            const callbacks=pending;pending=new Map();t+=Math.min(20,ms-n);
             for(const fn of callbacks.values())fn(t);
+            for(let retry=0;active!==intent;retry++){
+                if(retry>=400)throw Error('Atlas did not settle: '+intent);
+                await new Promise(done=>setTimeout(done,5));
+            }
         }};
     }""")
+
+
+def check_invitations(browser):
+    page = browser.new_page()
+    install_pet_clock(page)
     def wait(name):
         page.wait_for_function("id=>document.querySelector('#badge')?.dataset.clip===id",
                                arg=name,polling=20,timeout=4500)
@@ -136,12 +150,140 @@ def check_invitations(browser):
     wait("starWatch")
     assert page.evaluate("starGame.hand===-1 && !wantsRematch")
     advance(14700)
-    wait("idle")
-    assert page.evaluate("gestures.quiet>=25000 && !wantsRematch")
+    assert page.evaluate("starGame.phase==='off' && (active==='idle' || activeRange) && gestures.quiet>=25000 && !wantsRematch")
     advance(2600)
     wait("doze")
     page.close()
     print("An earned invitation visits the opposite side once; ignoring it preserves nap time.")
+
+
+def check_micro_contacts(browser):
+    def open_page(view="full", suffix="", reduced=False, url=None):
+        page = browser.new_page(viewport={"width": 960, "height": 800},
+                                reduced_motion="reduce" if reduced else "no-preference")
+        install_pet_clock(page)
+        page.goto(url or PAGE.as_uri()+suffix)
+        page.wait_for_function("active==='idle'",polling=20)
+        page.locator(f"[data-view={view}]").evaluate("e=>e.click()")
+        page.evaluate("""() => {
+            window.traces=[];
+            const paint=lcd.draw.bind(lcd);
+            lcd.draw=o=>{
+                traces.push([o.action,o.frame,o.contact?.phase,performance.now()]);
+                paint(o);
+            };
+        }""")
+        return page
+
+    def wait_for_groom(page):
+        page.evaluate("""async () => {
+            director.random=()=>0.4;
+            while(performance.now()<6800) {
+                await advancePet(20);
+                if (active==='idleGroomLeft' && frame>=Math.floor(take.frames/3)) return;
+            }
+            throw Error('Groom did not get its scheduled slot');
+        }""")
+
+    for view in ("full", "close"):
+        page = open_page(view)
+        wait_for_groom(page)
+        shown = page.evaluate("frame")
+        x,y,_ = point(page,"cheek",scroll=False)
+        page.mouse.move(x,y)
+        page.evaluate("traces.length=0")
+        page.mouse.down()
+        traces = page.evaluate("traces")
+        assert traces[0][:3] == ["idleGroomLeft", shown, "down"], traces[:3]
+        if view == "full":
+            page.evaluate("advancePet(900)")
+            traces = page.evaluate("traces")
+            arm = [f for action,f,_,_ in traces if action=="idleGroomLeft"]
+            steps = [f for i,f in enumerate(arm) if i==0 or f!=arm[i-1]]
+            assert steps==list(range(shown,-1,-1)), arm
+            assert page.evaluate("active==='cheekRight' && !lowering && gestures.cheek.held")
+        else:
+            page.evaluate("advancePet(40)")
+            assert page.evaluate("Boolean(lowering)")
+            page.locator("#agent-state").evaluate(
+                "e=>{e.value='waiting';e.dispatchEvent(new Event('change'))}")
+            assert page.evaluate("intent==='waiting' && !lowering && !gestures.pointer")
+            page.evaluate("advancePet(800)")
+            assert page.evaluate("active==='waiting' && !transfer && !activeRange")
+        page.mouse.up()
+        page.close()
+
+    project = PAGE.parents[2]
+    flow = (project/"protocol/fixtures/codex-flow.jsonl").read_text(encoding="utf-8").splitlines()
+    with subprocess.Popen([sys.executable,"-B",str(project/"tools/agent_preview.py"),"--port","0"],
+                          stdin=subprocess.PIPE,stderr=subprocess.PIPE,text=True,encoding="utf-8") as bridge:
+        try:
+            endpoint = bridge.stderr.readline().strip()
+            bridge.stdin.write(flow[0]+"\n")
+            bridge.stdin.flush()
+            page = open_page("close",url=endpoint+"badge/design/pixel-badge/index.html?agent=1")
+            page.wait_for_function("telemetry.mode==='LIVE' && desired==='idle'",polling=20)
+            wait_for_groom(page)
+            bridge.stdin.write(flow[4]+"\n")
+            bridge.stdin.flush()
+            page.wait_for_function("intent==='waiting' && active==='waiting'",polling=20)
+            assert page.evaluate("!lowering && !activeRange && director.state==='waiting'")
+            page.evaluate("advancePet(800)")
+            assert page.evaluate("active==='waiting' && !transfer && telemetry.mode==='LIVE'")
+            page.close()
+        finally:
+            bridge.terminate()
+
+    page = open_page()
+    wait_for_groom(page)
+    page.evaluate("advancePet(28600-performance.now())")
+    traces = page.evaluate("traces")
+    first = lambda name: next(ms for action,_,_,ms in traces if action==name)
+    assert first("idleGroomLeft") < first("browInviteLeft")
+    assert 7000 <= first("browInviteLeft") <= 7220
+    assert 28000 <= first("doze") <= 28500
+
+    # Replay a second nap request with the hands still up in a waking stretch.
+    def advance_to(name, frame):
+        page.evaluate("""async ([name,target]) => {
+            for (let i=0; i<180; i++) {
+                if (active===name && frame===target) return;
+                await advancePet(20);
+            }
+            throw Error('Expected '+name+' frame '+target+', got '+active+' frame '+frame);
+        }""", [name,frame])
+
+    scene_button = page.locator("#scene-button")
+    for side in ("Left", "Right"):
+        advance_to("doze",15)
+        page.locator("#badge").focus()
+        page.keyboard.press("Arrow"+side)
+        advance_to("peek"+side,8)
+        scene_button.evaluate("e=>e.click()")
+        wake = "wake"+side
+        advance_to(wake,8)
+        last = page.evaluate("take.frames-1")
+        page.evaluate("traces.splice(0,traces.length-1)")
+        scene_button.evaluate("e=>e.click()")
+        if side=="Left":
+            advance_to("doze",0)
+            painted = page.evaluate("traces.map(([a,f])=>[a,f])")
+            distinct = [v for i,v in enumerate(painted) if i==0 or painted[i-1]!=v]
+            assert distinct==[[wake,f] for f in range(8,last+1)]+[["doze",0]], distinct
+        else:
+            page.locator('[data-action="feed"]').evaluate("e=>e.click()")
+            advance_to("feed",1)
+            page.evaluate("advancePet(1000*take.frames/take.fps)")
+            assert page.evaluate("active==='idle' && !traces.some(([name])=>name==='doze')")
+    page.close()
+    for suffix,reduced in (("?motion=legacy",False),("",True)):
+        page = open_page(suffix=suffix,reduced=reduced)
+        page.evaluate("advancePet(6400)")
+        assert page.evaluate("active==='idle' && traces.every(x=>x[0]==='idle')")
+        page.evaluate("advancePet(1000)")
+        assert page.evaluate("active") == ("idle" if reduced else "browInviteLeft")
+        page.close()
+    print("Both crops: immediate touch, drawn arm retraction, live bridge preemption, quiet time, nap after stretch, legacy and reduced modes passed.")
 
 
 def exercise(browser, touch):
@@ -269,5 +411,6 @@ if __name__ == "__main__":
             exercise(browser, False)
             exercise(browser, True)
             check_invitations(browser)
+            check_micro_contacts(browser)
         finally:
             browser.close()

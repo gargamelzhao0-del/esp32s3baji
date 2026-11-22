@@ -39,10 +39,12 @@
         c.drawImage(atlas,120,100,66,75,-20,-62,66,75);
         c.restore();
     }
+    function palmTilt(a){
+        return clamp((a.x-a.ex)*a.side/(75*a.scale),-.7,.8)*.23;
+    }
     function palm(c,a,open,front,atlas){
         c.save();c.translate(a.x,a.y);c.scale(-a.side*a.scale,a.scale);
-        const tilt=clamp((a.x-a.ex)*a.side/(75*a.scale),-.7,.8)*.23;
-        c.rotate(tilt);
+        c.rotate(palmTilt(a));
         if(front){
             c.beginPath();c.moveTo(13,1);c.quadraticCurveTo(20,-7,14,-11);
             c.quadraticCurveTo(10,-14,7,-8);c.lineTo(1,-2);c.quadraticCurveTo(-1,5,6,4);c.closePath();
@@ -59,9 +61,10 @@
     }
     class DragonArms{
         constructor(atlas){this.atlas=atlas;this.hands={};}
-        draw(c,p,pass){
+        draw(c,p,pass,onlyHand){
             const s=p.stage,t=p.actionTime;
             for(const hand of ["left","right"]){
+                if (onlyHand && hand!==onlyHand) continue;
                 const a=this.hands[hand],right=hand==="right",selected=p.round?.side===a.side;
                 const offering=p.round?.kind==="five" && selected;
                 const keyboard=!s.kind && p.keyContact>.06;
@@ -73,13 +76,22 @@
                 if(offering)open=clamp(p.round.phase==="offer"?p.round.age/.27:1-p.round.age*.63);
                 else if(selected && p.round?.kind==="fly")open=.9;
                 else if(!right && p.work?.id==="waiting")open=.88;
+                if(p.palmOpen?.[hand]!=null)open=p.palmOpen[hand];
                 const depth=s.desk>.005 && (tool||furniture||treat)?"table":"body";
                 a.depth=depth;
                 if(pass===depth){
-                    sleeve(c,a,this.atlas);palm(c,a,open,false,this.atlas);
+                    const elbow=p.badgePalm?.[hand]?.elbow;
+                    const arm=elbow ? {...a,
+                        ex:a.ex+(a.sx+elbow.x*a.scale-a.ex)*elbow.mix,
+                        ey:a.ey+(a.sy+elbow.y*a.scale-a.ey)*elbow.mix} : a;
+                    sleeve(c,arm,this.atlas);
+                    const grip=p.badgePalm?.[hand] || (p.palmOpen?.[hand] ? {shape:"offer",amount:open} : null);
+                    if(!grip || !window.drawBadgePalm?.(c,a,grip,pass,this.atlas,palmTilt(a)))
+                        palm(c,a,open,false,this.atlas);
                 }else if(pass==="grip" && (tool||treat)){
                     const wrap=!(tool && (p.book>.15 || (!right && p.pad>.15)));
-                    palm(c,a,0,wrap,this.atlas);
+                    if(!p.badgePalm?.[hand] || !window.drawBadgePalm?.(c,a,p.badgePalm[hand],pass,this.atlas,palmTilt(a)))
+                        palm(c,a,0,wrap,this.atlas);
                 }
             }
         }

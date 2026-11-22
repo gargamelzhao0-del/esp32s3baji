@@ -44,6 +44,17 @@ class BadgeGestures {
       this.canvas.releasePointerCapture(id);
   }
 
+  pillowKey(point) {
+    if (point) {
+      if (this.pointer) return;
+      this.contact = {...point, part:"pillow", keyboard:true, phase:"down", age:0};
+    } else if (this.contact?.keyboard && this.contact.phase==="down") {
+      this.contact = {...this.contact, heldMs:this.contact.age, phase:"release", age:0};
+      this.io.note("你松开手，云朵枕轻轻鼓了起来。");
+    } else return;
+    this.io.invalidate?.();
+  }
+
   cancelContact() {
     const atForehead = this.pointer?.part === "offeredHead" ||
       (this.brush?.fromForehead && this.io.forehead?.clip);
@@ -116,10 +127,10 @@ class BadgeGestures {
         id === "peekLeft" ? "wakeLeft" : "wakeRight",
       );
     } else if (this.sleepFrame <= 6) {
-      // Her jaw is still opening. Close it from the actual drawing.
+      // During the first sleepy nod she can still sit straight back up.
       this.joinSleep(0, "idle");
     } else {
-      // Once the yawn has peaked, finish closing it. A breathing loop settles
+      // Once her head has tipped forward, finish settling. The breathing loop joins
       // along the shortest part of its cycle to the matching closed-eye pose.
       this.joinSleep(
         this.sleepFrame > 25 ? 35 : 15,
@@ -162,7 +173,7 @@ class BadgeGestures {
       }
       return join.to === 35 ? 15 : join.to;
     }
-    // A slow draw can delay a join, but cannot skip several eye or jaw poses.
+    // A slow draw can delay a join, but cannot skip her head or hand poses.
     join.age += Math.min(dt, 22);
     const distance = Math.abs(join.to - join.from);
     const step = reduced
@@ -271,7 +282,7 @@ class BadgeGestures {
     if (!hit?.part) return;
     this.quiet = 0;
     const id = this.io.intent();
-    const part = sleepingClip(id) ? "wake" : hit.part;
+    const part = sleepingClip(id) && hit.part !== "pillow" ? "wake" : hit.part;
     event.preventDefault();
     this.canvas.focus({ preventScroll: true });
     this.pointer = {
@@ -330,7 +341,7 @@ class BadgeGestures {
 
   move(event) {
     const touch = this.pointer;
-    if (!touch || event.pointerId !== touch.id) return;
+    if (!touch || event.pointerId !== touch.id || touch.part === "rubbed") return;
     const hit = this.io.hit(event, true);
     if (!hit) return;
     const dx = hit.x - touch.x,
@@ -356,7 +367,7 @@ class BadgeGestures {
     // the finger leaves, even if it later returns to the same animated target.
     if (!["head", "book", "cheek", "rubbed", "outside"].includes(touch.part)) {
       const sameTarget =
-        touch.part === "wake" ? Boolean(hit.part) : touch.part === hit.part;
+        touch.part === "wake" ? Boolean(hit.part && hit.part !== "pillow") : touch.part === hit.part;
       if (touch.moved || !hit.inside || !sameTarget) touch.part = "outside";
     }
     if (!hit.inside || touch.part === "outside") this.contact = null;
@@ -370,7 +381,14 @@ class BadgeGestures {
         this.contact = null;
         this.settlePage(false, false);
       } else {
-        this.page.progress = clampUnit(-dx / 88);
+        // The free edge travels on a curved path; match the photographed
+        // edge to the finger instead of scrubbing time by a fixed distance.
+        const edge = PIXEL_CLIPS[this.moon ? "turnMoon" : "turnStar"].book;
+        const x = edge[0][0] + dx, last = edge.length - 1;
+        let nearest = x <= edge[last][0] ? last : 0;
+        for (let i = 1; i <= last; i++)
+          if (Math.abs(edge[i][0] - x) < Math.abs(edge[nearest][0] - x)) nearest = i;
+        this.page.progress = nearest / last;
       }
     } else if (touch.part === "cheek" && this.cheek) {
       if (!hit.inside || Math.abs(dx) > 44 || Math.abs(dy) > 28) {
@@ -383,7 +401,11 @@ class BadgeGestures {
           touch.part = "rubbed";
           this.cheek = null;
           this.cheekTimes = [];
+          // She pulls her cheek away to giggle. Let the last contact fade
+          // on that pixel, even if the finger keeps moving across the glass.
+          if (this.contact) Object.assign(this.contact, { phase: "release", age: 0 });
           this.io.show("tickle");
+          this.io.poke?.("tickle", touch.side);
         }
       }
     } else if (touch.part === "head") {
@@ -433,6 +455,7 @@ class BadgeGestures {
     const hit = this.io.hit(event);
     const contact = this.contact;
     this.release();
+    if (touch.part === "rubbed") return;
     if (touch.part === "offeredHead") {
       this.io.forehead.release();
     } else if (touch.part === "cheek" && this.cheek) {
@@ -454,6 +477,8 @@ class BadgeGestures {
       );
     } else if (touch.part === "head" && this.brush?.releaseMs === null) {
       this.finishBrush(Boolean(hit));
+    } else if (touch.part === "pillow" && hit?.part === "pillow") {
+      this.io.note("你松开手，云朵枕轻轻鼓了起来。");
     } else if (hit && !touch.moved) {
       if (
         touch.part === "wake" &&
@@ -472,17 +497,17 @@ class BadgeGestures {
       }
     }
     this.contact =
-      hit && contact ? { ...contact, phase: "release", age: 0 } : null;
+      hit && contact ? { ...contact, phase: "release", heldMs:contact.age, age: 0 } : null;
     this.io.invalidate?.();
   }
 
-  idleTime(id, dt) {
+  idleTime(id, dt, autonomous = false) {
     if (this.contact) {
       this.contact.age = Math.min(200, this.contact.age + dt);
       if (this.contact.phase === "release" && this.contact.age >= 180)
         this.contact = null;
     }
-    if (id === "idle" && this.io.base() === "idle" && !this.pointer) {
+    if ((id === "idle" || autonomous) && this.io.base() === "idle" && !this.pointer) {
       this.quiet += dt;
       if (this.quiet >= 28000) this.nap();
     } else this.quiet = 0;
@@ -565,13 +590,15 @@ class BadgeGestures {
     }
     if (bookClip(id) && this.page) {
       const page = this.page;
+      const clip = PIXEL_CLIPS[id], last = clip.frames - 1;
       if (page.phase !== "drag") {
         page.age += dt;
         const forward = page.phase === "forward";
-        const u = clampUnit(page.age / (forward ? 420 : 240));
-        const blend = reduced ? 1 : 1 - (1 - u) ** 3;
-        page.progress = page.from + ((forward ? 1 : 0) - page.from) * blend;
-        if (u === 1) {
+        // Frame spacing already contains the paper's acceleration over the
+        // spine. Play the remaining drawings once, a little faster on recoil.
+        const step = page.age * clip.fps * (forward ? 1 : 1.5) / (1000 * last);
+        page.progress = reduced ? Number(forward) : clampUnit(page.from + (forward ? step : -step));
+        if (page.progress === Number(forward)) {
           if (forward) this.moon = !this.moon;
           this.page = null;
           if (!forward && page.glance && page.from > 0.035)
@@ -579,7 +606,7 @@ class BadgeGestures {
           else this.io.restore();
         }
       }
-      return Math.round(page.progress * (PIXEL_CLIPS[id].frames - 1));
+      return Math.round(page.progress * last);
     }
     return null;
   }

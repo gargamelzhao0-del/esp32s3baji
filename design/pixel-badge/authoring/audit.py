@@ -12,10 +12,14 @@ W, H = 138, 132
 # Poses designed to be the exact same drawing in different atlases. The star
 # entries are the lower-left/right watch cells that correspond to each catch.
 JOINS = [
+    (("doze",0), ("brush",4)), (("wakeLeft",-1), ("brush",4)), (("wakeRight",-1), ("brush",4)),
     (("doze",15), ("peekLeft",0)), (("doze",15), ("peekRight",0)),
     (("peekLeft",-1), ("wakeLeft",0)), (("peekRight",-1), ("wakeRight",0)),
+    (("wakeLeft",20), ("brush",4)), (("wakeRight",20), ("brush",4)),
     (("reading",0), ("turnStar",0)), (("turnStar",-1), ("readingMoon",0)),
     (("turnMoon",-1), ("reading",0)),
+    (("writing",44), ("stow-writingFace",0)),
+    (("stow-writingFace",-1), ("stow-writing",-1)),
     (("starWatch",19), ("starCatchLeft",0)), (("starWatch",25), ("starCatchRight",0)),
 ]
 for name, brushed, nestled in (("browInviteLeft", 19, 37), ("browInviteRight", 25, 43)):
@@ -23,6 +27,9 @@ for name, brushed, nestled in (("browInviteLeft", 19, 37), ("browInviteRight", 2
     JOINS.extend(((name, 0), (name, f)) for f in (54, 64, 76))
     JOINS.extend([((name, 36), (name, 83)), ((name, 82), ("brush", brushed)),
                   ((name, 88), ("brush", nestled)), ((name, 0), ("brush", 4))])
+for name in ("idleLookLeft", "idleLookRight", "idleGroomLeft", "idleGroomRight",
+             "idleStretch", "idleHum", "idleYawn"):
+    JOINS.extend([((name, 0), ("brush", 4)), ((name, -1), ("brush", 4))])
 
 
 def manifest(filename):
@@ -30,8 +37,33 @@ def manifest(filename):
     return json.loads(text[text.index("{"):text.rindex("}") + 1])
 
 
+def inspect_keycap(clip, name):
+    # Read the two gold swatches from the saved atlas. A contact that exists
+    # in the rig but is occluded by the baked fingertip must fail here.
+    with Image.open(ROOT / "assets" / (name + ".png")) as atlas:
+        palette = np.asarray(atlas.getpalette()).reshape(-1, 3)
+        gold = np.flatnonzero(np.all(palette == (240,197,115), axis=1) |
+                              np.all(palette == (255,233,166), axis=1))
+        pixels = np.asarray(atlas)
+        windows = []
+        for view, (ox, oy, step) in enumerate(((28,12,4), (113,34.5,2.75))):
+            lit = []
+            for frame, (x, y) in enumerate(clip["target"]):
+                col = (frame % 8)*W + int((x-ox)//step)
+                row = (frame//8 + view*((clip["frames"]+7)//8))*H + int((y-oy)//step)
+                lit.append(np.isin(pixels[row-1:row+5,col-3:col+5], gold).any())
+            starts = [i for i,down in enumerate(lit) if down and (i == 0 or not lit[i-1])]
+            assert len(starts) == 2, (name, view, "expected two visible presses", starts)
+            if name == "keyChime":
+                assert starts == clip["strikes"], (name, view, "key light and notes disagree", starts)
+            windows.append(lit)
+        assert windows[0] == windows[1], (name, "crops disagree on lit frames")
+
+
 def inspect(csv_path, contact_path):
     clips = {**manifest("clips.js"), **manifest("gesture-clips.js")}
+    for name in ("running", "keyChime"):
+        inspect_keycap(clips[name], name)
     board = Image.new("RGB", (8 * W, ((len(clips) + 7) // 8) * (H + 18)), "#242737")
     draw = ImageDraw.Draw(board)
     rows = []
@@ -78,7 +110,7 @@ def inspect(csv_path, contact_path):
                             repeat_from = tile
                         delta = np.count_nonzero(tile != previous) if previous is not None else 0
                         ys, xs = np.nonzero(tile)
-                        def visible(point):
+                        def visible(point, y_offset=0):
                             if view == "full":
                                 ox, oy, step, pan = 28, 12, 4, 0
                             else:
@@ -86,7 +118,7 @@ def inspect(csv_path, contact_path):
                                 step = 2.75
                                 pan = clip["closePan"][i] if "closePan" in clip else 0
                             sx = 23 + (point[0]-ox)/step-pan
-                            sy = (18 if view == "full" else 22) + (point[1]-oy)/step
+                            sy = (18 if view == "full" else 22) + (point[1]-oy)/step + y_offset
                             return 23 <= sy < 149 and 23 <= sx < 161 and (sx-92)**2 + (sy-92)**2 < 82**2
                         a = clip["anchors"][i]
                         target = clip.get("target") or clip.get("book") or clip.get("bubbles")
@@ -96,6 +128,7 @@ def inspect(csv_path, contact_path):
                             lx,ly,rx,ry = clip["palms"][i]
                             left_palm, right_palm = visible((lx,ly)), visible((rx,ry))
                             assert left_palm and right_palm, (name,view,i,"palm outside touchable round screen")
+                            assert visible((lx,ly), -4) and visible((rx,ry), -4), (name,view,i,"light outside round screen")
                         nose, head = visible(a[2:4]), visible(a[:2])
                         assert nose and head and can_touch is not False, (name, scene, view, i, "hit outside the screen")
                         cycle = scene == "base" and (name in {"working","running","reading","readingMoon","searching","waiting"} or "holdFrom" in clip)

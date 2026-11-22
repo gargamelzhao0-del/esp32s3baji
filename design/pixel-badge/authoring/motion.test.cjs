@@ -13,6 +13,7 @@ function make(options = {}) {
     random: options.random || (() => 0.5),
     storage,
     hasClip: options.hasClip || (() => true),
+    getClip: options.getClip,
     reduced: options.reduced || false,
   });
   return { motion, clock, advance: (ms) => (now += ms), at: () => now };
@@ -24,7 +25,7 @@ function ctx(overrides = {}) {
     base: "idle",
     active: "idle",
     intent: "idle",
-    quiet: 0,
+    quiet: 3200,
     pointer: false,
     forehead: false,
     star: false,
@@ -34,15 +35,15 @@ function ctx(overrides = {}) {
   };
 }
 
-test("state transitions cue the right expression", () => {
+test("seven Agent outcomes light their own emblem; held tools read from the scene", () => {
   const { motion } = make();
-  assert.equal(motion.setState("waiting").emote.kind, "question");
-  assert.equal(motion.setState("error").emote.kind, "exclaim");
-  assert.equal(motion.setState("succeeded").emote.kind, "sparkle");
-  assert.equal(motion.setState("limited").emote.kind, "ellipsis");
-  assert.equal(motion.setState("ended").emote.kind, "ellipsis");
-  assert.equal(motion.setState("cancelled").emote.kind, "ellipsis");
-  assert.equal(motion.setState("working").emote, null);
+  for (const state of ["reading", "running", "searching", "writing", "compact"])
+    assert.equal(motion.setState(state).emote, null);
+  for (const state of ["waiting", "error", "succeeded", "limited", "ended", "cancelled", "working"]) {
+    const { emote } = motion.setState(state);
+    assert.equal(emote.zone, "status");
+    assert.equal(emote.kind, state);
+  }
   assert.equal(motion.snapshot().state, "working");
   assert.equal(motion.setState("working"), null);
 });
@@ -101,6 +102,7 @@ test("micro-actions pause for pointer, invitation, star, sleep and signal priori
   const { motion, advance } = make();
   advance(8000);
   const cases = [
+    { quiet: 0 },
     { quiet: 7000 },
     { pointer: true },
     { forehead: true },
@@ -125,7 +127,7 @@ test("reduced motion suppresses micro-actions but keeps state cues", () => {
   const { motion, advance } = make({ reduced: true });
   advance(20000);
   assert.equal(motion.tick(0, ctx()), null);
-  assert.equal(motion.setState("waiting").emote.kind, "question");
+  assert.equal(motion.setState("waiting").emote.kind, "waiting");
 });
 
 test("recent pointer attention biases the next look", () => {
@@ -138,26 +140,59 @@ test("recent pointer attention biases the next look", () => {
   assert.equal(pick.clip, "idleLookLeft");
 });
 
-test("working state emits thought dots on its periodic beat", () => {
+test("thinking rekindles the lamp on its periodic beat", () => {
   const { motion, advance } = make({ random: () => 0 });
   motion.setState("working", { now: 1000 });
   advance(3000);
   motion.tick(0, ctx({ state: "working" }));
   assert.ok(
-    motion.activeEmotes().some((emote) => emote.kind === "dots"),
-    "expected thought dots",
+    motion.activeEmotes().some((emote) => emote.kind === "working" && emote.zone === "status"),
+    "expected the lamp to light",
   );
+});
+
+test("a rebaked gesture gets its entire reel and yields enough time before the next invitation", () => {
+  const { motion, advance } = make({
+    getClip: id => id === "idleGroomLeft" && { frames: 30, fps: 18 },
+  });
+  advance(8000);
+  assert.equal(motion.tick(0, ctx({ quiet: 5900, nextQuietAt: 7000 })), null);
+  const groom = motion.tick(0, ctx({ quiet: 15000, nextQuietAt: 28000 }));
+  assert.equal(groom.to, 29);
+  assert.equal(groom.duration, 1000 * 30 / 18);
+  motion.microEnded();
+  advance(11000);
+  assert.equal(motion.tick(0, ctx({ quiet: 26500, nextQuietAt: 28000 })), null);
+});
+
+test("authored hand impacts earn bond without an early floating hit; a state change retires old cues", () => {
+  const { motion, advance } = make({ random: () => 0 });
+  motion.setState("waiting");
+  assert.equal(motion.activeEmotes()[0].clip, "waiting");
+  for (const id of ["palmTap", "keyChime", "lensFind", "heartHug", "feed", "forehead", "sneeze"]) {
+    const bond = motion.bond;
+    assert.equal(motion.interact(id).emote, null);
+    assert.ok(motion.bond > bond);
+  }
+  motion.setState("reading");
+  advance(3000);
+  motion.tick(0, ctx({ state: "reading", base: "readingMoon", active: "turnMoon", intent: "turnMoon" }));
+  assert.equal(motion.activeEmotes().length, 0);
+  motion.tick(0, ctx({ state: "reading", base: "readingMoon", active: "readingMoon", intent: "readingMoon" }));
+  assert.equal(motion.activeEmotes()[0].clip, "readingMoon");
+  motion.setState("error");
+  assert.deepEqual(motion.activeEmotes().map(e => e.kind), ["error"]);
 });
 
 test("expressions expire independently", () => {
   const { motion, advance } = make();
   motion.setState("waiting", { now: 1000 });
   assert.equal(motion.activeEmotes(1000).length, 1);
-  advance(800);
+  advance(400);
   assert.equal(motion.activeEmotes().length, 1);
   advance(500);
   assert.equal(
-    motion.activeEmotes().filter((emote) => emote.kind === "question").length,
+    motion.activeEmotes().filter((emote) => emote.kind === "waiting").length,
     0,
   );
 });

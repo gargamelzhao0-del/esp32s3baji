@@ -4,6 +4,9 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const source = fs.readFileSync(path.join(__dirname, "../gestures.js"), "utf8");
+const baked = {};
+vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../gesture-clips.js"), "utf8"),
+  { window: { PIXEL_CLIPS: baked } });
 
 function fixture(base = "idle") {
   let now = 0,
@@ -13,8 +16,8 @@ function fixture(base = "idle") {
     cheekRight: { fps: 16, frames: 22 },
     peekLeft: { frames: 9 },
     peekRight: { frames: 9 },
-    turnStar: { frames: 25 },
-    turnMoon: { frames: 25 },
+    turnStar: baked.turnStar,
+    turnMoon: baked.turnMoon,
   };
   const Controller = vm.runInNewContext(source + "\nBadgeGestures", {
     PIXEL_CLIPS: clips,
@@ -86,17 +89,38 @@ test("a cancelled half-page returns quietly, a completed turn changes chart exac
   g.startPage();
   g.page.progress = 0.4;
   g.cancelContact();
-  assert.equal(g.sample("turnStar", 120, 120, false), 1);
-  g.sample("turnStar", 240, 120, false);
+  assert.equal(g.sample("turnStar", 120, 120, false), 7);
+  g.sample("turnStar", 420, 300, false);
   assert.equal(clip(), "reading");
   assert.equal(g.moon, false);
   g.startPage();
   g.settlePage(true);
-  g.sample("turnStar", 420, 420, false);
+  const seen = new Set();
+  for (let ms = 0; ms <= 1500; ms += 20)
+    seen.add(g.sample("turnStar", ms, ms === 0 ? 0 : 20, false));
+  assert.deepEqual([...seen], Array.from({ length: 25 }, (_, i) => i));
   assert.equal(clip(), "readingMoon");
   assert.equal(g.moon, true);
   g.startPage();
   assert.equal(clip(), "turnMoon");
+});
+
+test("the free edge follows a finger forward and back through both charts", () => {
+  const { g, pointer } = fixture("reading");
+  for (const [id, moon] of [["turnStar", false], ["turnMoon", true]]) {
+    g.moon = moon;
+    pointer("down", "book");
+    const edge = baked[id].book, right = edge[0][0], left = edge.at(-1)[0];
+    for (const direction of [-1, 1]) {
+      for (let i = 0; i <= right - left; i++) {
+        const x = direction < 0 ? right - i : left + i;
+        pointer("move", "book", x - right);
+        const frame = g.sample(id, 0, 0, false);
+        assert.ok(Math.abs(edge[frame][0] - x) <= 4, id + " edge at " + x);
+      }
+    }
+    g.interrupt();
+  }
 });
 
 test("the cheek reacts on contact, holds pressure and only rebounds after release", () => {
@@ -118,18 +142,37 @@ test("the cheek reacts on contact, holds pressure and only rebounds after releas
 
 test("two deliberate cheek reversals cause one tickle, jitter and dragging off the face do not", () => {
   const { g, clip, pointer } = fixture();
+  const reactions = [];
+  g.io.poke = (id) => reactions.push(id);
   pointer("down", "cheek");
   for (const x of [2, -2, 3, -4, 1]) pointer("move", "cheek", x);
   assert.equal(clip(), "cheekRight");
   for (const x of [20, -5, 17]) pointer("move", "cheek", x);
   assert.equal(clip(), "tickle");
   pointer("up", "cheek", 17);
+  assert.deepEqual(reactions, ["cheekRight", "tickle"]);
   assert.equal(g.cheekTimes.length, 0);
   pointer("down", "cheek");
   pointer("move", "nose", -55);
   assert.equal(g.contact, null);
   pointer("up", "cheek");
   assert.equal(g.cheekTimes.length, 0);
+});
+
+test("a tickled cheek leaves its last contact on the skin while the finger continues moving", () => {
+  const { g, clip, pointer } = fixture();
+  pointer("down", "cheek");
+  for (const x of [20, -5, 17]) pointer("move", "cheek", x);
+  assert.equal(clip(), "tickle");
+  assert.equal(g.contact.phase, "release");
+  const skin = [g.contact.sx, g.contact.sy];
+  pointer("move", "head", -40, -50);
+  g.idleTime("tickle", 120);
+  assert.deepEqual([g.contact.sx, g.contact.sy], skin);
+  pointer("up", "head", -40, -50);
+  assert.equal(g.contact.age, 120);
+  g.idleTime("tickle", 60);
+  assert.equal(g.contact, null);
 });
 
 test("three quick physical cheek taps still trigger tickle", () => {
@@ -215,13 +258,13 @@ test("a vertical book swipe cannot commit a turn after crossing the horizontal t
   pointer("down", "book");
   pointer("move", "", -66, 60);
   pointer("up", "", -66, 60);
-  g.sample("turnStar", 300, 300, false);
+  g.sample("turnStar", 500, 500, false);
   assert.equal(g.moon, false);
   assert.equal(clip(), "reading");
   pointer("down", "book");
   pointer("move", "", -41, 5);
   pointer("up", "", -41, 5);
-  g.sample("turnStar", 300, 300, false);
+  g.sample("turnStar", 500, 500, false);
   assert.equal(clip(), "glanceStar");
 });
 
