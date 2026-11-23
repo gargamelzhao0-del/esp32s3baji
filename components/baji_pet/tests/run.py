@@ -38,8 +38,31 @@ def inflate(src,length,dest,capacity):
 def crc(seed,buf,length):
     return zlib.crc32(c.string_at(buf,length),seed)
 
+def pack(magic, raw):
+    compressed = zlib.compress(raw, 1)
+    return struct.pack("<4sIII", magic, len(raw), len(compressed), zlib.crc32(raw)) + compressed
+
+
+def row_formats(asset):
+    """Exercise real pixels through both index widths and an invalid bank."""
+    assert asset[:4] == b"BPT2"
+    raw = zlib.decompress(asset[16:])
+    tiles, rows, patches, rectangles, idle, pat, _, _ = struct.unpack_from("<4I4H", raw)
+    poses = idle + pat
+    start = (24 + poses * (48 + 59*59*2) + 3) & ~3
+    start += poses*15*8 + patches*4 + rectangles*8
+    bank, = struct.unpack_from("<I", raw, start)
+    after = start + 4 + tiles*8*2
+    wide = bytearray(tiles*8*4)
+    for i, (row,) in enumerate(struct.iter_unpack("<H", raw[start+4:after])):
+        struct.pack_into("<I", wide, 4*i, row + (bank if i//8 >= 32768 else 0))
+    old = pack(b"BPT1", raw[:start] + wide + raw[after:])
+    bad = pack(b"BPT2", raw[:start] + struct.pack("<I", rows+1) + raw[start+4:])
+    return old, bad
+
+
 def run(build):
-    for header in ["baji_board.h","esp_heap_caps.h","esp_rom_crc.h","miniz.h"]:
+    for header in ["esp_err.h","esp_heap_caps.h","esp_rom_crc.h","miniz.h"]:
         (build/header).write_text('#include "host.h"\n')
     source=build/"callbacks.c"
     source.write_text('#include "host.h"\ninflate_fn inflate_host; checksum_fn checksum_host;\n'
@@ -47,7 +70,8 @@ def run(build):
     binary=build/("pet.dll" if os.name=="nt" else "pet.so")
     subprocess.run([os.environ.get("CC","gcc"),"-std=c11","-Wall","-Wextra","-Werror","-O2",
                     "-fPIC","-shared","-DBAJI_PET_EXTERNAL_ASSET","-I",str(build),"-I",str(HERE),
-                    "-I",str(ROOT/"include"),str(ROOT/"baji_pet.c"),str(source),"-o",str(binary)],check=True)
+                    "-I",str(ROOT/"include"),"-I",str(ROOT.parent/"baji_graphics/include"),
+                    str(ROOT/"baji_pet.c"),str(ROOT/"baji_pet_asset.c"),str(source),"-o",str(binary)],check=True)
     lib=c.CDLL(str(binary))
     lib.set_callbacks.argtypes=[inflate_fn,checksum_fn]
     lib.set_callbacks(inflate,crc)
@@ -60,6 +84,18 @@ def run(build):
     lib.baji_pet_forehead.restype=c.c_bool
     lib.baji_pet_close.argtypes=[ptr]
     asset=(ROOT/"assets/scene.bpz").read_bytes()
+    legacy, bad_bank = row_formats(asset)
+    empty = ptr()
+    assert lib.baji_pet_open_data(c.byref(empty),bad_bank,len(bad_bank)) and not empty.value
+    for payload in (asset, legacy):
+        check_pixels(lib, payload)
+    # Explicit unload lets Windows remove the temporary DLL.
+    if os.name=="nt":
+        import _ctypes
+        _ctypes.FreeLibrary(lib._handle)
+
+
+def check_pixels(lib, asset):
     golden=[v[0] for v in struct.iter_unpack("<I",(HERE/"web.crc").read_bytes())]
     p=ptr()
     for bad in [asset[:15],asset[:-1],asset[:12]+bytes(4)+asset[16:]]:
@@ -120,11 +156,7 @@ def run(build):
             assert c.string_at(c.addressof(band)+row*w*2,w*2)==c.string_at(
                 c.addressof(screen)+((y+row)*SIDE+x)*2,w*2)
     lib.baji_pet_close(p)
-    print("1095 web RGB565 states, all 146 clip entries/returns, 220 arbitrary jumps and 50 odd crops passed.")
-    # Explicit unload lets Windows remove the temporary DLL.
-    if os.name=="nt":
-        import _ctypes
-        _ctypes.FreeLibrary(lib._handle)
+    print(asset[:4].decode(), "1095 web RGB565 states, 146 clip entries/returns, 220 arbitrary jumps and 50 odd crops passed.")
 
 if __name__=="__main__":
     with tempfile.TemporaryDirectory() as temp:

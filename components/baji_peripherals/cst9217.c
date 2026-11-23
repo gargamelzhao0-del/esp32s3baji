@@ -18,13 +18,14 @@
  * with an ISR already running on the other core. */
 static portMUX_TYPE irq_lock = portMUX_INITIALIZER_UNLOCKED;
 static SemaphoreHandle_t irq_target;
+static uintptr_t irq_generation;
 
-static void IRAM_ATTR touch_irq(void *unused)
+static void IRAM_ATTR touch_irq(void *session)
 {
-    (void)unused;
     BaseType_t woke = pdFALSE;
     portENTER_CRITICAL_ISR(&irq_lock);
-    if (irq_target) xSemaphoreGiveFromISR(irq_target, &woke);
+    if (irq_target && (uintptr_t)session == irq_generation)
+        xSemaphoreGiveFromISR(irq_target, &woke);
     portEXIT_CRITICAL_ISR(&irq_lock);
     if (woke) portYIELD_FROM_ISR();
 }
@@ -52,11 +53,11 @@ static esp_err_t read_register(baji_peripherals_t *p, uint16_t reg, uint8_t *out
 esp_err_t baji_touch_release_pins(baji_peripherals_t *p)
 {
     if (p->irq_handler_added) {
-        esp_err_t err = gpio_isr_handler_remove(BAJI_TOUCH_INT);
-        if (err != ESP_OK) return err;
         portENTER_CRITICAL(&irq_lock);
         irq_target = NULL;
         portEXIT_CRITICAL(&irq_lock);
+        esp_err_t err = gpio_isr_handler_remove(BAJI_TOUCH_INT);
+        if (err != ESP_OK) return err;
         p->irq_handler_added = false;
     }
     if (p->irq_pin_owned) {
@@ -130,12 +131,21 @@ static esp_err_t start_touch(baji_peripherals_t *p)
     /* IDF's ISR service is process-wide. Leave it installed for other clients. */
     err = gpio_install_isr_service(0);
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) return err;
-    err = gpio_isr_handler_add(BAJI_TOUCH_INT, touch_irq, NULL);
-    if (err != ESP_OK) return err;
-    p->irq_handler_added = true;
+    /* GPIO interrupts can run as soon as the handler is registered. Publish
+     * its target first; a stale dispatch from a previous handle has a different ticket. */
     portENTER_CRITICAL(&irq_lock);
+    ++irq_generation;
+    uintptr_t ticket = irq_generation;
     irq_target = p->irq;
     portEXIT_CRITICAL(&irq_lock);
+    err = gpio_isr_handler_add(BAJI_TOUCH_INT, touch_irq, (void *)ticket);
+    if (err != ESP_OK) {
+        portENTER_CRITICAL(&irq_lock);
+        irq_target = NULL;
+        portEXIT_CRITICAL(&irq_lock);
+        return err;
+    }
+    p->irq_handler_added = true;
     /* A report already asserted during IRQ setup has no new falling edge. */
     if (gpio_get_level(BAJI_TOUCH_INT) == 0) xSemaphoreGive(p->irq);
     return ESP_OK;
@@ -159,11 +169,10 @@ esp_err_t baji_peripherals_touch_init(baji_peripherals_t *p)
 
 esp_err_t baji_peripherals_wait_touch(baji_peripherals_t *p, uint32_t timeout_ms)
 {
-    esp_err_t err = baji_peripheral_lock(p);
-    if (err != ESP_OK) return err;
-    bool ready = p->touch_ready;
-    xSemaphoreGive(p->mutex);
-    if (!ready) return ESP_ERR_INVALID_STATE;
+    if (!p) return ESP_ERR_INVALID_ARG;
+    /* IRQ waiting never touches the bus. The semaphore is immutable until
+     * close, when the owner has already joined all input consumers. */
+    if (!atomic_load_explicit(&p->touch_ready, memory_order_acquire)) return ESP_ERR_INVALID_STATE;
     uint64_t ticks = ((uint64_t)timeout_ms * configTICK_RATE_HZ + 999) / 1000;
     if (ticks >= portMAX_DELAY) ticks = portMAX_DELAY - 1;
     return xSemaphoreTake(p->irq, (TickType_t)ticks) == pdTRUE ? ESP_OK : ESP_ERR_TIMEOUT;
@@ -194,4 +203,13 @@ esp_err_t baji_peripherals_read_touch(baji_peripherals_t *p, baji_touch_sample_t
 esp_err_t baji_peripherals_poll_touch(baji_peripherals_t *p, baji_touch_sample_t *out)
 {
     return read_touch(p, out, true);
+}
+
+esp_err_t baji_peripherals_next_touch(baji_peripherals_t *p, uint32_t wait_ms,
+                                      baji_touch_sample_t *out)
+{
+    if (!out) return ESP_ERR_INVALID_ARG;
+    esp_err_t event = baji_peripherals_wait_touch(p, wait_ms);
+    if (event != ESP_OK && event != ESP_ERR_TIMEOUT) return event;
+    return read_touch(p, out, event == ESP_ERR_TIMEOUT);
 }

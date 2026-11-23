@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "baji_board_profile.h"
+#include <stdatomic.h>
 
 #define BAJI_I2C_TIMEOUT_MS 40
 
@@ -13,9 +14,11 @@ struct baji_peripherals {
     i2c_master_bus_handle_t bus;
     i2c_master_dev_handle_t touch;
     i2c_master_dev_handle_t power;
+    StaticSemaphore_t mutex_storage, irq_storage;
     SemaphoreHandle_t mutex;
     SemaphoreHandle_t irq;
-    bool touch_ready;
+    bool closing;
+    atomic_bool touch_ready;
     bool power_ready;
     bool reset_owned;
     bool irq_pin_owned;

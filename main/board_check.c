@@ -157,14 +157,9 @@ esp_err_t baji_board_check_run(baji_board_t *board, const baji_board_info_t *inf
         }
         // IRQ wakes immediately on a new contact. Poll while held to catch the
         // release; a slow idle fallback also recovers a missed interrupt edge.
-        err = baji_peripherals_wait_touch(io, scene.touch.pressed ? 16 : 250);
         baji_touch_sample_t sample;
-        if (err == ESP_OK) {
-            err = baji_peripherals_read_touch(io, &sample);
-        } else if (err == ESP_ERR_TIMEOUT) {
-            err = baji_peripherals_poll_touch(io, &sample);
-            if (err == ESP_ERR_NOT_FINISHED) continue;
-        }
+        err = baji_peripherals_next_touch(io, scene.touch.pressed ? 16 : 250, &sample);
+        if (err == ESP_ERR_NOT_FINISHED) continue;
         if (err != ESP_OK) {
             if (err != last_touch_error) ESP_LOGW(TAG, "touch sample: %s", esp_err_to_name(err));
             last_touch_error = err;

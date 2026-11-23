@@ -12,10 +12,14 @@ python upload.py --port COM21 --log runtime.log
 
 | 输出 | 字段含义 |
 | --- | --- |
+| `PET_COLUMN` | 在圆边以相同画笔绘制 692 个像素，交替对照七条带与同列合并两种路径，各预热 4 次、测 32 次。记录实际传输笔数及到最后一笔 DMA 的微秒数。 |
 | `PET_FULL`、`PET_FIRST` | 整圆稳定样本和首帧，从选帧/开始绘制到最后一笔 DMA 完成的微秒数 |
 | `PET_MEMORY` | 板级初始化完成时，空闲 PSRAM、内部内存及最大的可用内部 DMA 缓冲区，单位为字节 |
+| `PET_SCHEDULE` | 生产运行时待机的扫描与回调频率、丢失的姿势数、跨边沿提交数，以及静态页面从外部事件发布到画面提交的时间。该测试使用独立生产者任务，排除真人触摸 |
 | `PET_STAGE` | `sent/noop` 为有像素传输和无传输的节拍数；`pose_changes/gaze_changes` 记录实际播放器状态变化，`gaze_only_sent` 仅计独立视线变化且绘制成功的节拍 |
 | `te_draw_*`、`te_gaze_*` | 实际绘制及其独立视线子集从 TE 到 DMA 完成的微秒数；`noop_*` 计量无绘制的播放器调用耗时 |
 | `missed/late` | 两次调度间漏过的边沿，以及从当前边沿开始到提交结束时已经出现新边沿的次数 |
 
 脚本核对三个阶段、动作起落、视线单独更新和无变化时的零传输。丢包、传输错误、超时、漏过边沿或越过当前周期均返回非零退出码。成功时收到 `PET_END ok=1` 和 `PET_LIVE`，设备释放基准的 TE 监听，复用同一份已解码素材和显示句柄进入主工程的 `pet_app_run_loaded`，此时可用真手指互动。复位回到 Flash 中的原固件。
+
+默认待机采样 3.3 秒。长测可以用 `idf.py -DBAJI_SCHEDULE_CHECK_MS=60000 build` 构建，再以 `upload.py --port COM21 --timeout 150` 等待结果。

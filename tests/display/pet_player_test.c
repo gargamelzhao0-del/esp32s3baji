@@ -89,7 +89,7 @@ int main(void)
     baji_pet_t art = {0};
     baji_board_info_t info = {.width=SIDE, .height=SIDE};
     pet_player_t player;
-    pet_input_t in = {0};
+    baji_input_t in = {0};
     bool sent;
     pet_player_init(&player, &art, &info, 0);
     assert(pet_player_tick(&player, &board, &in, 0, &sent) == ESP_OK && sent);

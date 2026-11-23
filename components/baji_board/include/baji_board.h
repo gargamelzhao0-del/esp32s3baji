@@ -2,6 +2,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "baji_graphics.h"
 #include "baji_peripherals.h"
 #include "esp_err.h"
 
@@ -16,13 +17,6 @@ typedef struct {
     esp_err_t flash_status;
     esp_err_t touch_status, power_status;
 } baji_board_info_t;
-typedef struct { uint16_t x, y, width, height; } baji_rect_t;
-
-/* Paint every pixel of the supplied band, row-major RGB565, high byte first.
- * Stride is band.width * 2. The buffer is valid only during the callback.
- * Board operations and callbacks are serialized on the display owner's task. */
-typedef void (*baji_paint_fn)(const baji_rect_t *band, uint8_t *pixels, void *scene);
-
 /* Starts the panel dark. Optional touch and fuel gauge report independent
  * results; set brightness after the initial frame has reached the panel. */
 esp_err_t baji_board_open(baji_board_t **out, baji_board_info_t *info);

@@ -1,7 +1,14 @@
 #pragma once
 
 #include <stdbool.h>
-#include "baji_board.h"
+#include <stddef.h>
+#include <stdint.h>
+#include "baji_graphics.h"
+#include "esp_err.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct baji_pet baji_pet_t;
 typedef enum { BAJI_PET_IDLE, BAJI_PET_PAT } baji_pet_clip_t;
@@ -27,3 +34,7 @@ bool baji_pet_forehead(const baji_pet_t *pet, baji_pet_state_t state, uint16_t x
 size_t baji_pet_damage(baji_pet_t *pet, const baji_pet_state_t *old,
                        const baji_pet_state_t *next, baji_rect_t *regions, size_t capacity);
 void baji_pet_paint(const baji_rect_t *band, uint8_t *pixels, void *pet);
+
+#ifdef __cplusplus
+}
+#endif

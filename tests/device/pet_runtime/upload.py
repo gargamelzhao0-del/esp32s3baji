@@ -32,7 +32,7 @@ def verify_stage(fields):
 
 def upload(connection, asset, log, timeout):
     crc = zlib.crc32(asset)
-    header_sent = body_sent = verified = full = first = passed = False
+    header_sent = body_sent = verified = full = first = scheduled = passed = False
     stages, timing_errors, scene_errors = [], [], []
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -75,6 +75,8 @@ def upload(connection, asset, log, timeout):
             full = int(fields["n"]) == 12 and 0 < int(fields["p50"]) <= int(fields["max"])
         elif message == "PET_FIRST":
             first = int(fields["sent"]) == 1 and int(fields["us"]) > 0
+        elif message == "PET_SCHEDULE":
+            scheduled = fields["ok"] == "1"
         elif message == "PET_STAGE":
             name = fields["name"]
             stages.append(name)
@@ -85,7 +87,7 @@ def upload(connection, asset, log, timeout):
             if int(fields["missed"]) or int(fields["late"]):
                 timing_errors.append(name)
         elif message == "PET_END":
-            passed = verified and full and first and stages == list(STAGES) and not timing_errors and not scene_errors
+            passed = verified and full and first and scheduled and stages == list(STAGES) and not timing_errors and not scene_errors
             if not passed or fields != {"ok": "1", "functional": "1", "deadlines": "1", "err": "0"}:
                 raise ValueError(f"Qualification failed {fields}, stages {stages}, "
                                  f"timing failures {timing_errors}, scene errors {scene_errors}")

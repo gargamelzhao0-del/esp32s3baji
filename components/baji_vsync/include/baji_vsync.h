@@ -14,7 +14,8 @@ typedef struct {
 } baji_vsync_edge_t;
 
 /* One display task owns the TE input. Start after panel initialization; TE
- * and touch share IDF's process-wide GPIO interrupt service. */
+ * and touch share IDF's process-wide GPIO interrupt service. Only ESP_OK
+ * grants ownership. A failed new session may be retried by any task. */
 esp_err_t baji_vsync_open(void);
 
 /* Monotonic microseconds, sampled together with the latest rising-edge count.

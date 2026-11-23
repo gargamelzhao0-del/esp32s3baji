@@ -120,10 +120,14 @@ static esp_err_t release_hardware(void)
         panel.reset_owned = false;
     }
     panel.previous_width = panel.next_y = 0;
+    return ESP_OK;
+}
+
+static void release_owner(void)
+{
     portENTER_CRITICAL(&owner_lock);
     owner = NULL;
     portEXIT_CRITICAL(&owner_lock);
-    return ESP_OK;
 }
 
 esp_err_t baji_display_init(uint8_t brightness_percent)
@@ -136,6 +140,13 @@ esp_err_t baji_display_init(uint8_t brightness_percent)
     portEXIT_CRITICAL(&owner_lock);
     if (!acquired) return ESP_ERR_INVALID_STATE;
 
+    /* A failed startup never queued DMA. If its rollback stopped partway,
+     * the next owner can finish it even after the startup task has exited. */
+    esp_err_t err = release_hardware();
+    if (err != ESP_OK) {
+        release_owner();
+        return err;
+    }
     const spi_bus_config_t bus = {
         .sclk_io_num = BAJI_LCD_SCLK,
         .data0_io_num = BAJI_LCD_D0, .data1_io_num = BAJI_LCD_D1,
@@ -150,7 +161,7 @@ esp_err_t baji_display_init(uint8_t brightness_percent)
         .flags = SPI_DEVICE_HALFDUPLEX,
         .queue_size = 1,
     };
-    esp_err_t err = spi_bus_initialize(BAJI_LCD_HOST, &bus, SPI_DMA_CH_AUTO);
+    err = spi_bus_initialize(BAJI_LCD_HOST, &bus, SPI_DMA_CH_AUTO);
     if (err == ESP_OK) {
         panel.bus_owned = true;
         err = spi_bus_add_device(BAJI_LCD_HOST, &device, &panel.device);
@@ -158,6 +169,7 @@ esp_err_t baji_display_init(uint8_t brightness_percent)
     if (err == ESP_OK) err = configure_panel(brightness_percent * 255 / 100);
     if (err != ESP_OK) {
         esp_err_t cleanup = release_hardware();
+        release_owner();
         return cleanup == ESP_OK ? err : cleanup;
     }
     panel.ready = true;
@@ -291,7 +303,12 @@ esp_err_t baji_display_set_brightness(uint8_t percent)
 
 esp_err_t baji_display_deinit(void)
 {
-    if (!owns_display()) return ESP_ERR_INVALID_STATE;
+    TaskHandle_t caller = xTaskGetCurrentTaskHandle();
+    portENTER_CRITICAL(&owner_lock);
+    if (!owner && (panel.device || panel.bus_owned || panel.reset_owned)) owner = caller;
+    bool acquired = owner == caller;
+    portEXIT_CRITICAL(&owner_lock);
+    if (!acquired) return ESP_ERR_INVALID_STATE;
     if (panel.ready) {
         esp_err_t err = finish_batch();
         if (err != ESP_OK) return err;
@@ -299,5 +316,7 @@ esp_err_t baji_display_deinit(void)
         if (err != ESP_OK) return err;
         panel.ready = false;
     }
-    return release_hardware();
+    esp_err_t err = release_hardware();
+    if (err == ESP_OK) release_owner();
+    return err;
 }

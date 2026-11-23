@@ -140,6 +140,29 @@ def tile_rows(frame):
     return padded.reshape(STRIDE,TILE,STRIDE,TILE).transpose(0,2,1,3).astype(">u2")
 
 
+def encode_rows(row_ids, rows):
+    """Share pixel rows across two 32K-tile banks using 16-bit local indices."""
+    split = 1 << 15
+    left = np.unique(row_ids[:split])
+    right = np.unique(row_ids[split:])
+    if max(len(left), len(right)) > 1 << 16:
+        return b"BPT1", row_ids.astype("<u4").tobytes() + rows
+
+    # Left-only, shared, right-only. Both banks now see one contiguous
+    # range, and a row used in both banks still has only one pixel copy.
+    left_only = np.setdiff1d(left, right, assume_unique=True)
+    shared = np.intersect1d(left, right, assume_unique=True)
+    right_only = np.setdiff1d(right, left, assume_unique=True)
+    order = np.concatenate((left_only, shared, right_only))
+    new_id = np.empty(len(order), dtype=np.uint32)
+    new_id[order] = np.arange(len(order), dtype=np.uint32)
+    indices = new_id[row_ids]
+    indices[split:] -= len(left_only)
+    pixels = np.frombuffer(rows, dtype=np.uint8).reshape(-1, 2*TILE)
+    tables = struct.pack("<I", len(left_only)) + indices.astype("<u2").tobytes() + pixels[order].tobytes()
+    return b"BPT2", tables
+
+
 class Pack:
     def __init__(self):
         self.tiles = {}
@@ -203,11 +226,11 @@ class Pack:
         raw += bytes((-len(raw))%4)
         for table in (self.gazes,self.patches,rectangles):
             raw += b"".join(table)
-        raw += row_ids.tobytes()
-        raw += b"".join(rows)
+        magic, tables = encode_rows(row_ids, b"".join(rows))
+        raw += tables
         packed = zlib.compress(raw,9)
         print(f"{len(self.tiles)} tiles, {len(raw)} decoded bytes, {len(packed)} compressed",flush=True)
-        return struct.pack("<4sIII",b"BPT1",len(raw),len(packed),zlib.crc32(raw)) + packed
+        return struct.pack("<4sIII",magic,len(raw),len(packed),zlib.crc32(raw)) + packed
 
 
 def bake(web, browser_path, output, golden):

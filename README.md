@@ -32,7 +32,10 @@ ESP32-S3 固件默认启动近景像素白龙娘。手指在圆屏上移动时�
 ## 当前工程
 
 ```text
-main/                       宠物播放、触摸输入和可选 G1 板级诊断
+main/                       板卡启动、应用选择和可选 G1 诊断
+components/baji_pet_app/     摸头、视线、动作节拍和场景提交
+components/baji_runtime/     按需唤醒显示任务，汇集触摸及应用更新事件
+components/baji_graphics/    共享的像素矩形和 RGB565 绘制回调
 components/baji_pet/         网页原画生成的 RGB565 动作与视线素材及局部绘制
 components/baji_scene_damage/ 记录、合并待更新的物理像素区域
 components/baji_vsync/       面板扫描同步信号及时间戳

@@ -25,8 +25,31 @@ static int toward_center(int gaze)
     return gaze - (gaze > 0) + (gaze < 0);
 }
 
+static void update_gaze(baji_pet_state_t *next, const baji_input_t *input)
+{
+    if (input->touch.pressed) {
+        next->gaze_x = gaze_axis(input->touch.x, 233, 75, 2, next->gaze_x);
+        next->gaze_y = gaze_axis(input->touch.y, 233, 102, 1, next->gaze_y);
+    } else {
+        next->gaze_x = toward_center(next->gaze_x);
+        next->gaze_y = toward_center(next->gaze_y);
+    }
+}
+
+int64_t pet_player_next_update(const pet_player_t *p, const baji_input_t *input, int64_t now)
+{
+    baji_pet_state_t gaze = p->shown;
+    update_gaze(&gaze, input);
+    if (gaze.gaze_x != p->shown.gaze_x || gaze.gaze_y != p->shown.gaze_y)
+        return now;
+    int64_t origin = p->patting ? p->pat_since : p->idle_since;
+    unsigned fps = baji_pet_fps(p->shown.clip);
+    int64_t next_frame = (now - origin) * fps / 1000000 + 1;
+    return origin + (next_frame * 1000000 + fps - 1) / fps;
+}
+
 esp_err_t pet_player_tick(pet_player_t *p, baji_board_t *board,
-                          const pet_input_t *input, int64_t now, bool *submitted)
+                          const baji_input_t *input, int64_t now, bool *submitted)
 {
     *submitted = false;
     if (input->presses != p->last_press) {
@@ -50,13 +73,9 @@ esp_err_t pet_player_tick(pet_player_t *p, baji_board_t *board,
     if (!p->patting)
         next.frame = ((uint64_t)(now - p->idle_since) * baji_pet_fps(BAJI_PET_IDLE) / 1000000)
                      % baji_pet_frame_count(BAJI_PET_IDLE);
-    if (input->touch.pressed) {
-        next.gaze_x = gaze_axis(input->touch.x, 233, 75, 2, p->shown.gaze_x);
-        next.gaze_y = gaze_axis(input->touch.y, 233, 102, 1, p->shown.gaze_y);
-    } else {
-        next.gaze_x = toward_center(p->shown.gaze_x);
-        next.gaze_y = toward_center(p->shown.gaze_y);
-    }
+    next.gaze_x = p->shown.gaze_x;
+    next.gaze_y = p->shown.gaze_y;
+    update_gaze(&next, input);
 
     /* The display retains its last frame. Keep even failed/partial submissions
      * dirty until a later complete redraw from the latest scene succeeds. */

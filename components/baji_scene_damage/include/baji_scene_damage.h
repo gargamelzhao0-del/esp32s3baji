@@ -1,6 +1,7 @@
 #pragma once
 
-#include "baji_board.h"
+#include <stddef.h>
+#include "baji_graphics.h"
 
 #ifdef __cplusplus
 extern "C" {

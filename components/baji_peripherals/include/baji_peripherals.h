@@ -30,6 +30,13 @@ esp_err_t baji_peripherals_open(baji_peripherals_t **out);
 esp_err_t baji_peripherals_touch_init(baji_peripherals_t *p);
 esp_err_t baji_peripherals_power_init(baji_peripherals_t *p);
 
+/* Single-consumer input API. Wait for an IRQ, then read one report. After a
+ * quiet interval, poll once to recover a missed change. ESP_ERR_NOT_FINISHED
+ * means no report was available. Other errors are propagated. Only ESP_OK
+ * updates out. The wait duration excludes the subsequent I2C transaction. */
+esp_err_t baji_peripherals_next_touch(baji_peripherals_t *p, uint32_t wait_ms,
+                                      baji_touch_sample_t *out);
+
 /* Single consumer, task context. Coalesces falling edges and includes a report
  * already asserted at startup. ESP_ERR_TIMEOUT means no pending edge. */
 esp_err_t baji_peripherals_wait_touch(baji_peripherals_t *p, uint32_t timeout_ms);
@@ -40,7 +47,8 @@ esp_err_t baji_peripherals_read_touch(baji_peripherals_t *p, baji_touch_sample_t
  * untouched. After a signalled IRQ, use read_touch for strict validation. */
 esp_err_t baji_peripherals_poll_touch(baji_peripherals_t *p, baji_touch_sample_t *out);
 esp_err_t baji_peripherals_read_power(baji_peripherals_t *p, baji_power_status_t *out);
-/* Stop/join all callers first. ESP_OK consumes the handle; an error allows retry. */
+/* Stop/join all callers first. ESP_OK consumes the handle. On failure the
+ * partially closed handle accepts only another close attempt. */
 esp_err_t baji_peripherals_close(baji_peripherals_t *p);
 
 #ifdef __cplusplus

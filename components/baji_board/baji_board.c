@@ -116,6 +116,7 @@ static esp_err_t submit_round(baji_board_t *board, baji_rect_t area, baji_paint_
 
     enum { N = sizeof(cap) / sizeof(cap[0]) };
     unsigned top = 0;
+    baji_rect_t window = {0};
     for (unsigned i = 0; i <= 2 * N && top < bottom; ++i) {
         unsigned end, inset;
         if (i < N) {
@@ -133,13 +134,21 @@ static esp_err_t submit_round(baji_board_t *board, baji_rect_t area, baji_paint_
         unsigned x0 = area.x > inset ? area.x : inset;
         unsigned limit = BAJI_DISPLAY_WIDTH - inset, x1 = right < limit ? right : limit;
         if (y0 < y1 && x0 < x1) {
-            baji_rect_t window = {x0, y0, x1 - x0, y1 - y0};
-            esp_err_t err = submit_window(board, window, paint, scene);
-            if (err != ESP_OK) return err;
+            /* A narrow dirty area may intersect several aperture bands at
+             * identical columns. Let the DMA byte limit alone split that run. */
+            if (window.x == x0 && window.width == x1-x0 && window.y+window.height == y0) {
+                window.height += y1-y0;
+            } else {
+                if (window.height) {
+                    esp_err_t err = submit_window(board, window, paint, scene);
+                    if (err != ESP_OK) return err;
+                }
+                window = (baji_rect_t){x0, y0, x1-x0, y1-y0};
+            }
         }
         top = end;
     }
-    return ESP_OK;
+    return window.height ? submit_window(board, window, paint, scene) : ESP_OK;
 }
 
 static esp_err_t paint_areas(baji_board_t *board, const baji_rect_t *areas, size_t count,

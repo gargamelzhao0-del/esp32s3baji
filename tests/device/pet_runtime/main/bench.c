@@ -12,6 +12,7 @@
 #include "freertos/task.h"
 #include "pet_app.h"
 #include "pet_player.h"
+#include "schedule_check.h"
 
 static bool read_exact(void *buffer, size_t size)
 {
@@ -72,13 +73,13 @@ static unsigned ordered[PAT_EDGES];
 static const char *const labels[] = {"idle", "drag", "pat"};
 static const unsigned counts[] = {IDLE_EDGES, DRAG_EDGES, PAT_EDGES};
 
-static pet_input_t input_at(unsigned phase, unsigned i)
+static baji_input_t input_at(unsigned phase, unsigned i)
 {
     static const uint16_t path[][2] = {
         {82,330},{136,350},{192,363},{255,359},{330,342},
         {382,312},{372,150},{335,110},{136,110},{94,156}
     };
-    pet_input_t in = {0};
+    baji_input_t in = {0};
     if (phase == 1) {
         size_t point = (i/7) % (sizeof(path)/sizeof(path[0]));
         in.presses = 1;
@@ -99,6 +100,50 @@ static int by_time(const void *a, const void *b)
 {
     unsigned left = *(const unsigned *)a, right = *(const unsigned *)b;
     return (left > right) - (left < right);
+}
+
+typedef struct {
+    baji_pet_t *art;
+    unsigned bands, pixels;
+} column_probe_t;
+
+static void paint_column(const baji_rect_t *band, uint8_t *pixels, void *context)
+{
+    column_probe_t *probe = context;
+    ++probe->bands;
+    probe->pixels += (unsigned)band->width * band->height;
+    baji_pet_paint(band, pixels, probe->art);
+}
+
+static esp_err_t measure_edge_column(baji_board_t *board, baji_pet_t *art)
+{
+    enum { WARM = 4, N = 32 };
+    /* Preserve the former seven aperture boundaries as an A/B control. */
+    const baji_rect_t split[] = {{52,60,2,28}, {52,88,2,34}, {52,122,2,32}, {52,154,2,158},
+                                 {52,312,2,32}, {52,344,2,34}, {52,378,2,28}};
+    const baji_rect_t column = {52,0,2,466};
+    unsigned times[2][N], bands[2] = {0};
+    for (unsigned i = 0; i < WARM+N; ++i) {
+        for (unsigned j = 0; j < 2; ++j) {
+            unsigned joined = (i+j) % 2;
+            column_probe_t probe = {.art=art};
+            int64_t start = esp_timer_get_time();
+            esp_err_t err = baji_board_paint_round_regions(board, joined ? &column : split,
+                        joined ? 1 : sizeof(split)/sizeof(split[0]), paint_column, &probe);
+            unsigned elapsed = (unsigned)(esp_timer_get_time()-start);
+            if (err != ESP_OK) return err;
+            if (probe.pixels != 692 || probe.bands != (joined ? 1 : 7)) return ESP_ERR_INVALID_STATE;
+            bands[joined] = probe.bands;
+            if (i >= WARM) times[joined][i-WARM] = elapsed;
+        }
+    }
+    for (unsigned j = 0; j < 2; ++j) {
+        qsort(times[j], N, sizeof(times[j][0]), by_time);
+        printf("PET_COLUMN mode=%s n=%u pixels=692 dma=%u p50=%u p95=%u max=%u\n",
+               j ? "joined" : "split", (unsigned)N, bands[j], (times[j][N/2-1]+times[j][N/2])/2,
+               times[j][(N*95+99)/100-1], times[j][N-1]);
+    }
+    return ESP_OK;
 }
 
 static esp_err_t measure_full(baji_board_t *board, const baji_board_info_t *info, baji_pet_t *art)
@@ -157,7 +202,7 @@ static esp_err_t measure(pet_player_t *player, baji_board_t *board, bool *functi
             if (!i) s->first_us = edge.edge_us;
             s->last_us = edge.edge_us;
 
-            pet_input_t input = input_at(phase, i);
+            baji_input_t input = input_at(phase, i);
             baji_pet_state_t old = player->shown;
             bool sent;
             int64_t start = esp_timer_get_time();
@@ -219,6 +264,7 @@ void app_main(void)
     baji_board_t *board = NULL;
     baji_board_info_t info;
     if (err == ESP_OK) err = baji_board_open(&board, &info);
+    if (err == ESP_OK) err = measure_edge_column(board, art);
     if (err == ESP_OK) err = measure_full(board, &info, art);
     if (err == ESP_OK) {
         printf("PET_MEMORY free_psram=%u free_internal=%u largest_internal_dma=%u\n",
@@ -226,7 +272,7 @@ void app_main(void)
                (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA));
         pet_player_t player;
-        pet_input_t input = {0};
+        baji_input_t input = {0};
         bool sent = false, functional = false, on_time = false;
         int64_t start = esp_timer_get_time();
         pet_player_init(&player, art, &info, start);
@@ -240,6 +286,8 @@ void app_main(void)
             esp_err_t closed = baji_vsync_close();
             if (err == ESP_OK) err = closed;
         }
+        if (err == ESP_OK && functional && on_time)
+            err = check_runtime_schedule(board, &info, art);
         printf("PET_END ok=%d functional=%d deadlines=%d err=%d\n",
                err == ESP_OK && functional && on_time, functional, on_time, err);
         if (err == ESP_OK && functional) {

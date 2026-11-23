@@ -98,7 +98,14 @@ int main(void)
     fail_config = false;
     fail_add = true;
     assert(baji_vsync_open() == ESP_FAIL && !callback && resets == 2);
+    /* Registration and its cleanup both fail. The caller never received a
+     * session; another task must be able to open without closing it. */
+    fail_reset = true;
+    assert(baji_vsync_open() == ESP_FAIL && !callback);
+    assert(baji_vsync_close() == ESP_ERR_INVALID_STATE);
+    task = tasks + 1;
     fail_add = false;
+    fail_reset = false;
     assert(baji_vsync_open() == ESP_OK && adds == 1);
     assert(baji_vsync_open() == ESP_ERR_INVALID_STATE);
     assert(baji_vsync_wait(0, 0, &e) == ESP_ERR_TIMEOUT && !e.seq && !e.edge_us);
@@ -112,10 +119,10 @@ int main(void)
     signal_during_wait = true;
     assert(baji_vsync_wait(e.seq, 30, &e) == ESP_OK && e.seq == 3 && e.edge_us == now);
 
-    task = tasks + 1;
+    task = tasks;
     assert(baji_vsync_close() == ESP_ERR_INVALID_STATE);
     assert(baji_vsync_wait(e.seq, 0, &e) == ESP_ERR_INVALID_STATE);
-    task = tasks;
+    task = tasks + 1;
     void (*old_callback)(void *) = callback;
     void *old_argument = argument;
     fail_remove = true;

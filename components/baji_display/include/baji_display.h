@@ -16,7 +16,9 @@ enum {
 };
 
 /* One task owns the display from init through deinit. Calls from another task,
- * including a second init, return ESP_ERR_INVALID_STATE. Task context only. */
+ * including a second init, return ESP_ERR_INVALID_STATE. Task context only.
+ * Failed startup leaves no live display or borrowed buffers. If its hardware
+ * rollback also fails, a later init or explicit deinit can finish cleanup. */
 esp_err_t baji_display_init(uint8_t brightness_percent);
 esp_err_t baji_display_set_brightness(uint8_t percent);
 

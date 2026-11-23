@@ -4,25 +4,36 @@
 
 固件基于 ESP-IDF 5.5.4。板级驱动使用 IDF 的 SPI、I2C、GPIO 与 FreeRTOS API。候选角色 UI 可在 G2 接入 LVGL 9。电脑端采用 Python，先实现命令行 bridge 与适配器，再加托盘。设置和映射使用 JSON，协议规范使用 JSON Schema 2020-12。
 
-当前诊断应用从 `baji_board` 获取能力和运行时错误，绘制和触摸标记在 `main/board_check.c`。`baji_core` 继续独立提供设备状态投影。[板级设计与源码对应关系](06-hardware-and-environment.md)
+主固件由 `main` 打开板卡，启动像素角色应用，结束后回收板卡。G1 诊断保留独立入口。板级驱动可以单独接受实板与宿主测试，角色素材与变化区域算法可以脱离 SPI、GPIO、I²C 进行像素验证。[板级实现](06-hardware-and-environment.md) · [实板回归](../tests/device/pet_runtime/README.md)
+
+## 接入一个应用画面
+
+1. 在应用组件中持有场景状态、板卡句柄和已提交的画面状态，向 `baji_runtime_run` 提供绘制回调。回调在显示所有者任务上执行，接收单调微秒时间、最新触点及按下计数。短按即使在两帧之间结束，计数和按下位置也会保留。
+2. 由应用选择变化区域。用 `baji_board_paint_round_regions` 一次提交该帧的全部区域，绘制函数须填满板级回调给出的实际矩形。最后一笔 DMA 成功后再提交逻辑状态并清空变化区域。发生部分传输错误时保留这些区域，下次使用最新场景覆盖。
+3. 在 `next_us` 返回下一次变化的绝对时间。需要逐扫描跟随视线时返回当前时刻；纯静态信息页可返回 `INT64_MAX`；页面完成时返回 `BAJI_FRAME_DONE`。运行时会提早等待 TE，遇到信号中断时使用软件时钟，并在信号恢复后重新同步。
+4. Agent 或其他后台任务可以在自己的锁内发布最新快照，然后给 `baji_runtime_config_t.changed` 指定的二值信号量。应用负责这个信号量的生命周期；多次通知会合并，绘制回调负责读取最新数据。该机制也能唤醒静态画面。账户数据采集与设备传输可以独立接入。[运行时接口](../components/baji_runtime/include/baji_runtime.h) · [实际应用](../components/baji_pet_app/pet_app.c)
 
 ## 当前与目标目录
 
 | 路径 | 当前内容 / 后续职责 |
 | --- | --- |
 | main/app_main.c、main/board_check.c | 启动并清理板卡，绘制色条和触点，记录内存与电源读数 |
+| components/baji_graphics、baji_scene_damage | 约定物理像素矩形、RGB565 回调和有界变化区域，接口独立于板卡 |
+| components/baji_board、baji_display、baji_peripherals、baji_vsync | 板卡生命周期和条带缓冲、面板传输、触摸与电源、扫描同步 |
+| components/baji_runtime | 管理显示调度与触摸读取任务，等待应用期限或外部事件，处理重试及退出 |
+| components/baji_pet、baji_pet_app | 载入并校验素材，绘制 RGB565 像素；上层播放器处理动作、触点与视线 |
 | components/baji_core | 已实现纯 C 状态投影、序号去重、连接 TTL、指标 TTL、姿态选择 |
 | contracts/baji_ports.h | 资源、输入、UI、传输接口草案。硬件接口使用 `baji_board.h` |
 | protocol | 已有严格 Schema、完整快照与边界场景 |
 | host/baji_bridge | 已有 USB 分帧与适配器类型接口；真实宿主适配器待实现 |
 | host/config.example.json | 演示配置，真实适配器默认关闭，串口不猜测 |
-| assets | 已有角色源清单和动效配方；固件转换包待 G2 |
+| assets | 角色源清单和动效配方；当前设备用素材包在 `components/baji_pet/assets` |
 | design | 可离线打开的圆屏交互原型 |
 | tools / tests | 环境诊断、构建、协议检查、回放、状态测试 |
 | reference/original-template | 原 HelloWorld 和原测试的备份 |
 | docs | 工程规格、开发顺序、验收和事实记录 |
 
-当前 `baji_board` 聚合 `baji_display` 与 `baji_peripherals`，二者共享 `baji_board_profile` 板型定义。后续按功能增加 `baji_protocol`、`baji_transport`、`baji_assets`、`baji_ui`、`baji_input`、`baji_power` 与 `baji_settings`。
+`baji_board` 聚合显示与外设驱动，硬件引脚集中在 `baji_board_profile`。角色渲染器使用 `baji_graphics` 的数据约定。运行时和播放器通过板级接口提交画面。`-BoardCheck` 构建仅选入板级诊断需要的项目组件；产品与实板角色基准链接同一个应用组件。
 
 ## 模块职责与失败路径
 

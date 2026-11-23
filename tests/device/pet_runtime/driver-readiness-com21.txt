@@ -1,0 +1,41 @@
+[BPT1]
+PET_ASSET bytes=1299156 crc32=608342ae ok=1
+PET_COLUMN mode=split n=32 pixels=692 dma=7 p50=292 p95=298 max=298
+PET_COLUMN mode=joined n=32 pixels=692 dma=1 p50=262 p95=269 max=269
+PET_FULL n=12 p50=19439 p95=19452 max=19452
+PET_MEMORY free_psram=4387048 free_internal=138507 largest_internal_dma=53248
+PET_FIRST us=19437 sent=1
+PET_STAGE name=idle ticks=180 sent=37 noop=143 missed=0 late=0 span_us=3041455 pose_changes=37 gaze_changes=0 gaze_only_sent=0 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=10942 te_draw_p95=12662 te_draw_max=12908 noop_p95=3 noop_max=8 te_gaze_p95=0 te_gaze_max=0
+PET_STAGE name=drag ticks=180 sent=61 noop=119 missed=0 late=0 span_us=3043583 pose_changes=36 gaze_changes=29 gaze_only_sent=25 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=10576 te_draw_p95=12300 te_draw_max=12999 noop_p95=3 noop_max=3 te_gaze_p95=296 te_gaze_max=300
+PET_STAGE name=pat ticks=240 sent=57 noop=183 missed=0 late=0 span_us=4063013 pose_changes=57 gaze_changes=0 gaze_only_sent=0 pat_start=1 pat_end=1 unchanged_sent=0 te_draw_p50=10810 te_draw_p95=12394 te_draw_max=12903 noop_p95=3 noop_max=3 te_gaze_p95=0 te_gaze_max=0
+PET_SCHEDULE ok=1 span_us=3332482 edges=196 callbacks=41 draws=41 callback_millihz=12003 panel_millihz=58815 skipped_poses=0 late=0 max_te_dma_us=12921 extra_static=0 rescue=0 eye_only=1 event_callback_us=4615 event_dma_us=4850 err=0
+PET_END ok=1 functional=1 deadlines=1 err=0
+PET_LIVE
+
+[BPT2]
+PET_ASSET bytes=1201523 crc32=1ababb04 ok=1
+PET_COLUMN mode=split n=32 pixels=692 dma=7 p50=303 p95=309 max=310
+PET_COLUMN mode=joined n=32 pixels=692 dma=1 p50=275 p95=282 max=282
+PET_FULL n=12 p50=19439 p95=19452 max=19452
+PET_MEMORY free_psram=5370088 free_internal=138507 largest_internal_dma=53248
+PET_FIRST us=19447 sent=1
+PET_STAGE name=idle ticks=180 sent=37 noop=143 missed=0 late=0 span_us=3042902 pose_changes=37 gaze_changes=0 gaze_only_sent=0 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=10561 te_draw_p95=11985 te_draw_max=12076 noop_p95=3 noop_max=3 te_gaze_p95=0 te_gaze_max=0
+PET_STAGE name=drag ticks=180 sent=60 noop=120 missed=0 late=0 span_us=3043756 pose_changes=36 gaze_changes=29 gaze_only_sent=24 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=10273 te_draw_p95=11696 te_draw_max=12166 noop_p95=3 noop_max=9 te_gaze_p95=285 te_gaze_max=286
+PET_STAGE name=pat ticks=240 sent=57 noop=183 missed=0 late=0 span_us=4066218 pose_changes=57 gaze_changes=0 gaze_only_sent=0 pat_start=1 pat_end=1 unchanged_sent=0 te_draw_p50=10508 te_draw_p95=11775 te_draw_max=12076 noop_p95=3 noop_max=8 te_gaze_p95=0 te_gaze_max=0
+PET_SCHEDULE ok=1 span_us=3333078 edges=196 callbacks=41 draws=41 callback_millihz=12000 panel_millihz=58804 skipped_poses=0 late=0 max_te_dma_us=12082 extra_static=0 rescue=0 eye_only=1 event_callback_us=4945 event_dma_us=5179 err=0
+PET_END ok=1 functional=1 deadlines=1 err=0
+PET_LIVE
+
+[BPT2, 60 s idle qualification]
+PET_ASSET bytes=1201523 crc32=1ababb04 ok=1
+PET_COLUMN mode=split n=32 pixels=692 dma=7 p50=303 p95=309 max=310
+PET_COLUMN mode=joined n=32 pixels=692 dma=1 p50=275 p95=281 max=282
+PET_FULL n=12 p50=19440 p95=19451 max=19451
+PET_MEMORY free_psram=5370088 free_internal=138507 largest_internal_dma=53248
+PET_FIRST us=19447 sent=1
+PET_STAGE name=idle ticks=180 sent=37 noop=143 missed=0 late=0 span_us=3042931 pose_changes=37 gaze_changes=0 gaze_only_sent=0 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=10561 te_draw_p95=11988 te_draw_max=12076 noop_p95=3 noop_max=3 te_gaze_p95=0 te_gaze_max=0
+PET_STAGE name=drag ticks=180 sent=60 noop=120 missed=0 late=0 span_us=3042537 pose_changes=36 gaze_changes=29 gaze_only_sent=24 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=10282 te_draw_p95=11702 te_draw_max=12166 noop_p95=3 noop_max=3 te_gaze_p95=284 te_gaze_max=285
+PET_STAGE name=pat ticks=240 sent=57 noop=183 missed=0 late=0 span_us=4062752 pose_changes=57 gaze_changes=0 gaze_only_sent=0 pat_start=1 pat_end=1 unchanged_sent=0 te_draw_p50=10509 te_draw_p95=11770 te_draw_max=12076 noop_p95=3 noop_max=3 te_gaze_p95=0 te_gaze_max=0
+PET_SCHEDULE ok=1 span_us=60014515 edges=3530 callbacks=721 draws=721 callback_millihz=11997 panel_millihz=58819 skipped_poses=0 late=0 max_te_dma_us=12089 extra_static=0 rescue=0 eye_only=1 event_callback_us=5679 event_dma_us=5925 err=0
+PET_END ok=1 functional=1 deadlines=1 err=0
+PET_LIVE

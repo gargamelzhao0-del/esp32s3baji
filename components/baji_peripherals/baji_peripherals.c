@@ -15,6 +15,7 @@ esp_err_t baji_attach_i2c(baji_peripherals_t *p, uint8_t address, i2c_master_dev
 esp_err_t baji_peripheral_lock(baji_peripherals_t *p)
 {
     if (!p) return ESP_ERR_INVALID_ARG;
+    if (p->closing) return ESP_ERR_INVALID_STATE;
     return xSemaphoreTake(p->mutex, pdMS_TO_TICKS(250)) == pdTRUE ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
@@ -24,8 +25,9 @@ esp_err_t baji_peripherals_open(baji_peripherals_t **out)
     *out = NULL;
     baji_peripherals_t *p = heap_caps_calloc(1, sizeof(*p), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (!p) return ESP_ERR_NO_MEM;
-    p->mutex = xSemaphoreCreateMutex();
-    p->irq = xSemaphoreCreateBinary();
+    atomic_init(&p->touch_ready, false);
+    p->mutex = xSemaphoreCreateMutexStatic(&p->mutex_storage);
+    p->irq = xSemaphoreCreateBinaryStatic(&p->irq_storage);
     esp_err_t err = ESP_ERR_NO_MEM;
     if (p->mutex && p->irq) {
         const i2c_master_bus_config_t cfg = {
@@ -59,6 +61,7 @@ static esp_err_t detach(i2c_master_dev_handle_t *dev)
 esp_err_t baji_peripherals_close(baji_peripherals_t *p)
 {
     if (!p) return ESP_ERR_INVALID_ARG;
+    p->closing = true;
     p->touch_ready = false;
     p->power_ready = false;
     esp_err_t err = baji_touch_release_pins(p);

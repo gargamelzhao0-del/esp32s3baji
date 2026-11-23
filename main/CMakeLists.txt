@@ -1,3 +1,12 @@
-idf_component_register(SRCS "app_main.c" "board_check.c" "pet_app.c" "pet_player.c"
-                       PRIV_REQUIRES baji_board baji_pet baji_scene_damage baji_vsync esp_timer
-                       INCLUDE_DIRS "")
+idf_build_get_property(g1_only BAJI_G1_ONLY)
+set(app_requires baji_board esp_timer)
+if(NOT g1_only)
+    list(APPEND app_requires baji_pet_app)
+endif()
+idf_component_register(SRCS "app_main.c" PRIV_REQUIRES ${app_requires} INCLUDE_DIRS "")
+if(g1_only)
+    target_compile_definitions(${COMPONENT_LIB} PRIVATE BAJI_G1_ONLY=1)
+endif()
+if(g1_only OR CONFIG_BAJI_BOARD_CHECK)
+    target_sources(${COMPONENT_LIB} PRIVATE "board_check.c")
+endif()

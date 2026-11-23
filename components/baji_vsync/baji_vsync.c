@@ -17,6 +17,14 @@ static bool enabled, pin_owned, handler_added;
 static uint32_t sequence;
 static int64_t edge_time;
 
+static esp_err_t reset_input_pin(void)
+{
+    if (!pin_owned) return ESP_OK;
+    esp_err_t err = gpio_reset_pin(BAJI_LCD_TE);
+    if (err == ESP_OK) pin_owned = false;
+    return err;
+}
+
 static void IRAM_ATTR vsync_irq(void *argument)
 {
     BaseType_t woke = pdFALSE;
@@ -55,8 +63,8 @@ esp_err_t baji_vsync_open(void)
         .intr_type = GPIO_INTR_POSEDGE,
     };
     esp_err_t err = gpio_config(&config);
-    pin_owned = err == ESP_OK;
     if (err == ESP_OK) {
+        pin_owned = true;
         portENTER_CRITICAL(&lock);
         sequence = 0;
         edge_time = 0;
@@ -73,7 +81,14 @@ esp_err_t baji_vsync_open(void)
         handler_added = err == ESP_OK;
     }
     if (err != ESP_OK) {
-        esp_err_t cleanup = baji_vsync_close();
+        /* Registration is the last fallible step: no ISR is attached on this
+         * path. Even a failed GPIO reset must not strand an invisible owner.
+         * A later open can reconfigure the same pin or retry its reset. */
+        esp_err_t cleanup = reset_input_pin();
+        portENTER_CRITICAL(&lock);
+        enabled = false;
+        owner = NULL;
+        portEXIT_CRITICAL(&lock);
         if (cleanup != ESP_OK) return cleanup;
     }
     return err;
@@ -128,11 +143,8 @@ esp_err_t baji_vsync_close(void)
         if (err != ESP_OK) return err;
         handler_added = false;
     }
-    if (pin_owned) {
-        esp_err_t err = gpio_reset_pin(BAJI_LCD_TE);
-        if (err != ESP_OK) return err;
-        pin_owned = false;
-    }
+    esp_err_t err = reset_input_pin();
+    if (err != ESP_OK) return err;
     portENTER_CRITICAL(&lock);
     owner = NULL;
     portEXIT_CRITICAL(&lock);

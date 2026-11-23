@@ -76,12 +76,8 @@ esp_err_t baji_board_paint_round_regions(baji_board_t *board, const baji_rect_t 
 esp_err_t baji_board_set_brightness(baji_board_t *b, uint8_t pct)
 { (void)b; assert(pct == 45); return ESP_OK; }
 baji_peripherals_t *baji_board_peripherals(baji_board_t *b) { (void)b; return NULL; }
-esp_err_t baji_peripherals_wait_touch(baji_peripherals_t *p, uint32_t ms)
-{ (void)p; (void)ms; return ESP_OK; }
-esp_err_t baji_peripherals_read_touch(baji_peripherals_t *p, baji_touch_sample_t *s)
-{ (void)p; assert(step + 1 < sizeof(touches)/sizeof(touches[0])); *s = touches[++step]; return ESP_OK; }
-esp_err_t baji_peripherals_poll_touch(baji_peripherals_t *p, baji_touch_sample_t *s)
-{ (void)p; (void)s; assert(0); return ESP_FAIL; }
+esp_err_t baji_peripherals_next_touch(baji_peripherals_t *p, uint32_t ms, baji_touch_sample_t *s)
+{ (void)p; (void)ms; assert(step + 1 < sizeof(touches)/sizeof(touches[0])); *s = touches[++step]; return ESP_OK; }
 esp_err_t baji_peripherals_read_power(baji_peripherals_t *p, baji_power_status_t *s)
 { (void)p; (void)s; assert(0); return ESP_FAIL; }
 void vTaskDelay(int ticks) { (void)ticks; assert(0); }

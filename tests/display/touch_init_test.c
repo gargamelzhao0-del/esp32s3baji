@@ -8,6 +8,11 @@ static int reset_low, commands, id_reads, report_reads, selected, failed_registe
 static unsigned tick, selected_at;
 static bool fail_tx;
 static int irq_level = 1, irq_signals;
+static bool pulse_during_add, bus_locked;
+static int lock_calls;
+static void (*irq_handler)(void *);
+static void *irq_argument;
+static TickType_t wait_ticks;
 static uint8_t report[10];
 
 static bool nack(int reg, bool tx)
@@ -50,16 +55,37 @@ esp_err_t gpio_config(const gpio_config_t *cfg) { assert(cfg); return ESP_OK; }
 int gpio_get_level(int pin) { assert(pin == BAJI_TOUCH_INT); return irq_level; }
 esp_err_t gpio_reset_pin(int pin) { (void)pin; return ESP_OK; }
 esp_err_t gpio_install_isr_service(int flags) { (void)flags; return ESP_OK; }
-esp_err_t gpio_isr_handler_remove(int pin) { assert(pin == BAJI_TOUCH_INT); return ESP_OK; }
+esp_err_t gpio_isr_handler_remove(int pin) { assert(pin == BAJI_TOUCH_INT); irq_handler = NULL; return ESP_OK; }
 esp_err_t gpio_isr_handler_add(int pin, void (*handler)(void *), void *arg)
 {
-    assert(pin == BAJI_TOUCH_INT && handler && !arg);
+    assert(pin == BAJI_TOUCH_INT && handler && !irq_handler);
+    irq_handler = handler;
+    irq_argument = arg;
+    if (pulse_during_add) handler(arg);
     return ESP_OK;
 }
-int xSemaphoreGiveFromISR(SemaphoreHandle_t sem, BaseType_t *woke) { (void)sem; (void)woke; return pdTRUE; }
+int xSemaphoreGiveFromISR(SemaphoreHandle_t sem, BaseType_t *woke)
+{
+    assert(sem == &irq_signals);
+    irq_signals = 1;
+    *woke = pdTRUE;
+    return pdTRUE;
+}
 int xSemaphoreGive(SemaphoreHandle_t sem) { if (sem == &irq_signals) ++irq_signals; return pdTRUE; }
-int xSemaphoreTake(SemaphoreHandle_t sem, TickType_t ticks) { (void)sem; (void)ticks; return pdTRUE; }
-esp_err_t baji_peripheral_lock(baji_peripherals_t *p) { assert(p); return ESP_OK; }
+int xSemaphoreTake(SemaphoreHandle_t sem, TickType_t ticks)
+{
+    assert(sem == &irq_signals);
+    wait_ticks = ticks;
+    if (!irq_signals) return pdFALSE;
+    irq_signals = 0;
+    return pdTRUE;
+}
+esp_err_t baji_peripheral_lock(baji_peripherals_t *p)
+{
+    assert(p);
+    ++lock_calls;
+    return bus_locked ? ESP_ERR_TIMEOUT : ESP_OK;
+}
 esp_err_t baji_attach_i2c(baji_peripherals_t *p, uint8_t addr, i2c_master_dev_handle_t *dev)
 {
     assert(addr == 0x5a);
@@ -130,6 +156,50 @@ static void check_poll(void)
     assert(baji_touch_release_pins(&driver) == ESP_OK);
 }
 
+static void check_irq_lifetime(void)
+{
+    baji_peripherals_t driver = {.irq = &irq_signals};
+    baji_touch_sample_t sample = {.pressed = true, .x = 11, .y = 22};
+    assert(baji_peripherals_wait_touch(NULL, 0) == ESP_ERR_INVALID_ARG);
+    assert(baji_peripherals_wait_touch(&driver, 0) == ESP_ERR_INVALID_STATE);
+    assert(baji_peripherals_next_touch(&driver, 0, NULL) == ESP_ERR_INVALID_ARG);
+    irq_signals = 0;
+    irq_level = 1;
+    pulse_during_add = true;
+    assert(baji_peripherals_touch_init(&driver) == ESP_OK);
+    int locks = lock_calls;
+    bus_locked = true;
+    assert(baji_peripherals_wait_touch(&driver, 0) == ESP_OK);
+    assert(baji_peripherals_wait_touch(&driver, 4) == ESP_ERR_TIMEOUT && wait_ticks == 4);
+    assert(lock_calls == locks);
+    irq_handler(irq_argument);
+    int reads = report_reads;
+    assert(baji_peripherals_next_touch(&driver, 0, &sample) == ESP_ERR_TIMEOUT);
+    assert(lock_calls == locks+1 && report_reads == reads && sample.x == 11);
+    bus_locked = false;
+
+    memset(report, 0, sizeof(report));
+    assert(baji_peripherals_next_touch(&driver, 20, &sample) == ESP_ERR_NOT_FINISHED);
+    irq_handler(irq_argument);
+    assert(baji_peripherals_next_touch(&driver, 20, &sample) == ESP_ERR_INVALID_RESPONSE);
+    assert(sample.pressed && sample.x == 11 && sample.y == 22);
+    report[6] = 0xab;
+    assert(baji_peripherals_next_touch(&driver, 20, &sample) == ESP_OK && !sample.pressed);
+    assert(report_reads == reads+3);
+
+    void (*old)(void *) = irq_handler;
+    void *old_argument = irq_argument;
+    assert(baji_touch_release_pins(&driver) == ESP_OK);
+    driver = (baji_peripherals_t){.irq = &irq_signals};
+    pulse_during_add = false;
+    assert(baji_peripherals_touch_init(&driver) == ESP_OK);
+    old(old_argument);
+    assert(baji_peripherals_wait_touch(&driver, 0) == ESP_ERR_TIMEOUT);
+    irq_handler(irq_argument);
+    assert(baji_peripherals_wait_touch(&driver, 0) == ESP_OK);
+    assert(baji_touch_release_pins(&driver) == ESP_OK);
+}
+
 int main(void)
 {
     check_start(COMMAND, true, 1, true);
@@ -138,6 +208,8 @@ int main(void)
     check_start(COMMAND, true, 4, false);
     check_start(PROJECT, false, 4, false);
     check_poll();
+    check_irq_lifetime();
     puts("CST9217 startup NACK recovery, retry limit and single-attempt runtime reads passed.");
     puts("CST9217 idle/IRQ distinction, polling errors and missed-edge press/release passed.");
+    puts("CST9217 IRQ publication, stale ISR, bus-independent waits and unified input passed.");
 }

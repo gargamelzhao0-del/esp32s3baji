@@ -9,8 +9,10 @@
 static alignas(4) uint8_t strips[2][BAJI_DISPLAY_MAX_TRANSFER_BYTES];
 static int caller, actors[2];
 static bool bus, device, reset, stalled, reject_queue, polling;
-static bool bus_locked, reject_acquire;
-static unsigned lock_count, unlock_count;
+static bool bus_locked, reject_acquire, reject_remove, reject_bus_free;
+static unsigned lock_count, unlock_count, color_count;
+static bool probe_lifecycle;
+static unsigned blocked_contenders;
 static uint8_t fail_register;
 static spi_transaction_t *borrowed;
 static struct { uint8_t reg, data[4]; } commands[64];
@@ -67,6 +69,23 @@ void heap_caps_free(void *address)
 }
 
 TaskHandle_t xTaskGetCurrentTaskHandle(void) { return &actors[caller]; }
+
+/* Schedule a second owner at driver-call boundaries in mid-startup, mid-
+ * rollback and mid-close. It must never see a partially transitioned panel. */
+static void contend_for_display(void)
+{
+    if (!probe_lifecycle) return;
+    int active = caller;
+    caller ^= 1;
+    probe_lifecycle = false;
+    assert(baji_display_init(0) == ESP_ERR_INVALID_STATE);
+    assert(baji_display_wait() == ESP_ERR_INVALID_STATE);
+    assert(baji_display_deinit() == ESP_ERR_INVALID_STATE);
+    probe_lifecycle = true;
+    caller = active;
+    ++blocked_contenders;
+}
+
 void vTaskDelay(int ticks)
 {
     assert(wait_count < 4);
@@ -85,6 +104,7 @@ esp_err_t gpio_set_level(int pin, int level)
 }
 esp_err_t gpio_reset_pin(int pin)
 {
+    contend_for_display();
     assert(reset && pin == 1);
     reset = false;
     return ESP_OK;
@@ -96,6 +116,7 @@ bool esp_ptr_dma_capable(const void *address)
 }
 esp_err_t spi_bus_initialize(int host, const spi_bus_config_t *config, int dma)
 {
+    contend_for_display();
     assert(!bus && host == 2 && dma == SPI_DMA_CH_AUTO);
     assert(config->sclk_io_num == 38 && config->data0_io_num == 4 && config->data3_io_num == 7);
     assert(config->max_transfer_sz == BAJI_DISPLAY_MAX_TRANSFER_BYTES);
@@ -104,12 +125,15 @@ esp_err_t spi_bus_initialize(int host, const spi_bus_config_t *config, int dma)
 }
 esp_err_t spi_bus_free(int host)
 {
+    contend_for_display();
     assert(host == 2 && bus && !device);
+    if (reject_bus_free) return ESP_FAIL;
     bus = false;
     return ESP_OK;
 }
 esp_err_t spi_bus_add_device(int host, const spi_device_interface_config_t *config, spi_device_handle_t *out)
 {
+    contend_for_display();
     assert(host == 2 && bus && !device && config->clock_speed_hz == 40000000);
     assert(config->spics_io_num == 12 && config->command_bits == 8 && config->address_bits == 24);
     device = true;
@@ -118,7 +142,9 @@ esp_err_t spi_bus_add_device(int host, const spi_device_interface_config_t *conf
 }
 esp_err_t spi_bus_remove_device(spi_device_handle_t handle)
 {
+    contend_for_display();
     assert(handle == &device && device && !borrowed && !bus_locked);
+    if (reject_remove) return ESP_FAIL;
     device = false;
     return ESP_OK;
 }
@@ -162,6 +188,7 @@ static esp_err_t start_color(spi_device_handle_t handle, spi_transaction_t *tran
     assert(transaction->flags == (SPI_TRANS_MODE_QIO | SPI_TRANS_DMA_BUFFER_ALIGN_MANUAL));
     if (reject_queue) return ESP_ERR_TIMEOUT;
     if (gram.enabled) record_color(transaction);
+    ++color_count;
     borrowed = transaction;
     polling = poll;
     return ESP_OK;
@@ -384,6 +411,53 @@ static void check_board_paint(void)
     assert(baji_board_close(board) == ESP_OK && releases == 2);
 }
 
+static void check_startup_rollback(void)
+{
+    baji_board_t *board;
+    baji_board_info_t info;
+    wait_count = command_count = allocations = releases = 0;
+    probe_lifecycle = true;
+    fail_register = 0xc4;
+    reject_remove = true;
+    assert(baji_board_open(&board, &info) == ESP_FAIL);
+    assert(!board && bus && device && reset && releases == 2);
+
+    /* The failed app task can end. A different owner must recover the old
+     * hardware before allocating a second SPI host/device on the same pins. */
+    caller = 1;
+    fail_register = 0;
+    wait_count = command_count = allocations = releases = 0;
+    /* The previous cleanup error persists for an additional attempt. No
+     * second initialization can touch the still-owned bus in the meantime. */
+    assert(baji_board_open(&board, &info) == ESP_FAIL && !board && releases == 2);
+    assert(wait_count == 0 && command_count == 0 && bus && device);
+    reject_remove = false;
+    allocations = releases = 0;
+    assert(baji_board_open(&board, &info) == ESP_OK);
+    reject_remove = true;
+    assert(baji_board_close(board) == ESP_FAIL && releases == 0 && bus && device);
+    caller = 0;
+    assert(baji_display_init(0) == ESP_ERR_INVALID_STATE);
+    assert(baji_display_deinit() == ESP_ERR_INVALID_STATE);
+    assert(baji_board_close(board) == ESP_ERR_INVALID_STATE);
+    caller = 1;
+    reject_remove = false;
+    assert(baji_board_close(board) == ESP_OK && !bus && !device && !reset);
+
+    /* Partial rollback after removing the device only needs to free the
+     * remaining bus and reset pin. An explicit deinit can do that as well. */
+    wait_count = command_count = 0;
+    fail_register = 0xc4;
+    reject_bus_free = true;
+    assert(baji_display_init(0) == ESP_FAIL && bus && !device && reset);
+    caller = 0;
+    reject_bus_free = false;
+    assert(baji_display_deinit() == ESP_OK && !bus && !reset);
+    fail_register = 0;
+    probe_lifecycle = false;
+    assert(blocked_contenders >= 12);
+}
+
 unsigned check_round_region(baji_board_t *board, baji_rect_t area);
 
 static const baji_rect_t pair[] = {{220,210,20,20}, {228,218,20,20}};
@@ -405,8 +479,13 @@ static void check_round_windows(void)
     command_count = wait_count = allocations = releases = 0;
     assert(baji_board_open(&board, &info) == ESP_OK);
     command_count = 0;
+    unsigned previous = color_count;
     assert(check_round_region(board, (baji_rect_t){0,0,466,466}) == 182340);
+    assert(color_count - previous == 17);
     assert(check_round_region(board, (baji_rect_t){0,0,4,4}) == 0);
+    previous = color_count;
+    assert(check_round_region(board, (baji_rect_t){52,0,2,466}) == 2 * (466 - 2*60));
+    assert(color_count - previous == 1);
     assert(check_round_region(board, (baji_rect_t){165,167,137,131}) == 138*132);
     const baji_rect_t edges[] = {
         {0,0,466,1}, {1,465,464,1}, {465,1,1,464}, {0,0,1,466},
@@ -448,6 +527,7 @@ int main(void)
     open_display();
     assert(baji_display_deinit() == ESP_OK);
     check_board_paint();
+    check_startup_rollback();
     check_round_windows();
     puts("Display protocol, DMA ownership, odd dirty rectangles, double-buffer retries and teardown passed.");
 }

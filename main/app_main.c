@@ -1,6 +1,9 @@
-#include "board_check.h"
-#include "pet_app.h"
 #include "sdkconfig.h"
+#if defined(BAJI_G1_ONLY) || defined(CONFIG_BAJI_BOARD_CHECK)
+#include "board_check.h"
+#else
+#include "pet_app.h"
+#endif
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -21,7 +24,7 @@ void app_main(void)
         ESP_LOGI("baji", "physical flash=%u bytes", (unsigned)info.flash_bytes);
     else
         ESP_LOGW("baji", "flash size unknown: %s", esp_err_to_name(info.flash_status));
-#ifdef CONFIG_BAJI_BOARD_CHECK
+#if defined(BAJI_G1_ONLY) || defined(CONFIG_BAJI_BOARD_CHECK)
     err = baji_board_check_run(board, &info);
 #else
     err = pet_app_run(board, &info);

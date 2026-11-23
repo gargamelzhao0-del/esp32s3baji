@@ -32,6 +32,9 @@ with tempfile.TemporaryDirectory(prefix="baji-display-test-") as directory:
         "-I", str(COMPONENTS / "baji_board/include"), "-I", str(COMPONENTS / "baji_peripherals/include"),
         "-I", str(COMPONENTS / "baji_scene_damage/include"),
         "-I", str(COMPONENTS / "baji_pet/include"),
+        "-I", str(COMPONENTS / "baji_graphics/include"),
+        "-I", str(COMPONENTS / "baji_pet_app/include"),
+        "-I", str(COMPONENTS / "baji_runtime/include"),
     ]
     peripherals = COMPONENTS / "baji_peripherals"
     for name, sources in {
@@ -42,10 +45,12 @@ with tempfile.TemporaryDirectory(prefix="baji-display-test-") as directory:
         ],
         "touch_init_test": [peripherals / "cst9217.c", HERE / "touch_init_test.c"],
         "vsync_test": [COMPONENTS / "baji_vsync/baji_vsync.c", HERE / "vsync_test.c"],
-        "pet_player_test": [COMPONENTS.parent / "main/pet_player.c", COMPONENTS / "baji_scene_damage/baji_scene_damage.c",
+        "pet_player_test": [COMPONENTS / "baji_pet_app/pet_player.c", COMPONENTS / "baji_scene_damage/baji_scene_damage.c",
                             HERE / "pet_player_test.c"],
         "board_check_paint_test": [COMPONENTS.parent / "main/board_check.c", HERE / "board_check_paint_test.c"],
         "peripheral_decode_test": [peripherals / "test/test_peripheral_decode.c"],
+        "peripheral_lifecycle_test": [peripherals / "baji_peripherals.c", peripherals / "axp2101.c",
+                                      HERE / "peripheral_lifecycle_test.c"],
     }.items():
         executable = build / (name + (".exe" if os.name == "nt" else ""))
         options = ["-DBAJI_HOST_VSYNC", "-I", str(COMPONENTS / "baji_vsync/include")] if name == "vsync_test" else []

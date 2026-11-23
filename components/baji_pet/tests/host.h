@@ -4,7 +4,6 @@
 #include <stdlib.h>
 typedef int esp_err_t;
 enum { ESP_OK, ESP_ERR_INVALID_ARG, ESP_ERR_INVALID_STATE, ESP_ERR_INVALID_RESPONSE, ESP_ERR_NO_MEM };
-typedef struct { uint16_t x,y,width,height; } baji_rect_t;
 enum { MALLOC_CAP_INTERNAL=1, MALLOC_CAP_SPIRAM=2, MALLOC_CAP_8BIT=4 };
 static inline void *heap_caps_malloc(size_t n,unsigned f) {(void)f;return malloc(n);}
 static inline void *heap_caps_calloc(size_t n,size_t size,unsigned f) {(void)f;return calloc(n,size);}
