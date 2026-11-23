@@ -21,5 +21,6 @@ int xSemaphoreTake(SemaphoreHandle_t semaphore, TickType_t ticks);
 esp_err_t gpio_isr_handler_remove(int pin);
 esp_err_t gpio_install_isr_service(int flags);
 esp_err_t gpio_isr_handler_add(int pin, void (*handler)(void *), void *arg);
+int gpio_get_level(int pin);
 esp_err_t i2c_master_transmit(i2c_master_dev_handle_t dev, const uint8_t *data, size_t size, int timeout);
 esp_err_t i2c_master_receive(i2c_master_dev_handle_t dev, uint8_t *data, size_t size, int timeout);

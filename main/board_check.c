@@ -4,6 +4,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <stdlib.h>
+#include <string.h>
 
 static const char *TAG = "board_check";
 enum { MARK_RADIUS = 9, POWER_PERIOD_MS = 5000 };
@@ -13,31 +14,72 @@ typedef struct {
     baji_touch_sample_t touch;
 } scene_t;
 
-static uint16_t color_at(const scene_t *scene, int x, int y)
+/* Repeat the wire-order pixel in disjoint chunks. This also works on odd
+ * clipped widths and on a byte-aligned caller buffer. */
+static void fill_solid(uint8_t *pixels, unsigned count, uint16_t color)
 {
-    const baji_touch_sample_t *p = &scene->touch;
-    if (p->pressed) {
-        int dx = abs(x - p->x), dy = abs(y - p->y);
-        if ((dx <= 1 && dy <= MARK_RADIUS) || (dy <= 1 && dx <= MARK_RADIUS)) return 0xffff;
+    if (!count) return;
+    pixels[0] = (uint8_t)(color >> 8);
+    pixels[1] = (uint8_t)color;
+    for (unsigned filled = 1; filled < count; ) {
+        unsigned next = count - filled < filled ? count - filled : filled;
+        memcpy(pixels + 2 * filled, pixels, 2 * next);
+        filled += next;
     }
-    int dx = x - scene->cx, dy = y - scene->cy;
-    // Left to right RGB verifies the wire byte order. A single gold tick marks twelve o'clock.
-    if (dy >= -15 && dy < 15 && dx >= -90 && dx < 90)
-        return dx < -30 ? 0xf800 : dx < 30 ? 0x07e0 : 0x001f;
-    if (abs(dx) <= 2 && dy >= -177 && dy < -155) return 0xff2e;
-    int r2 = dx*dx + dy*dy;
-    if (r2 >= 174*174 && r2 <= 176*176) return 0x526b;
-    return 0x1083;
+}
+
+/* x0 and x1 are inclusive display coordinates. */
+static void span(const baji_rect_t *band, uint8_t *row, int x0, int x1, uint16_t color)
+{
+    int last = band->x + band->width - 1;
+    if (x0 < band->x) x0 = band->x;
+    if (x1 > last) x1 = last;
+    if (x0 <= x1) fill_solid(row + 2 * (x0 - band->x), x1 - x0 + 1, color);
+}
+
+/* Floor(sqrt(squared)) for the two exact circular boundaries. */
+static int circle_extent(int squared)
+{
+    int lo = 0, hi = 176;
+    while (lo < hi) {
+        int mid = (lo + hi + 1) / 2;
+        if (mid * mid <= squared) lo = mid;
+        else hi = mid - 1;
+    }
+    return lo;
 }
 
 static void paint(const baji_rect_t *band, uint8_t *pixels, void *context)
 {
     const scene_t *scene = context;
-    for (unsigned y = band->y; y < band->y + band->height; ++y) {
-        for (unsigned x = band->x; x < band->x + band->width; ++x) {
-            uint16_t pixel = color_at(scene, x, y);
-            *pixels++ = (uint8_t)(pixel >> 8);
-            *pixels++ = (uint8_t)pixel;
+    const int cx = scene->cx;
+    fill_solid(pixels, (unsigned)band->width * band->height, 0x1083);
+    for (int y = band->y; y < band->y + band->height; ++y, pixels += band->width * 2) {
+        int dy = y - scene->cy, yy = dy * dy;
+        if (yy <= 176 * 176) {
+            int outer = circle_extent(176 * 176 - yy);
+            if (yy >= 174 * 174) {
+                span(band, pixels, cx - outer, cx + outer, 0x526b);
+            } else {
+                /* Strictly inside the inner circle is excluded from the ring. */
+                int hole = circle_extent(174 * 174 - 1 - yy);
+                span(band, pixels, cx - outer, cx - hole - 1, 0x526b);
+                span(band, pixels, cx + hole + 1, cx + outer, 0x526b);
+            }
+        }
+        if (dy >= -177 && dy < -155)
+            span(band, pixels, cx - 2, cx + 2, 0xff2e);
+        if (dy >= -15 && dy < 15) {
+            span(band, pixels, cx - 90, cx - 31, 0xf800);
+            span(band, pixels, cx - 30, cx + 29, 0x07e0);
+            span(band, pixels, cx + 30, cx + 89, 0x001f);
+        }
+        if (scene->touch.pressed) {
+            int offset = abs(y - scene->touch.y);
+            if (offset <= MARK_RADIUS) {
+                int arm = offset <= 1 ? MARK_RADIUS : 1;
+                span(band, pixels, scene->touch.x - arm, scene->touch.x + arm, 0xffff);
+            }
         }
     }
 }
@@ -110,7 +152,12 @@ esp_err_t baji_board_check_run(baji_board_t *board, const baji_board_info_t *inf
         // release; a slow idle fallback also recovers a missed interrupt edge.
         err = baji_peripherals_wait_touch(io, scene.touch.pressed ? 16 : 250);
         baji_touch_sample_t sample;
-        if (err == ESP_OK || err == ESP_ERR_TIMEOUT) err = baji_peripherals_read_touch(io, &sample);
+        if (err == ESP_OK) {
+            err = baji_peripherals_read_touch(io, &sample);
+        } else if (err == ESP_ERR_TIMEOUT) {
+            err = baji_peripherals_poll_touch(io, &sample);
+            if (err == ESP_ERR_NOT_FINISHED) continue;
+        }
         if (err != ESP_OK) {
             if (err != last_touch_error) ESP_LOGW(TAG, "touch sample: %s", esp_err_to_name(err));
             last_touch_error = err;

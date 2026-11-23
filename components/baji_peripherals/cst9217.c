@@ -136,7 +136,8 @@ static esp_err_t start_touch(baji_peripherals_t *p)
     portENTER_CRITICAL(&irq_lock);
     irq_target = p->irq;
     portEXIT_CRITICAL(&irq_lock);
-    xSemaphoreGive(p->irq); /* One initial sample covers touches during startup. */
+    /* A report already asserted during IRQ setup has no new falling edge. */
+    if (gpio_get_level(BAJI_TOUCH_INT) == 0) xSemaphoreGive(p->irq);
     return ESP_OK;
 }
 
@@ -168,14 +169,29 @@ esp_err_t baji_peripherals_wait_touch(baji_peripherals_t *p, uint32_t timeout_ms
     return xSemaphoreTake(p->irq, (TickType_t)ticks) == pdTRUE ? ESP_OK : ESP_ERR_TIMEOUT;
 }
 
-esp_err_t baji_peripherals_read_touch(baji_peripherals_t *p, baji_touch_sample_t *out)
+static esp_err_t read_touch(baji_peripherals_t *p, baji_touch_sample_t *out, bool polling)
 {
     if (!out) return ESP_ERR_INVALID_ARG;
     esp_err_t err = baji_peripheral_lock(p);
     if (err != ESP_OK) return err;
     uint8_t report[10];
     err = p->touch_ready ? read_register(p, CST_REPORT, report, sizeof(report)) : ESP_ERR_INVALID_STATE;
-    if (err == ESP_OK) err = baji_decode_touch(report, BAJI_LCD_WIDTH, BAJI_LCD_HEIGHT, out);
+    if (err == ESP_OK) {
+        /* With no pending IRQ the chip can return register contents instead of
+         * a report. Only a successful bus read can mean "no report yet". */
+        if (polling && report[6] != BAJI_CST_REPORT_MARKER) err = ESP_ERR_NOT_FINISHED;
+        else err = baji_decode_touch(report, BAJI_LCD_WIDTH, BAJI_LCD_HEIGHT, out);
+    }
     xSemaphoreGive(p->mutex);
     return err;
+}
+
+esp_err_t baji_peripherals_read_touch(baji_peripherals_t *p, baji_touch_sample_t *out)
+{
+    return read_touch(p, out, false);
+}
+
+esp_err_t baji_peripherals_poll_touch(baji_peripherals_t *p, baji_touch_sample_t *out)
+{
+    return read_touch(p, out, true);
 }

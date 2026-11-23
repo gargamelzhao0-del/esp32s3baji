@@ -30,12 +30,15 @@ esp_err_t baji_peripherals_open(baji_peripherals_t **out);
 esp_err_t baji_peripherals_touch_init(baji_peripherals_t *p);
 esp_err_t baji_peripherals_power_init(baji_peripherals_t *p);
 
-/* Single consumer, task context. Starts with one pending sample, then coalesces
- * falling edges. ESP_ERR_TIMEOUT means no pending edge. A held contact should
- * also be sampled periodically to catch release even without a final IRQ. */
+/* Single consumer, task context. Coalesces falling edges and includes a report
+ * already asserted at startup. ESP_ERR_TIMEOUT means no pending edge. */
 esp_err_t baji_peripherals_wait_touch(baji_peripherals_t *p, uint32_t timeout_ms);
 /* Task context. Both reads publish a new sample only on ESP_OK. */
 esp_err_t baji_peripherals_read_touch(baji_peripherals_t *p, baji_touch_sample_t *out);
+/* Poll after an IRQ timeout to recover a missed edge or release. A successful
+ * transfer without a report marker returns ESP_ERR_NOT_FINISHED, leaving out
+ * untouched. After a signalled IRQ, use read_touch for strict validation. */
+esp_err_t baji_peripherals_poll_touch(baji_peripherals_t *p, baji_touch_sample_t *out);
 esp_err_t baji_peripherals_read_power(baji_peripherals_t *p, baji_power_status_t *out);
 /* Stop/join all callers first. ESP_OK consumes the handle; an error allows retry. */
 esp_err_t baji_peripherals_close(baji_peripherals_t *p);

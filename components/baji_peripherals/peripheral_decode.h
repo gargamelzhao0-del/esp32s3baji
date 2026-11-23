@@ -2,11 +2,13 @@
 
 #include "baji_peripherals.h"
 
+#define BAJI_CST_REPORT_MARKER 0xab
+
 /* Waveshare CST9217 single-point packet, first contact in a multi-contact report. */
 static inline esp_err_t baji_decode_touch(const uint8_t data[10], uint16_t width, uint16_t height,
                                          baji_touch_sample_t *out)
 {
-    if (data[6] != 0xab) return ESP_ERR_INVALID_RESPONSE;
+    if (data[6] != BAJI_CST_REPORT_MARKER) return ESP_ERR_INVALID_RESPONSE;
     baji_touch_sample_t sample = {0};
     if ((data[5] & 0x7f) && (data[0] & 0x0f) == 6) {
         uint16_t x = ((uint16_t)data[1] << 4) | (data[3] >> 4);

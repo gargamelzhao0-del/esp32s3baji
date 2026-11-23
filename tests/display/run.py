@@ -18,9 +18,14 @@ with tempfile.TemporaryDirectory(prefix="baji-display-test-") as directory:
         target.write_text('#include "spi_recorder.h"\n', encoding="ascii")
     for header in ("driver/i2c_master.h", "esp_attr.h", "freertos/semphr.h"):
         (build / header).write_text('#include "touch_recorder.h"\n', encoding="ascii")
+    (build / "esp_log.h").write_text(
+        '#include <stdio.h>\n#define ESP_LOGI(tag, ...) ((void)(tag), (void)sizeof(printf(__VA_ARGS__)))\n'
+        '#define ESP_LOGW ESP_LOGI\n#define esp_err_to_name(e) "host error"\n', encoding="ascii")
+    (build / "esp_timer.h").write_text(
+        '#include <stdint.h>\nstatic inline int64_t esp_timer_get_time(void) { return 0; }\n', encoding="ascii")
     compiler = [
         os.environ.get("CC", "gcc"), "-std=c11", "-Wall", "-Wextra", "-Werror",
-        "-I", str(build), "-I", str(HERE),
+        "-I", str(build), "-I", str(HERE), "-I", str(COMPONENTS.parent / "main"),
         "-I", str(COMPONENTS / "baji_board_profile/include"),
         "-I", str(COMPONENTS / "baji_display/include"),
         "-I", str(COMPONENTS / "baji_board/include"), "-I", str(COMPONENTS / "baji_peripherals/include"),
@@ -32,6 +37,7 @@ with tempfile.TemporaryDirectory(prefix="baji-display-test-") as directory:
             HERE / "display_test.c",
         ],
         "touch_init_test": [peripherals / "cst9217.c", HERE / "touch_init_test.c"],
+        "board_check_paint_test": [COMPONENTS.parent / "main/board_check.c", HERE / "board_check_paint_test.c"],
         "peripheral_decode_test": [peripherals / "test/test_peripheral_decode.c"],
     }.items():
         executable = build / (name + (".exe" if os.name == "nt" else ""))
