@@ -51,7 +51,8 @@ unsigned dsk_curve_at(const uint32_t *edges, unsigned steps, unsigned half_us,
 void dsk_model_init(dsk_model_t *m, unsigned steps, int64_t now)
 {
     *m = (dsk_model_t){.shown = {.item = 1, .phase = 1}, .last_clip = 1,
-                       .playing = true, .float_origin = now, .last_tick = now};
+                       .playing = true, .motion_steps = 1, .float_origin = now,
+                       .last_tick = now, .clock_us = now};
     if (steps < 1 || steps > DSK_MAX_BUBBLE_STEPS) steps = 1;
     m->bubble_steps = steps;
     dsk_curve_edges(m->float_edges, steps, HALF_FLOAT_US);
@@ -75,6 +76,8 @@ bool dsk_command(dsk_model_t *m, dsk_command_t command, unsigned value)
         if (value >= DSK_CLIPS) return false;
         s->item = m->last_clip = value;
         s->frame = 0;
+        m->subframe = m->start_sample = 0;
+        m->last_tick = m->clock_us;
         m->playing = true;
         break;
     case DSK_SELECT_STATE:
@@ -82,6 +85,7 @@ bool dsk_command(dsk_model_t *m, dsk_command_t command, unsigned value)
         m->last_pose = value;
         s->item = DSK_CLIPS + value;
         s->frame = 0;
+        m->subframe = 0;
         break;
     case DSK_SET_PHASE:
         if (value >= DSK_PHASES) return false;
@@ -92,6 +96,8 @@ bool dsk_command(dsk_model_t *m, dsk_command_t command, unsigned value)
         s->close = value;
         break;
     case DSK_TOGGLE_PLAY:
+        m->start_sample = s->frame * m->motion_steps + m->subframe;
+        m->last_tick = m->clock_us;
         m->playing = !m->playing;
         break;
     case DSK_STEP_BACK:
@@ -106,6 +112,9 @@ bool dsk_command(dsk_model_t *m, dsk_command_t command, unsigned value)
             s->item = DSK_CLIPS + next;
         }
         m->playing = false;
+        m->subframe = 0;
+        m->start_sample = s->frame * m->motion_steps;
+        m->last_tick = m->clock_us;
         break;
     }
     default:
@@ -114,19 +123,15 @@ bool dsk_command(dsk_model_t *m, dsk_command_t command, unsigned value)
     return true;
 }
 
-static int64_t clip_period(uint8_t clip)
-{
-    return (1000000 + rates[clip] - 1) / rates[clip];
-}
-
 void dsk_advance(dsk_model_t *m, int64_t now)
 {
-    if (m->shown.item < DSK_CLIPS && m->playing &&
-        now - m->last_tick >= clip_period(m->shown.item)) {
-        /* The reference rAF loop advances one frame and timestamps it with
-         * the observed tick, including after resuming a paused clip. */
-        m->shown.frame = (m->shown.frame + 1) % counts[m->shown.item];
-        m->last_tick = now;
+    m->clock_us = now;
+    if (m->shown.item < DSK_CLIPS && m->playing && now >= m->last_tick) {
+        unsigned rate = rates[m->shown.item] * m->motion_steps;
+        uint64_t tick = (uint64_t)(now - m->last_tick) * rate / 1000000;
+        unsigned sample = (unsigned)((m->start_sample + tick) % (counts[m->shown.item] * m->motion_steps));
+        m->shown.frame = sample / m->motion_steps;
+        m->subframe = sample % m->motion_steps;
     }
     unsigned offset = dsk_curve_at(m->float_edges, m->bubble_steps, HALF_FLOAT_US,
                                    now - m->float_origin, NULL);
@@ -137,8 +142,12 @@ void dsk_advance(dsk_model_t *m, int64_t now)
 int64_t dsk_next_update(const dsk_model_t *m, int64_t now)
 {
     int64_t next = INT64_MAX;
-    if (m->shown.item < DSK_CLIPS && m->playing)
-        next = m->last_tick + clip_period(m->shown.item);
+    if (m->shown.item < DSK_CLIPS && m->playing) {
+        unsigned rate = rates[m->shown.item] * m->motion_steps;
+        int64_t elapsed = now >= m->last_tick ? now - m->last_tick : 0;
+        int64_t tick = elapsed * rate / 1000000 + 1;
+        next = m->last_tick + (tick * 1000000 + rate - 1) / rate;
+    }
     if (m->bubble_steps > 1) {
         uint32_t delta;
         dsk_curve_at(m->float_edges, m->bubble_steps, HALF_FLOAT_US, now - m->float_origin, &delta);

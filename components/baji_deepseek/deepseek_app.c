@@ -17,6 +17,7 @@ struct deepseek_app {
     dsh_motion_t motion;
     dsh_canvas_t hd_canvas;
     dsh_view_t selected_hd;
+    unsigned selected_hd_mix;
     bool hd_initialized, hd_selected;
     baji_damage_t pending;
     baji_board_t *board;
@@ -36,13 +37,16 @@ static esp_err_t prepare_hd(deepseek_app_t *app)
 {
     dsh_view_t view = app->ui.hd;
     if (!app->hd_initialized) {
+        dsk_canvas_release_motion(&app->canvas);
         if (!dsh_canvas_init(&app->hd_canvas, &app->hd)) return ESP_ERR_NO_MEM;
         if (app->motion.count) dsh_canvas_set_motion(&app->hd_canvas, &app->motion);
         app->hd_initialized = true;
         full_screen(app);
     }
-    if (app->hd_selected && !memcmp(&app->selected_hd, &view, sizeof(view))) return ESP_OK;
-    if (!dsh_canvas_select(&app->hd_canvas, view)) {
+    unsigned mix = view.gallery ? 0 : app->ui.breath_mix;
+    if (app->hd_selected && app->selected_hd_mix == mix &&
+        !memcmp(&app->selected_hd, &view, sizeof(view))) return ESP_OK;
+    if (!dsh_canvas_select_blend(&app->hd_canvas, view, mix)) {
         /* A failed decode can already have released the previous image.
          * Force reselection even if the next input goes back to that pose. */
         app->hd_selected = false;
@@ -50,8 +54,16 @@ static esp_err_t prepare_hd(deepseek_app_t *app)
         return ESP_FAIL;
     }
     if (!app->hd_selected || view.gallery || app->selected_hd.gallery) full_screen(app);
-    else baji_damage_mark(&app->pending, 63, 63, 340, 340);
+    else if (view.item != app->selected_hd.item || view.guides != app->selected_hd.guides)
+        baji_damage_mark(&app->pending, DSH_INSET, DSH_INSET, DSH_STAGE, DSH_STAGE);
+    else {
+        baji_rect_t areas[DSH_DAMAGE_STRIPS];
+        unsigned from = app->selected_hd.breath * 8 + app->selected_hd_mix;
+        unsigned n = dsh_canvas_motion_damage(&app->hd_canvas, from, areas);
+        for (unsigned i = 0; i < n; i++) baji_damage_add(&app->pending, areas[i]);
+    }
     app->selected_hd = view;
+    app->selected_hd_mix = mix;
     app->hd_selected = true;
     return ESP_OK;
 }
@@ -65,8 +77,9 @@ static esp_err_t prepare_pixel(deepseek_app_t *app)
     }
     dsk_frame_t frame = app->ui.pixel.shown;
     unsigned mix = app->ui.pixel.bubble_mix;
-    if (!dsk_canvas_damage_blend(&app->canvas, frame, mix, mark, &app->pending) ||
-        !dsk_canvas_select_blend(&app->canvas, frame, mix)) return ESP_ERR_INVALID_STATE;
+    unsigned sub = app->ui.pixel.subframe;
+    if (!dsk_canvas_damage_motion(&app->canvas, frame, mix, sub, mark, &app->pending) ||
+        !dsk_canvas_select_motion(&app->canvas, frame, mix, sub)) return ESP_ERR_INVALID_STATE;
     return ESP_OK;
 }
 
@@ -114,6 +127,7 @@ esp_err_t deepseek_app_open_motion(deepseek_app_t **out, baji_board_t *board, co
      * presentation boundary; deterministic replay may supply its own clock. */
     if (now < 0) now = esp_timer_get_time();
     dsk_controls_init(&app->ui, app->pixel.bubble_steps, hd != NULL, now);
+    app->ui.pixel.motion_steps = dsk_art_motion_steps(&app->pixel);
     baji_damage_init(&app->pending, info->width, info->height);
     *out = app;
     return ESP_OK;
@@ -129,6 +143,7 @@ void deepseek_app_close(deepseek_app_t *app)
 {
     if (!app) return;
     if (app->hd_initialized) dsh_canvas_close(&app->hd_canvas);
+    dsk_canvas_release_motion(&app->canvas);
     dsk_art_close(&app->pixel);
     free(app);
 }

@@ -8,7 +8,7 @@ void dsk_controls_init(dsk_controls_t *ui, unsigned steps, bool hd_available, in
 {
     *ui = (dsk_controls_t){.hd_available = hd_available, .breathing = true, .breath_origin = now};
     ui->hd.guides = true;
-    dsk_curve_edges(ui->breath_edges, 17, BREATH_HALF_US);
+    dsk_curve_edges(ui->breath_edges, 129, BREATH_HALF_US);
     dsk_model_init(&ui->pixel, steps, now);
     dsk_model_smooth_bubble(&ui->pixel);
 }
@@ -105,8 +105,10 @@ int64_t dsk_controls_tick(dsk_controls_t *ui, uint32_t presses, uint16_t px, uin
     else if (!ui->hd.gallery) {
         uint32_t delta = 0;
         int64_t time = ui->breathing ? now : ui->freeze_time;
-        ui->hd.breath = dsk_curve_at(ui->breath_edges, 17, BREATH_HALF_US,
+        unsigned phase = dsk_curve_at(ui->breath_edges, 129, BREATH_HALF_US,
                                       time - ui->breath_origin, &delta);
+        ui->hd.breath = phase / 8;
+        ui->breath_mix = phase % 8;
         if (ui->breathing) next = now + delta;
     }
     if (g->active && ui->hd_available && !ui->hold_cancelled && ui->press_time + HOLD_US < next)

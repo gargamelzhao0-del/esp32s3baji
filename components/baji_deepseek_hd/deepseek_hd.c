@@ -1,4 +1,5 @@
 #include "baji_deepseek_hd.h"
+#include "hd_playback.h"
 #include "esp_heap_caps.h"
 #include "esp_rom_crc.h"
 #include "miniz.h"
@@ -181,6 +182,7 @@ static void release_motion_page(dsh_canvas_t *c)
 void dsh_canvas_set_motion(dsh_canvas_t *c, const dsh_motion_t *motion)
 {
     if (!c) return;
+    dsh_playback_release(c);
     if (motion != c->motion) release_motion_page(c);
     c->motion = motion;
     c->exact_id = MISSING;
@@ -221,13 +223,13 @@ static void select_gallery(dsh_canvas_t *c, dsh_view_t v)
     gallery_axis(c->sample_y, h, dh, v.pan_y, v.zoom);
 }
 
-static void select_breath(dsh_canvas_t *c, unsigned step)
+static void select_breath(dsh_canvas_t *c, unsigned eighths)
 {
     /* Inverse CSS translateY(-4px) scaleY(1.015) about the image centre,
      * evaluated once per row at pixel centres. Source and stage share x. */
     for (int y = 0; y < DSH_STAGE; y++) {
         int centre = (DSH_STAGE - 1) * 128;
-        int y256 = centre + (y * 256 - centre + (int)step * 64) * 3200 / (3200 + 3 * (int)step);
+        int y256 = centre + (y * 256 - centre + (int)eighths * 8) * 25600 / (25600 + 3 * (int)eighths);
         y256 = clamp(y256, 0, (DSH_STAGE - 1) * 256);
         c->sample_y[y] = y256 / 256;
         c->weight[y] = y256 % 256;
@@ -303,8 +305,12 @@ bool dsh_canvas_select(dsh_canvas_t *c, dsh_view_t v)
 {
     if (!c || !c->art || v.item >= 18 || v.sheet >= 4 || v.breath > 16 ||
         v.zoom > 1 || v.pan_x < -100 || v.pan_x > 100 || v.pan_y < -100 || v.pan_y > 100) return false;
+    c->playing_sample = false;
+    c->fractional_breath = false;
+    if (v.gallery) dsh_playback_release(c);
     unsigned id = v.gallery ? (unsigned)FIRST_SHEET + v.sheet :
                   v.item < 6 ? v.item + 1u : v.item == 6 ? 1u : v.item;
+    if (c->compact && c->image_id != id) dsh_compact_release(c);
     if (!v.gallery && v.breath && c->motion) {
         unsigned key = (id - 1) * LEVELS + v.breath - 1;
         if (key >= c->motion->first && key - c->motion->first < c->motion->count) {
@@ -322,26 +328,24 @@ bool dsh_canvas_select(dsh_canvas_t *c, dsh_view_t v)
         c->exact = NULL;
     }
     if (!select_image(c, id)) return false;
-    if (!v.gallery && v.breath && !c->background && !(c->background = unpack(c, 0))) return false;
+    if (!v.gallery && v.breath && !c->compact && !c->background && !(c->background = unpack(c, 0))) return false;
     c->view = v;
     if (v.gallery) select_gallery(c, v);
-    else select_breath(c, v.breath);
+    else select_breath(c, 8 * v.breath);
     return true;
 }
 
-static inline unsigned mix565(unsigned a, unsigned b, unsigned weight)
+bool dsh_select_compact(dsh_canvas_t *c, dsh_view_t v, unsigned mix)
 {
-    if (!weight || a == b) return a;
-    // Separate R and B with a spare byte so both lanes can be rounded together.
-    unsigned inv = 256 - weight;
-    uint32_t a_rb = ((a >> 11) << 16) | (a & 31);
-    uint32_t b_rb = ((b >> 11) << 16) | (b & 31);
-    uint32_t rb = (a_rb * inv + b_rb * weight + 0x800080) >> 8;
-    unsigned g = (((a >> 5 & 63) * inv + (b >> 5 & 63) * weight + 128) >> 8);
-    return ((rb >> 16) << 11) | (g << 5) | (rb & 31);
+    if (!dsh_canvas_select(c, v)) return false;
+    if (!mix) return true;
+    if (!c->compact && !c->background && !(c->background = unpack(c, 0))) return false;
+    select_breath(c, 8 * v.breath + mix);
+    c->fractional_breath = true;
+    return true;
 }
 
-static unsigned move_sample(unsigned color, unsigned alpha, unsigned bg_src, unsigned bg_dst)
+unsigned dsh_compensate(unsigned color, unsigned alpha, unsigned bg_src, unsigned bg_dst)
 {
     if (alpha == 255 || bg_src == bg_dst) return color;
     if (!alpha) return bg_dst;
@@ -360,14 +364,14 @@ static inline unsigned pose_pixel(const dsh_canvas_t *c, int x, int y)
     const bool horizontal = y == 326 && x >= 1 && x < DSH_STAGE - 1;
     int p = c->sample_y[y] * DSH_STAGE + x;
     unsigned w = c->weight[y], bg = c->background[at];
-    unsigned color = move_sample(c->image[p], alpha[p], c->background[p], bg);
+    unsigned color = dsh_compensate(c->image[p], alpha[p], c->background[p], bg);
     if (w) {
         p += DSH_STAGE;
-        unsigned other = move_sample(c->image[p], alpha[p], c->background[p], bg);
-        color = mix565(color, other, w);
+        unsigned other = dsh_compensate(c->image[p], alpha[p], c->background[p], bg);
+        color = dsh_mix565(color, other, w);
     }
-    if (c->view.guides && vertical) color = mix565(color, 0x8f1b, 141);
-    if (c->view.guides && horizontal) color = mix565(color, 0xf6d3, 166);
+    if (c->view.guides && vertical) color = dsh_mix565(color, 0x8f1b, 141);
+    if (c->view.guides && horizontal) color = dsh_mix565(color, 0xf6d3, 166);
     return color;
 }
 
@@ -428,14 +432,23 @@ static void paint_captured(const baji_rect_t *b, uint8_t *dst, const uint16_t *i
 void dsh_paint(const baji_rect_t *band, uint8_t *pixels, void *opaque)
 {
     const dsh_canvas_t *c = opaque;
-    if (!c || !c->art || (!c->image && c->exact_id == MISSING) || !pixels || !band || band->x + band->width > DSH_PANEL ||
+    if (!c || !c->art || !pixels || !band || band->x + band->width > DSH_PANEL ||
         band->y + band->height > DSH_PANEL) return;
-    if (!c->view.gallery && (c->exact_id != MISSING || !c->view.breath)) {
+    if (c->playing_sample) {
+        dsh_playback_paint(band, pixels, c);
+        return;
+    }
+    if (!c->image && c->exact_id == MISSING) return;
+    if (!c->view.gallery && (c->exact_id != MISSING || (!c->view.breath && !c->fractional_breath))) {
         unsigned n = DSH_STAGE * DSH_STAGE;
         bool exact = c->exact_id != MISSING;
         const uint16_t *src = exact ? c->exact : c->image;
         const uint16_t *guides = exact ? src + n : src + n * 3 / 2;
-        paint_captured(band, pixels, src, c->view.guides ? guides : NULL, exact && c->motion->wire);
+        paint_captured(band, pixels, src, c->view.guides ? guides : NULL, exact ? c->motion->wire : c->compact != NULL);
+        return;
+    }
+    if (c->compact && !c->view.gallery && c->exact_id == MISSING) {
+        dsh_compact_paint(band, pixels, c);
         return;
     }
     for (unsigned y = band->y; y < band->y + band->height; y++) {
@@ -457,6 +470,7 @@ void dsh_paint(const baji_rect_t *band, uint8_t *pixels, void *opaque)
 void dsh_canvas_close(dsh_canvas_t *c)
 {
     if (!c) return;
+    dsh_playback_release(c);
     heap_caps_free(c->image);
     heap_caps_free(c->background);
     heap_caps_free(c->exact);

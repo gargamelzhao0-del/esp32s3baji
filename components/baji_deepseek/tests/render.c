@@ -32,13 +32,14 @@ static uint8_t *load(const char *path, size_t *size)
 int main(int argc, char **argv)
 {
     bool blended = argc > 1 && strcmp(argv[1], "--blend") == 0;
-    if (blended) { argv++; argc--; }
+    bool moving = argc > 1 && strcmp(argv[1], "--motion") == 0;
+    if (blended || moving) { argv++; argc--; }
     if (argc < 2 || argc > 3) return 2;
     size_t size = 0;
     uint8_t *data = load(argv[1], &size);
     dsk_art_t art;
     if (!dsk_art_open(&art, data, size)) {
-        fputs("invalid or unavailable DSK2 pack\n", stderr);
+        fputs("invalid or unavailable scene pack\n", stderr);
         free(data);
         return 1;
     }
@@ -52,14 +53,15 @@ int main(int argc, char **argv)
             crc = (crc >> 1) ^ ((0u - (crc & 1u)) & 0xedb88320u);
         table[i] = crc;
     }
-    unsigned item, frame, phase, closeup, bubble, mix = 0;
+    unsigned item, frame, phase, closeup, bubble, mix = 0, sub = 0;
     int status = 0, fields;
-    int expected = blended ? 6 : 5;
-    while ((fields = blended ? scanf("%u%u%u%u%u%u", &item, &frame, &phase, &closeup, &bubble, &mix) :
+    int expected = moving ? 7 : blended ? 6 : 5;
+    while ((fields = moving ? scanf("%u%u%u%u%u%u%u", &item, &frame, &phase, &closeup, &bubble, &mix, &sub) :
+                     blended ? scanf("%u%u%u%u%u%u", &item, &frame, &phase, &closeup, &bubble, &mix) :
                                scanf("%u%u%u%u%u", &item, &frame, &phase, &closeup, &bubble)) == expected) {
         if (item >= DSK_ITEMS || frame > 255 || phase >= DSK_PHASES ||
             closeup > 1 || bubble >= art.bubble_steps ||
-            !dsk_canvas_select_blend(&canvas, (dsk_frame_t){item, frame, phase, closeup, bubble}, mix)) {
+            !dsk_canvas_select_motion(&canvas, (dsk_frame_t){item, frame, phase, closeup, bubble}, mix, sub)) {
             fputs("invalid selection\n", stderr);
             status = 2;
             break;
@@ -73,6 +75,7 @@ int main(int argc, char **argv)
     if (fields != EOF && fields != expected) status = 2;
     if (raw && fclose(raw) != 0) status = 1;
     if (fflush(stdout) != 0) status = 1;
+    dsk_canvas_release_motion(&canvas);
     dsk_art_close(&art);
     free(data);
     return status;

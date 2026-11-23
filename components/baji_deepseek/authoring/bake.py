@@ -92,7 +92,7 @@ class Pack:
             crc = zlib.crc32(panel.tobytes())
             self.goldens.append(f"{phase} {view} {pose} {bubble} {crc:08x}\n")
 
-    def save(self, output, goldens):
+    def save(self, output, goldens, web, browser):
         frames = len(PHASES) * len(VIEWS) * POSES
         if len(self.maps) != frames * STEPS * COLS * 2:
             raise ValueError("Incomplete set of browser captures")
@@ -100,10 +100,12 @@ class Pack:
         data = self.maps + self.rows.ids(3) + q16.ids(3) + q8.ids(3) + q4.ids(2) + q2.data
         counts = [len(d.codebook) for d in [*self.quads, self.rows]]
         header = struct.pack("<4s9I", b"DSK2", STEPS, frames, *counts, len(data), zlib.crc32(data))
-        output.write_bytes(header + data)
+        from motion import chrome_layers, controls_and_art, pack
+        result = pack(header + data, *controls_and_art(web), *chrome_layers(web, browser))
+        output.write_bytes(result)
         goldens.write_text("".join(self.goldens), encoding="ascii", newline="\n")
-        print(f"{len(data) + len(header):,} bytes, dictionary sizes {counts}, "
-              f"SHA256 {hashlib.sha256(header + data).hexdigest()}")
+        print(f"{len(result):,} DSK3 bytes, anchor dictionary sizes {counts}, "
+              f"SHA256 {hashlib.sha256(result).hexdigest()}")
 
 
 def capture(url, browser_path, manifest, pack):
@@ -178,7 +180,7 @@ def main():
             pack = Pack()
             url = f"http://127.0.0.1:{server.server_port}/pixel/deepseek/v1/review.html"
             capture(url, args.browser, manifest, pack)
-            pack.save(args.output, args.goldens)
+            pack.save(args.output, args.goldens, args.web, args.browser)
         finally:
             server.shutdown()
             thread.join()

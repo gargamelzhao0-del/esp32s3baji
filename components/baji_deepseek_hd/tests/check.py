@@ -25,6 +25,8 @@ class View(ct.Structure):
 def build(folder):
     for name in ["esp_heap_caps.h", "esp_rom_crc.h", "miniz.h"]:
         (folder / name).write_text('#include "host.h"\n')
+    (folder / "esp_heap_caps.h").write_text('#include "host.h"\n'
+        'void *limited_alloc(size_t, unsigned);\n#define heap_caps_malloc limited_alloc\n')
     (folder / "esp_partition.h").write_text('#include "partition_host.h"\n')
     shim = folder / "shim.c"
     shim.write_text("""
@@ -32,6 +34,13 @@ def build(folder):
 #include "baji_deepseek_hd.h"
 inflate_fn inflate_host;
 checksum_fn checksum_host;
+static int deny_stage;
+void deny_cache(int deny) {deny_stage = deny;}
+void *limited_alloc(size_t size, unsigned flags) {
+    (void)flags;
+    if (deny_stage && size >= 300000 && size <= 340000) return NULL;
+    return malloc(size);
+}
 void hooks(inflate_fn inf, checksum_fn crc) {inflate_host=inf; checksum_host=crc;}
 size_t canvas_size(void) {return sizeof(dsh_canvas_t);}
 size_t art_size(void) {return sizeof(dsh_art_t);}
@@ -39,9 +48,10 @@ size_t motion_size(void) {return sizeof(dsh_motion_t);}
 """)
     target = folder / ("hd.dll" if os.name == "nt" else "hd.so")
     subprocess.run([os.environ.get("CC", "gcc"), "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
-                    "-fPIC", "-shared", "-DESP_PLATFORM", "-I", folder, "-I", HERE,
+                    "-fPIC", "-shared", "-DESP_PLATFORM", "-DDSH_HOST_TEST", "-I", folder, "-I", HERE,
                     "-I", PET_TEST, "-I", COMPONENT / "include", "-I", COMPONENT.parent / "baji_graphics/include",
-                    COMPONENT / "deepseek_hd.c", HERE / "partition_host.c", shim, "-o", target], check=True)
+                    COMPONENT / "deepseek_hd.c", COMPONENT / "hd_playback.c", COMPONENT / "hd_compact.c",
+                    HERE / "partition_host.c", shim, "-o", target], check=True)
     lib = ct.CDLL(str(target))
     lib.hooks.argtypes = [host.inflate_fn, host.checksum_fn]
     lib.hooks(host.inflate, host.crc)
@@ -51,11 +61,15 @@ size_t motion_size(void) {return sizeof(dsh_motion_t);}
     for fn, args in [(lib.dsh_art_open, [ct.c_void_p, ct.c_void_p, ct.c_size_t]),
                      (lib.dsh_canvas_init, [ct.c_void_p, ct.c_void_p]),
                      (lib.dsh_canvas_select, [ct.c_void_p, View]),
+                     (lib.dsh_canvas_select_blend, [ct.c_void_p, View, ct.c_uint]),
+                     (lib.dsh_select_compact, [ct.c_void_p, View, ct.c_uint]),
                      (lib.dsh_motion_open, [ct.c_void_p, ct.c_void_p, ct.c_size_t]),
                      (lib.dsh_motion_open_frame, [ct.c_void_p, ct.c_uint, ct.c_uint, ct.c_uint,
                                                   ct.c_void_p, ct.c_size_t])]:
         fn.argtypes, fn.restype = args, ct.c_bool
     lib.dsh_paint.argtypes = [ct.POINTER(host.Rect), ct.c_void_p, ct.c_void_p]
+    lib.dsh_canvas_motion_damage.argtypes = [ct.c_void_p, ct.c_uint, ct.POINTER(host.Rect)]
+    lib.dsh_canvas_motion_damage.restype = ct.c_uint
     lib.dsh_canvas_close.argtypes = [ct.c_void_p]
     lib.dsh_canvas_set_motion.argtypes = [ct.c_void_p, ct.c_void_p]
     lib.dsh_partition_motion_open.argtypes = [ct.c_void_p]
@@ -121,6 +135,39 @@ def run(lib, update, ram):
         assert not lib.dsh_canvas_select(canvas, View(item=18))
         persist("poses.crc", poses)
         persist("sheets.crc" if ram else "sheets-native.crc", sheets)
+        if ram:
+            baseline = ct.create_string_buffer(lib.canvas_size())
+            assert lib.dsh_canvas_init(baseline, art)
+            stage = host.Rect(63, 63, 340, 340)
+            try:
+                for item in range(18):
+                    for guide in (False, True):
+                        for phase in (*range(0, 129, 8), 3, 39, 75, 121):
+                            v = View(item=item, breath=phase//8, guides=guide)
+                            assert lib.dsh_select_compact(baseline, v, phase%8)
+                            assert lib.dsh_canvas_select_blend(canvas, v, phase%8)
+                            expected = ct.create_string_buffer(340*340*2)
+                            lib.dsh_paint(ct.byref(stage), expected, baseline)
+                            assert paint(stage) == expected.raw, (item, guide, phase)
+            finally:
+                lib.dsh_canvas_close(baseline)
+            print("Compact row routing matches the full per-pixel CSS transform for 756 stage selections")
+            view = View(item=1)
+            assert lib.dsh_canvas_select(canvas, view)
+            resting = paint(stage)
+            lib.deny_cache(1)
+            try:
+                assert lib.dsh_canvas_select_blend(canvas, view, 3)
+                assert paint(stage) != resting
+                assert lib.dsh_canvas_select_blend(canvas, view, 0)
+                assert paint(stage) == resting
+                view.breath = 7
+                assert lib.dsh_canvas_select_blend(canvas, view, 0)
+                compact = paint(stage)
+                assert lib.dsh_canvas_select(canvas, view)
+                assert paint(stage) == compact
+            finally:
+                lib.deny_cache(0)
         print("36 resting stages match browser RGB565, 612 breathing/guide frames and 16 gallery views checked")
         if not ram:
             check_exact(lib, canvas, render, paint)
@@ -188,6 +235,49 @@ def check_exact(lib, canvas, render, paint):
                 image = render(View(item=item, breath=level, guides=guides))
                 assert zlib.crc32(paint(stage)) == golden[key], key
                 assert image[:466 * 2 * 63] == bytes(466 * 2 * 63)
+    # Motion anchors are browser captures, including the separately overlaid guide pixels.
+    # Test the interpolated painter through an odd subrectangle crossing both guides.
+    patch = host.Rect(63 + 151, 63 + 315, 27, 18)
+    for item in range(18):
+        entry = item + 1 if item < 6 else 1 if item == 6 else item
+        for g in (False, True):
+            for level in range(17):
+                view = View(item=item, breath=level, guides=g)
+                assert lib.dsh_canvas_select_blend(canvas, view, 0)
+                assert zlib.crc32(paint(stage)) == golden[entry, level, int(g)]
+            for level in (0, 3, 12, 15):
+                v = View(item=item, breath=level, guides=g)
+                assert lib.dsh_canvas_select_blend(canvas, v, 0)
+                left = [p[0] for p in struct.iter_unpack(">H", paint(patch))]
+                assert lib.dsh_canvas_select_blend(canvas, View(item=item, breath=level+1, guides=g), 0)
+                right = [p[0] for p in struct.iter_unpack(">H", paint(patch))]
+                mix = 1 + (level + item) % 7
+                assert lib.dsh_canvas_select_blend(canvas, v, mix)
+                def channel(a, b, shift, mask):
+                    return ((((a >> shift & mask)*(8-mix) + (b >> shift & mask)*mix + 4)//8) << shift)
+                expected = b"".join(struct.pack(">H", channel(a,b,11,31) | channel(a,b,5,63) | channel(a,b,0,31))
+                                    for a,b in zip(left,right))
+                assert paint(patch) == expected
+            # Apply just the marked bands to a retained display. A jump may
+            # cross several anchor pairs or reverse at the end of a breath.
+            phases = (0, 5, 8, 11, 78, 126, 128, 113, 76, 0)
+            retained = None
+            for idx, phase in enumerate(phases):
+                view = View(item=item, breath=phase//8, guides=g)
+                assert lib.dsh_canvas_select_blend(canvas, view, phase%8)
+                latest = paint(stage)
+                if retained is None:
+                    retained = bytearray(latest)
+                    continue
+                boxes = (host.Rect * 10)()
+                count = lib.dsh_canvas_motion_damage(canvas, phases[idx-1], boxes)
+                assert count <= len(boxes)
+                for box in boxes[:count]:
+                    for y in range(box.y-63, box.y-63+box.height):
+                        start = 2*(y*340+box.x-63)
+                        end = start + 2*box.width
+                        retained[start:end] = latest[start:end]
+                assert retained == latest, (item, g, phase)
     # A qualifier may supply a single random-access page. Exercise XOR mode
     # with a real browser frame even when the shipping pack fits direct frames.
     entry, item, level = 2, 1, 9

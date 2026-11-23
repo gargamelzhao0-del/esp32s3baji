@@ -49,6 +49,9 @@ typedef struct {
     uint16_t *background, *image;
     unsigned image_id, width, height;
     dsh_view_t view;
+    struct dsh_playback *playback;
+    struct dsh_compact *compact;
+    bool playing_sample, fractional_breath;
     uint16_t sample_x[DSH_PANEL], sample_y[DSH_PANEL], weight[DSH_STAGE];
 } dsh_canvas_t;
 
@@ -57,6 +60,17 @@ bool dsh_canvas_init(dsh_canvas_t *canvas, const dsh_art_t *art);
 /* Call again when replacing the contents of a borrowed single-frame page. */
 void dsh_canvas_set_motion(dsh_canvas_t *canvas, const dsh_motion_t *motion);
 bool dsh_canvas_select(dsh_canvas_t *canvas, dsh_view_t view);
+/* mix/8 advances from the selected reference displacement towards the next.
+ * Caches only the active pose. Gallery selections release the pose cache. */
+bool dsh_canvas_select_blend(dsh_canvas_t *canvas, dsh_view_t view, unsigned mix);
+/* Use after selecting another displacement of the same pose with the same
+ * guides. Boxes cover every changed stage pixel, including skipped levels. */
+enum { DSH_DAMAGE_STRIPS = 10 };
+unsigned dsh_canvas_motion_damage(dsh_canvas_t *canvas, unsigned previous_phase,
+                                  baji_rect_t areas[DSH_DAMAGE_STRIPS]);
+/* Register one complete pose from individually supplied compressed pages.
+ * The caller retains the 16 page descriptors and their bytes until detach. */
+bool dsh_canvas_seed_motion(dsh_canvas_t *canvas, unsigned item, const dsh_motion_t pages[16]);
 void dsh_paint(const baji_rect_t *band, uint8_t *pixels, void *canvas);
 void dsh_canvas_close(dsh_canvas_t *canvas);
 const void *dsh_builtin(size_t *bytes);

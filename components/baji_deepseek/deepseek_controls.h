@@ -9,7 +9,8 @@ typedef struct {
     bool hd_available, hd_mode, hold_cancelled, breathing;
     int8_t start_pan_x, start_pan_y;
     int64_t press_time, breath_origin, freeze_time;
-    uint32_t breath_edges[17];
+    uint8_t breath_mix;
+    uint32_t breath_edges[129];
 } dsk_controls_t;
 
 void dsk_controls_init(dsk_controls_t *ui, unsigned bubble_steps, bool hd_available, int64_t now);

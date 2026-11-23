@@ -42,13 +42,21 @@ void dsh_canvas_set_motion(dsh_canvas_t *c, const dsh_motion_t *m)
 {
     c->motion = m;
 }
-bool dsh_canvas_select(dsh_canvas_t *c, dsh_view_t view)
+bool dsh_canvas_select_blend(dsh_canvas_t *c, dsh_view_t view, unsigned mix)
 {
+    (void)mix;
     c->image = NULL;
     if (fail_decode) { fail_decode = false; return false; }
     c->view = view;
     c->image = &token;
     return true;
+}
+unsigned dsh_canvas_motion_damage(dsh_canvas_t *c, unsigned from, baji_rect_t areas[DSH_DAMAGE_STRIPS])
+{
+    (void)c;
+    (void)from;
+    areas[0] = (baji_rect_t){DSH_INSET, DSH_INSET, DSH_STAGE, DSH_STAGE};
+    return 1;
 }
 void dsh_canvas_close(dsh_canvas_t *c)
 {

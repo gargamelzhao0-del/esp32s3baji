@@ -56,20 +56,20 @@ int main(void)
     assert(!ui.hd.guides);
     tap(230, 400);
     assert(!ui.breathing);
-    unsigned pose = ui.hd.breath;
-    assert(contact(false, 230, 400, 1500000) == INT64_MAX && ui.hd.breath == pose);
+    unsigned pose = ui.hd.breath * 8 + ui.breath_mix;
+    assert(contact(false, 230, 400, 1500000) == INT64_MAX && ui.hd.breath * 8u + ui.breath_mix == pose);
     tap(230, 395);
-    assert(ui.breathing && ui.hd.breath == pose);
+    assert(ui.breathing && ui.hd.breath * 8u + ui.breath_mix == pose);
     assert(contact(false, 230, 395, 1) > now);
-    bool seen[17] = {0};
+    bool seen[129] = {0};
     int64_t until = now + 2800000;
     while (now < until) {
         int64_t next = contact(false, 230, 395, 0);
-        seen[ui.hd.breath] = true;
+        seen[ui.hd.breath * 8 + ui.breath_mix] = true;
         assert(next > now);
         now = next;
     }
-    for (int i = 0; i < 17; i++) assert(seen[i]);
+    for (int i = 0; i < 129; i++) assert(seen[i]);
     tap(78, 220);
     assert(ui.hd.item == 6);
     tap(78, 220);
@@ -102,6 +102,6 @@ int main(void)
     contact(true, 233, 233, 500000);
     assert(!ui.hd_mode); /* Movement cancelled long press, even after returning. */
     contact(false, 233, 233, 1000);
-    puts("Dual-mode long press, 17 breathing levels, all linked poses, guides, four sheets and zoom/pan passed");
+    puts("Dual-mode long press, 129 breathing positions, all linked poses, guides, four sheets and zoom/pan passed");
     return 0;
 }

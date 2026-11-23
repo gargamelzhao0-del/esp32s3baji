@@ -14,11 +14,11 @@ static void motion(void)
         dsk_model_init(&m, 7, 300);
         assert(dsk_command(&m, DSK_SELECT_CLIP, clip));
         unsigned fps = dsk_clip_fps(clip), n = dsk_clip_frames(clip);
-        int64_t period = (1000000 + fps - 1) / fps;
         for (unsigned i = 1; i <= n; i++) {
-            dsk_advance(&m, 300 + i * period - 1);
+            int64_t due = 300 + ((int64_t)i * 1000000 + fps - 1) / fps;
+            dsk_advance(&m, due - 1);
             assert(m.shown.frame == i - 1);
-            dsk_advance(&m, 300 + i * period);
+            dsk_advance(&m, due);
             assert(m.shown.frame == i % n);
         }
     }
@@ -66,6 +66,22 @@ static void motion(void)
         unsigned position = i <= 48 ? i : 96 - i;
         assert(m.shown.bubble == position / 8 && m.bubble_mix == position % 8);
     }
+    dsk_model_init(&m, 1, 0);
+    m.motion_steps = 8;
+    for (unsigned i = 0; i < 800; i++) {
+        int64_t now = (int64_t)i * 17000; /* An independent panel oscillator. */
+        dsk_advance(&m, now);
+        unsigned phase = now * 56 / 1000000 % 96;
+        assert(m.shown.frame == phase/8 && m.subframe == phase%8);
+        assert(dsk_next_update(&m, now) > now);
+    }
+    dsk_command(&m, DSK_TOGGLE_PLAY, 0);
+    unsigned frozen = m.shown.frame * 8 + m.subframe;
+    dsk_advance(&m, m.clock_us + 20000000);
+    assert(m.shown.frame * 8u + m.subframe == frozen);
+    dsk_command(&m, DSK_TOGGLE_PLAY, 0);
+    dsk_advance(&m, m.clock_us + 18000);
+    assert(m.shown.frame * 8u + m.subframe == (frozen + 1) % 96);
 }
 
 static void gestures(void)
@@ -123,6 +139,81 @@ static void apply(baji_rect_t area, dsk_canvas_t *c)
         memcpy(retained + ((area.y + y) * DSK_SIDE + area.x) * 2,
                band + y * area.width * 2, area.width * 2);
 }
+
+/* The panel retains its previous image. Change cloud and pose clocks
+ * independently, repaint only the reported rectangles and compare the full
+ * retained GRAM to a fresh paint, including quiescent / skipped samples. */
+static void sprite_motion(dsk_canvas_t *canvas)
+{
+    unsigned steps = dsk_art_motion_steps(canvas->art);
+    dsk_frame_t zero = {0};
+    assert(!dsk_canvas_select_motion(canvas,zero,0,steps));
+    if (steps == 1) return;
+    assert(!dsk_canvas_select_motion(canvas,(dsk_frame_t){.item = 7},0,1));
+    baji_rect_t full = {0,0,DSK_SIDE,DSK_SIDE};
+    assert(dsk_canvas_select_motion(canvas,zero,0,0));
+    dsk_paint(&full,retained,canvas);
+    unsigned state = 9251;
+    for (unsigned i = 0; i < 240; i++) {
+        state = state*1664525 + 1013904223;
+        unsigned clip = (state>>21)%DSK_CLIPS;
+        dsk_frame_t f = {clip, (state>>16)%dsk_clip_frames(clip), (state>>9)%4,
+                         state%2, (state>>7)%canvas->art->bubble_steps};
+        unsigned mix = (unsigned)f.bubble+1 < canvas->art->bubble_steps ? (state>>3)%8 : 0;
+        unsigned sub = (state>>20)%8;
+        if (i%3 == 1) f = canvas->selected;
+        if ((unsigned)f.bubble+1 == canvas->art->bubble_steps) mix = 0;
+        marked = 0;
+        assert(dsk_canvas_damage_motion(canvas,f,mix,sub,mark,NULL));
+        assert(dsk_canvas_select_motion(canvas,f,mix,sub));
+        for (size_t j = 0; j < marked; j++) apply(regions[j],canvas);
+        dsk_paint(&full,reference,canvas);
+        assert(!memcmp(retained,reference,sizeof(reference)));
+        marked = 0;
+        assert(dsk_canvas_damage_motion(canvas,f,mix,sub,mark,NULL) && !marked);
+        if (i%7 == 0) dsk_canvas_release_motion(canvas);
+    }
+    /* The large white rice mound enters on key 6. Its footprint must stay
+     * empty for all eight samples of key 5: a blended next pose would make
+     * the basin and the old hands overlap before the cut. */
+    baji_rect_t rice = {117,233,18,18};
+    for (unsigned key = 5; key <= 6; key++) {
+        for (unsigned sub = 0; sub < 8; sub++) {
+            assert(dsk_canvas_select_motion(canvas,(dsk_frame_t){1,key,1,0,0},0,sub));
+            dsk_paint(&rice,band,canvas);
+            unsigned white = 0;
+            for (unsigned i = 0; i < rice.width*rice.height; i++) {
+                unsigned rgb = band[2*i]*256u + band[2*i+1];
+                white += (rgb >> 11) > 24 && (rgb >> 5 & 63) > 50 && (rgb & 31) > 22;
+            }
+            assert(white == (key == 5 ? 0u : 324u));
+        }
+    }
+    /* Count separately visible body/prop samples through one whole loop at
+     * the specified original duration, with the speech cloud fixed. */
+    for (unsigned item = 0; item < DSK_CLIPS; item++) {
+        unsigned count = dsk_clip_frames(item), changed = 0;
+        uint16_t old[27*65] = {0};
+        for (unsigned tick = 0; tick <= count*8; tick++) {
+            dsk_frame_t f = {item,tick/8%count,1,0,0};
+            assert(dsk_canvas_select_motion(canvas,f,0,tick%8));
+            dsk_paint(&full,reference,canvas);
+            unsigned sample = 0;
+            bool difference = false;
+            for (unsigned y = 166; y < 382; y += 8)
+                for (unsigned x = 106; x < 366; x += 4) {
+                    const uint8_t *p = reference + 2*(y*DSK_SIDE+x);
+                    uint16_t color = (uint16_t)p[0]<<8 | p[1];
+                    difference |= old[sample] != color;
+                    old[sample++] = color;
+                }
+            if (tick && difference) changed++;
+        }
+        assert(changed*dsk_clip_fps(item) >= count*30);
+    }
+    dsk_canvas_release_motion(canvas);
+}
+
 
 static void canvases(const uint8_t *data, size_t size)
 {
@@ -183,6 +274,7 @@ static void canvases(const uint8_t *data, size_t size)
             }
         }
     }
+    sprite_motion(&c);
     dsk_art_close(&art);
 }
 
