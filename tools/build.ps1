@@ -3,6 +3,7 @@ param(
     [string]$ToolsRoot = 'C:/Espressif',
     [string]$IdfPath,
     [string]$PythonEnvironment,
+    [switch]$BoardCheck,
     [ValidateRange(1, 64)][int]$Jobs = 4
 )
 $ErrorActionPreference = 'Stop'
@@ -25,7 +26,8 @@ $saved = @{}
 foreach ($key in $names) { $saved[$key] = [Environment]::GetEnvironmentVariable($key, 'Process') }
 $aliasDrive = $null
 $root = $projectRoot
-$buildName = 'build-firmware-native'
+$profileName = if ($BoardCheck) { 'g1' } else { 'pet' }
+$buildName = "build-firmware-$profileName-native"
 try {
     # Keep CMake, GCC specs and response files on the same ASCII path.
     # idf.py resolves SUBST back to the Unicode source path before invoking CMake.
@@ -37,7 +39,7 @@ try {
             if ($LASTEXITCODE -ne 0) { continue }
             $aliasDrive = $drive
             $root = $drive + '/'
-            $buildName = 'build-firmware-' + $letter.ToLowerInvariant()
+            $buildName = "build-firmware-$profileName-" + $letter.ToLowerInvariant()
             break
         }
         if (-not $aliasDrive) { throw 'Cannot map the Unicode project path. No free build drive Z: through R:.' }
@@ -62,9 +64,11 @@ try {
 
     # The original preparation sdkconfig lives at the repository root. Each
     # build tree owns its generated config, seeded from the 1.75C defaults.
+    $defaults = "$($root.TrimEnd('/','\'))/sdkconfig.defaults"
+    if ($BoardCheck) { $defaults += ";$($root.TrimEnd('/','\'))/config/sdkconfig.board-check.defaults" }
     & $cmake -G Ninja -S $root -B $buildDir "-DPYTHON=$python" "-DCMAKE_MAKE_PROGRAM=$ninja" `
         -DPYTHON_DEPS_CHECKED=1 -DESP_PLATFORM=1 -DCCACHE_ENABLE=OFF -DIDF_TARGET=esp32s3 `
-        "-DSDKCONFIG=$buildDir/sdkconfig" "-DSDKCONFIG_DEFAULTS=$($root.TrimEnd('/','\'))/sdkconfig.defaults"
+        "-DSDKCONFIG=$buildDir/sdkconfig" "-DSDKCONFIG_DEFAULTS=$defaults"
     if ($LASTEXITCODE -ne 0) { throw 'Firmware CMake configuration failed.' }
     & $cmake --build $buildDir --parallel $Jobs
     if ($LASTEXITCODE -ne 0) { throw 'Firmware compilation failed.' }

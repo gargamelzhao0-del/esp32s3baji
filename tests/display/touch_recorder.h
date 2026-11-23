@@ -4,6 +4,7 @@
 typedef void *i2c_master_bus_handle_t;
 typedef void *i2c_master_dev_handle_t;
 typedef void *SemaphoreHandle_t;
+typedef struct { int token; } StaticSemaphore_t;
 typedef uint32_t TickType_t;
 typedef int BaseType_t;
 #define IRAM_ATTR
@@ -16,6 +17,7 @@ typedef int BaseType_t;
 #define portYIELD_FROM_ISR() ((void)0)
 
 int xSemaphoreGiveFromISR(SemaphoreHandle_t semaphore, BaseType_t *woke);
+SemaphoreHandle_t xSemaphoreCreateBinaryStatic(StaticSemaphore_t *storage);
 int xSemaphoreGive(SemaphoreHandle_t semaphore);
 int xSemaphoreTake(SemaphoreHandle_t semaphore, TickType_t ticks);
 esp_err_t gpio_isr_handler_remove(int pin);

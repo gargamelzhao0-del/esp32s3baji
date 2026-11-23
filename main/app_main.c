@@ -1,4 +1,6 @@
 #include "board_check.h"
+#include "pet_app.h"
+#include "sdkconfig.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -19,8 +21,12 @@ void app_main(void)
         ESP_LOGI("baji", "physical flash=%u bytes", (unsigned)info.flash_bytes);
     else
         ESP_LOGW("baji", "flash size unknown: %s", esp_err_to_name(info.flash_status));
+#ifdef CONFIG_BAJI_BOARD_CHECK
     err = baji_board_check_run(board, &info);
-    ESP_LOGE("baji", "board check stopped: %s", esp_err_to_name(err));
+#else
+    err = pet_app_run(board, &info);
+#endif
+    ESP_LOGE("baji", "display application stopped: %s", esp_err_to_name(err));
     // app_main's task is deleted when it returns. Keep the owner alive until
     // SPI has actually returned its last descriptor and teardown succeeds.
     esp_err_t last_cleanup = ESP_OK;

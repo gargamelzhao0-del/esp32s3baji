@@ -1,0 +1,8 @@
+menu "Electronic badge"
+    config BAJI_BOARD_CHECK
+        bool "Run the G1 hardware check at startup"
+        default n
+        help
+            Show color bars, touch coordinates and power readings in place
+            of the interactive pixel pet.
+endmenu

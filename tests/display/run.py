@@ -22,24 +22,32 @@ with tempfile.TemporaryDirectory(prefix="baji-display-test-") as directory:
         '#include <stdio.h>\n#define ESP_LOGI(tag, ...) ((void)(tag), (void)sizeof(printf(__VA_ARGS__)))\n'
         '#define ESP_LOGW ESP_LOGI\n#define esp_err_to_name(e) "host error"\n', encoding="ascii")
     (build / "esp_timer.h").write_text(
-        '#include <stdint.h>\nstatic inline int64_t esp_timer_get_time(void) { return 0; }\n', encoding="ascii")
+        '#include <stdint.h>\n#ifdef BAJI_HOST_VSYNC\nint64_t esp_timer_get_time(void);\n#else\n'
+        'static inline int64_t esp_timer_get_time(void) { return 0; }\n#endif\n', encoding="ascii")
     compiler = [
         os.environ.get("CC", "gcc"), "-std=c11", "-Wall", "-Wextra", "-Werror",
         "-I", str(build), "-I", str(HERE), "-I", str(COMPONENTS.parent / "main"),
         "-I", str(COMPONENTS / "baji_board_profile/include"),
         "-I", str(COMPONENTS / "baji_display/include"),
         "-I", str(COMPONENTS / "baji_board/include"), "-I", str(COMPONENTS / "baji_peripherals/include"),
+        "-I", str(COMPONENTS / "baji_scene_damage/include"),
+        "-I", str(COMPONENTS / "baji_pet/include"),
     ]
     peripherals = COMPONENTS / "baji_peripherals"
     for name, sources in {
+        "scene_damage_test": [COMPONENTS / "baji_scene_damage/baji_scene_damage.c", HERE / "scene_damage_test.c"],
         "display_test": [
             COMPONENTS / "baji_display/baji_display.c", COMPONENTS / "baji_board/baji_board.c",
             HERE / "display_test.c", HERE / "round_paint_test.c",
         ],
         "touch_init_test": [peripherals / "cst9217.c", HERE / "touch_init_test.c"],
+        "vsync_test": [COMPONENTS / "baji_vsync/baji_vsync.c", HERE / "vsync_test.c"],
+        "pet_player_test": [COMPONENTS.parent / "main/pet_player.c", COMPONENTS / "baji_scene_damage/baji_scene_damage.c",
+                            HERE / "pet_player_test.c"],
         "board_check_paint_test": [COMPONENTS.parent / "main/board_check.c", HERE / "board_check_paint_test.c"],
         "peripheral_decode_test": [peripherals / "test/test_peripheral_decode.c"],
     }.items():
         executable = build / (name + (".exe" if os.name == "nt" else ""))
-        subprocess.run([*compiler, "-I", str(peripherals), *map(str, sources), "-o", str(executable)], check=True)
+        options = ["-DBAJI_HOST_VSYNC", "-I", str(COMPONENTS / "baji_vsync/include")] if name == "vsync_test" else []
+        subprocess.run([*compiler, *options, "-I", str(peripherals), *map(str, sources), "-o", str(executable)], check=True)
         subprocess.run([str(executable)], check=True)

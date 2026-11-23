@@ -4,7 +4,7 @@
 
 本项目让圆屏角色跟随电脑上的 AI Agent 工作：**客户端决定主题，实际模型决定角色，生命周期事件决定姿态；额度、上下文与电量独立显示。**
 
-项目包含 ESP32-S3 板级诊断固件、白龙娘浏览器原型，以及跟随 Codex CLI 事件或 BAJI 快照的本机预览桥。当前固件已实现 CO5300 显示、CST9217 触摸和 AXP2101 电源读取，已通过 ESP-IDF 5.5.4 构建，实机显示、触感和供电表现待验证。[板级接口与上板检查](docs/06-hardware-and-environment.md)
+ESP32-S3 固件默认启动近景像素白龙娘。手指在圆屏上移动时她会看向触点，点按额头会播放一次摸头表演。固件保留 G1 色条、触摸十字和电源诊断入口。浏览器原型可通过本机预览桥跟随 Codex CLI 事件或 BAJI 快照。[板级接口与上板检查](docs/06-hardware-and-environment.md)
 
 ## 先看这三个入口
 
@@ -32,7 +32,10 @@
 ## 当前工程
 
 ```text
-main/                       启动及色条、触摸十字、电源诊断
+main/                       宠物播放、触摸输入和可选 G1 板级诊断
+components/baji_pet/         网页原画生成的 RGB565 动作与视线素材及局部绘制
+components/baji_scene_damage/ 记录、合并待更新的物理像素区域
+components/baji_vsync/       面板扫描同步信号及时间戳
 components/baji_board/       应用侧板级接口和条带双缓冲
 components/baji_display/     CO5300 QSPI 与 DMA 传输
 components/baji_peripherals/ 共享 I2C、CST9217、AXP2101
@@ -79,7 +82,7 @@ python tools/check_preparation.py
 # 串口分帧的离线单元测试
 python -m unittest discover -s host/tests -v
 
-# 构建 1.75C 诊断固件
+# 构建 1.75C 电子宠物固件
 .\tools\build.ps1
 
 # 生成演示帧文件，不向设备发送
@@ -96,9 +99,9 @@ VS Code 已选用 ESP-IDF 5.5.4。普通 `idf.py build` 和 IDE 的构建按钮�
 
 协议、资源和浏览器原型的既有离线检查，以及本轮固件构建与板级检查结果，见[验证记录](docs/08-validation-log.md)。
 
-下一步在实物上核对 Flash 与 PSRAM 容量、色条方向及颜色、触点坐标和电池状态，记录连续运行与刷新耗时。[上板检查步骤](docs/06-hardware-and-environment.md)
+用 `.\tools\build.ps1 -BoardCheck` 可以单独构建色条、触摸十字和电源诊断固件。使用 IDF 开发终端时也可在 `menuconfig → Electronic badge` 中启用 G1。角色节拍和局部刷新可通过 RAM 基准独立复测。[上板检查步骤](docs/06-hardware-and-environment.md) · [角色互动基准](tests/device/pet_runtime/README.md)
 
-设备端角色动画、Flash 角色资源包、固件 JSON 解析与 USB 联调、真实 Hook 安装、账号额度采集、续航和功耗实测仍在后续阶段。
+设备内置待机、视线与摸头画面。Agent 实时额度和上下文、更多动作、续航和整机功耗仍在后续阶段。
 
 ## 素材来源
 

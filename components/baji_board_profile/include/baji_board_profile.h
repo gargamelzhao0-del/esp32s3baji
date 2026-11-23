@@ -9,6 +9,7 @@
 #define BAJI_LCD_D2     GPIO_NUM_6
 #define BAJI_LCD_D3     GPIO_NUM_7
 #define BAJI_LCD_RST    GPIO_NUM_1
+#define BAJI_LCD_TE     GPIO_NUM_13
 #define BAJI_LCD_X_GAP  6
 #define BAJI_LCD_Y_GAP  0
 #define BAJI_LCD_WIDTH  466

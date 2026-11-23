@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.22)
+get_filename_component(BADGE_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+set(EXTRA_COMPONENT_DIRS "${BADGE_ROOT}/components")
+set(BAJI_PET_EXTERNAL_ASSET ON CACHE BOOL "Stream the runtime art into PSRAM" FORCE)
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+idf_build_set_property(MINIMAL_BUILD ON)
+project(pet_runtime)

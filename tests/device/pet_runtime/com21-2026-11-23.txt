@@ -1,0 +1,42 @@
+[run1]
+PET_ASSET bytes=1299156 crc32=608342ae ok=1
+PET_FULL n=12 p50=19437 p95=19451 max=19451
+PET_FIRST us=19436 sent=1
+PET_STAGE name=idle ticks=180 sent=37 noop=143 missed=0 late=0 span_us=3042030 pose_changes=37 gaze_changes=0 gaze_only_sent=0 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=10944 te_draw_p95=12675 te_draw_max=12918 noop_p95=3 noop_max=9 te_gaze_p95=0 te_gaze_max=0
+PET_STAGE name=drag ticks=180 sent=57 noop=123 missed=0 late=0 span_us=3044980 pose_changes=36 gaze_changes=29 gaze_only_sent=21 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=10661 te_draw_p95=12686 te_draw_max=13000 noop_p95=3 noop_max=3 te_gaze_p95=298 te_gaze_max=301
+PET_STAGE name=pat ticks=240 sent=57 noop=183 missed=0 late=0 span_us=4062358 pose_changes=57 gaze_changes=0 gaze_only_sent=0 pat_start=1 pat_end=1 unchanged_sent=0 te_draw_p50=10818 te_draw_p95=12404 te_draw_max=12913 noop_p95=3 noop_max=3 te_gaze_p95=0 te_gaze_max=0
+PET_END ok=1 functional=1 deadlines=1 err=0
+PET_LIVE
+
+[window-ab]
+PET_ASSET bytes=1300547 crc32=0e12647e ok=1
+PET_FULL n=12 p50=19433 p95=19451 max=19451
+PET_MEMORY free_psram=4387048 free_internal=142295 largest_internal_dma=57344
+PET_FIRST us=19432 sent=1
+PET_STAGE name=idle ticks=180 sent=37 noop=143 missed=0 late=0 span_us=3043228 pose_changes=37 gaze_changes=0 gaze_only_sent=0 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=11279 te_draw_p95=12068 te_draw_max=12236 noop_p95=3 noop_max=3 te_gaze_p95=0 te_gaze_max=0
+PET_STAGE name=drag ticks=180 sent=57 noop=123 missed=0 late=0 span_us=3043267 pose_changes=36 gaze_changes=29 gaze_only_sent=21 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=10793 te_draw_p95=11988 te_draw_max=12254 noop_p95=3 noop_max=3 te_gaze_p95=296 te_gaze_max=297
+PET_STAGE name=pat ticks=240 sent=57 noop=183 missed=0 late=0 span_us=4061325 pose_changes=57 gaze_changes=0 gaze_only_sent=0 pat_start=1 pat_end=1 unchanged_sent=0 te_draw_p50=11032 te_draw_p95=12242 te_draw_max=13377 noop_p95=3 noop_max=9 te_gaze_p95=0 te_gaze_max=0
+PET_END ok=1 functional=1 deadlines=1 err=0
+PET_LIVE
+
+[simple-ab]
+PET_ASSET bytes=1300452 crc32=cb3cee97 ok=1
+PET_FULL n=12 p50=19433 p95=19450 max=19450
+PET_MEMORY free_psram=4387048 free_internal=142295 largest_internal_dma=57344
+PET_FIRST us=19433 sent=1
+PET_STAGE name=idle ticks=180 sent=37 noop=143 missed=0 late=0 span_us=3042470 pose_changes=37 gaze_changes=0 gaze_only_sent=0 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=11527 te_draw_p95=12528 te_draw_max=12561 noop_p95=3 noop_max=3 te_gaze_p95=0 te_gaze_max=0
+PET_STAGE name=drag ticks=180 sent=57 noop=123 missed=0 late=0 span_us=3043332 pose_changes=36 gaze_changes=29 gaze_only_sent=21 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=10821 te_draw_p95=12340 te_draw_max=12502 noop_p95=3 noop_max=3 te_gaze_p95=298 te_gaze_max=302
+PET_STAGE name=pat ticks=240 sent=57 noop=183 missed=0 late=0 span_us=4064481 pose_changes=57 gaze_changes=0 gaze_only_sent=0 pat_start=1 pat_end=1 unchanged_sent=0 te_draw_p50=11065 te_draw_p95=12492 te_draw_max=13498 noop_p95=3 noop_max=3 te_gaze_p95=0 te_gaze_max=0
+PET_END ok=1 functional=1 deadlines=1 err=0
+PET_LIVE
+
+[release-live]
+PET_ASSET bytes=1299156 crc32=608342ae ok=1
+PET_FULL n=12 p50=19434 p95=19451 max=19451
+PET_MEMORY free_psram=4387048 free_internal=142295 largest_internal_dma=57344
+PET_FIRST us=19435 sent=1
+PET_STAGE name=idle ticks=180 sent=37 noop=143 missed=0 late=0 span_us=3040827 pose_changes=37 gaze_changes=0 gaze_only_sent=0 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=10917 te_draw_p95=12641 te_draw_max=12887 noop_p95=3 noop_max=3 te_gaze_p95=0 te_gaze_max=0
+PET_STAGE name=drag ticks=180 sent=59 noop=121 missed=0 late=0 span_us=3043157 pose_changes=36 gaze_changes=29 gaze_only_sent=23 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=10626 te_draw_p95=12645 te_draw_max=12967 noop_p95=3 noop_max=3 te_gaze_p95=302 te_gaze_max=307
+PET_STAGE name=pat ticks=240 sent=57 noop=183 missed=0 late=0 span_us=4064586 pose_changes=57 gaze_changes=0 gaze_only_sent=0 pat_start=1 pat_end=1 unchanged_sent=0 te_draw_p50=10800 te_draw_p95=12373 te_draw_max=12882 noop_p95=3 noop_max=3 te_gaze_p95=0 te_gaze_max=0
+PET_END ok=1 functional=1 deadlines=1 err=0
+PET_LIVE
