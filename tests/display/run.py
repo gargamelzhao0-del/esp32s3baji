@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix="baji-display-test-") as directory:
     for name, sources in {
         "display_test": [
             COMPONENTS / "baji_display/baji_display.c", COMPONENTS / "baji_board/baji_board.c",
-            HERE / "display_test.c",
+            HERE / "display_test.c", HERE / "round_paint_test.c",
         ],
         "touch_init_test": [peripherals / "cst9217.c", HERE / "touch_init_test.c"],
         "board_check_paint_test": [COMPONENTS.parent / "main/board_check.c", HERE / "board_check_paint_test.c"],

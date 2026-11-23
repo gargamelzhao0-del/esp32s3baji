@@ -36,6 +36,7 @@ typedef int portMUX_TYPE;
 #define portENTER_CRITICAL(lock) ((void)(lock))
 #define portEXIT_CRITICAL(lock) ((void)(lock))
 #define pdMS_TO_TICKS(ms) (ms)
+#define portMAX_DELAY UINT32_MAX
 
 TaskHandle_t xTaskGetCurrentTaskHandle(void);
 void vTaskDelay(int ticks);
@@ -51,6 +52,10 @@ esp_err_t spi_bus_free(int host);
 esp_err_t spi_bus_add_device(int host, const spi_device_interface_config_t *config, spi_device_handle_t *device);
 esp_err_t spi_bus_remove_device(spi_device_handle_t device);
 esp_err_t spi_device_polling_transmit(spi_device_handle_t device, spi_transaction_t *transaction);
+esp_err_t spi_device_polling_start(spi_device_handle_t device, spi_transaction_t *transaction, uint32_t ticks);
+esp_err_t spi_device_polling_end(spi_device_handle_t device, uint32_t ticks);
+esp_err_t spi_device_acquire_bus(spi_device_handle_t device, uint32_t ticks);
+void spi_device_release_bus(spi_device_handle_t device);
 esp_err_t spi_device_queue_trans(spi_device_handle_t device, spi_transaction_t *transaction, int ticks);
 esp_err_t spi_device_get_trans_result(spi_device_handle_t device, spi_transaction_t **done, int ticks);
 size_t esp_psram_get_size(void);

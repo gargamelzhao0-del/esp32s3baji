@@ -18,18 +18,22 @@
 
 | 端口 | 板级配置 |
 | --- | --- |
-| CO5300 显示 | SPI2，CS 12，SCLK 38，D0–D3 为 4、5、6、7，面板复位 1。可见区域 466 × 466，显存列起点偏移 6。亮度经寄存器 `0x51` 设置。 |
+| CO5300 显示 | SPI2，CS 12，SCLK 38，D0–D3 为 4、5、6、7，面板复位 1，TE 扫描同步信号在 GPIO13。可见区域 466 × 466，显存列起点偏移 6。亮度经寄存器 `0x51` 设置。 |
 | CST9217 触摸 | I²C1 共线，SDA 15、SCL 14、400 kHz，7 位地址 `0x5a`，触摸复位 2，低有效中断 11。识别芯片 ID 和分辨率后，两个方向按 `465 - 原始坐标` 变换。 |
 | AXP2101 电源 | 同一总线，7 位地址 `0x34`。启动读取芯片 ID，采样电池连接、USB 有效供电、充电与剩余电量。无电池或无效百分比显示为 unknown，0% 是有效读数。寄存器位定义与 XPowers 对照。[AXP2101 状态实现](https://github.com/lewisxhe/XPowersLib/blob/master/src/XPowersAXP2101.hpp) |
 | 存储与控制台 | QIO Flash、80 MHz 八线 PSRAM、USB Serial/JTAG。启动日志读取实际物理 Flash 容量和已初始化的 PSRAM 容量。 |
 
 ## 性能与所有权
 
-全屏 RGB565 需要 434,312 字节。本版用两块内部 DMA 缓冲，每块 466 × 32 × 2 = 29,824 字节，两块共 59,648 字节。单次条带小于 32 KiB，整屏拆成 15 段，条带之间可交叠计算和传输。绘制回调直接填当前可写缓冲；提交下一段时回收上段，最终等待最后一次 DMA。超时保留尚在使用的缓冲。面板的偶数像素对齐由板级层处理，回调填满扩边后的矩形，避免相邻像素残留。[板级 API](../components/baji_board/include/baji_board.h)
+全屏 RGB565 需要 434,312 字节。本版用两块内部 DMA 缓冲，每块 466 × 32 × 2 = 29,824 字节，两块共 59,648 字节。单次条带小于 32 KiB，完整矩形拆成 15 段，条带之间可交叠计算和传输。绘制回调直接填当前可写缓冲；提交下一段时回收上段，最终等待最后一次 DMA。超时保留尚在使用的缓冲。面板的偶数像素对齐由板级层处理，回调填满扩边后的矩形，避免相邻像素残留。[板级 API](../components/baji_board/include/baji_board.h)
 
 窄区域按实际宽度分配条带高度。例如从第 1 行起刷新最右一列的 465 个像素，扩边后为 2 × 466，整列只提交一次 DMA。显示从初始化到释放由同一个任务拥有。触摸和电量使用同一总线实例与互斥锁，IRQ 只发信号，在任务上下文读取 I²C。诊断页在静止时停止显示刷新，首次全屏绘制并完成 DMA 后才提亮。触摸移动时就近合并标记的旧、新矩形，远距离移动只更新两块局部区域。
 
-40 MHz 四线的像素数据理论上限为 20 MB/s，整幅 RGB565 的理想传输时间约 21.7 ms。此下限未计命令、等待、渲染或面板扫描。MotoNav 的历史 RGB332 地图结果不作为电子吧唧的帧率。
+圆屏应用通过 `baji_board_paint_round()` 更新可见范围。上下边缘各分六段，覆盖中心在 (232.5, 232.5) 的圆面，并保留约 3 个像素的径向余量。一次整圆绘制发送 182,340 个 RGB565 像素，采用 13 个窗口和 17 笔 DMA。矩形 `baji_board_paint()` 仍可更新所有 217,156 个显存像素。两个或多个分离区域可用 `baji_board_paint_round_regions()` 按传入顺序绘制，整批共用末次 DMA 等待。每个回调按收到的矩形重建内容，包括偶数对齐的相邻像素。[板级 API](../components/baji_board/include/baji_board.h)
+
+面板地址相同的轴可复用。驱动在需要重新定位时获取总线，连续条带沿用当前批次，公开的等待操作完成后释放总线。至多 1,024 字节的小块使用短时轮询回收 DMA，更大的传输由中断唤醒任务。直接使用异步显示 API 时，应在进入空闲前调用 `baji_display_wait()`。[显示 API](../components/baji_display/include/baji_display.h)
+
+CO5300 的 QSPI 写时钟周期至少 20 ns。ESP32-S3 的 80 MHz APB 通过整数分频，在规格内可选的最高档为 40 MHz。四线净荷上限为 20 MB/s。完整矩形和本版圆屏窗口的纯数据下限分别为 21.716 ms、18.234 ms。面板扫描、绘制和 DMA 回收各自独立计时。[CO5300 数据手册 §6.4](https://files.waveshare.com/wiki/common/Co5300_Datasheet.pdf) · [乐鑫 SPI 主机驱动](https://docs.espressif.com/projects/esp-idf/en/v5.5.4/esp32s3/api-reference/peripherals/spi_master.html) · [实板基准](../tests/device/display_bench/README.md)
 
 ## 复验
 

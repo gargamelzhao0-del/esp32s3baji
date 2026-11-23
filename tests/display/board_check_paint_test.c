@@ -48,7 +48,7 @@ static void check_rect(baji_rect_t area, baji_paint_fn paint, void *scene)
     }
 }
 
-esp_err_t baji_board_paint(baji_board_t *board, baji_rect_t dirty, baji_paint_fn paint, void *scene)
+esp_err_t baji_board_paint_round(baji_board_t *board, baji_rect_t dirty, baji_paint_fn paint, void *scene)
 {
     (void)board;
     check_rect(dirty, paint, scene);
@@ -60,6 +60,17 @@ esp_err_t baji_board_paint(baji_board_t *board, baji_rect_t dirty, baji_paint_fn
     }
     /* End the board's continuous loop after validating the release. */
     return step + 1 == sizeof(touches)/sizeof(touches[0]) ? ESP_FAIL : ESP_OK;
+}
+
+esp_err_t baji_board_paint_round_regions(baji_board_t *board, const baji_rect_t *areas, size_t count,
+                                         baji_paint_fn paint, void *scene)
+{
+    assert(count == 2);
+    for (size_t i = 0; i < count; ++i) {
+        esp_err_t err = baji_board_paint_round(board, areas[i], paint, scene);
+        if (err != ESP_OK) return err;
+    }
+    return ESP_OK;
 }
 
 esp_err_t baji_board_set_brightness(baji_board_t *b, uint8_t pct)

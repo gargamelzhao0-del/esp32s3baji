@@ -53,10 +53,17 @@ static void paint(const baji_rect_t *band, uint8_t *pixels, void *context)
 {
     const scene_t *scene = context;
     const int cx = scene->cx;
+    int x0 = (int)band->x - cx, x1 = x0 + band->width - 1;
+    int near_x = x0 > 0 ? x0 : x1 < 0 ? -x1 : 0;
+    int far_x = abs(x0) > abs(x1) ? abs(x0) : abs(x1);
+    /* A small dirty window usually misses the ring. Reject those rows before
+     * computing either circle extent, including tall narrow cursor windows. */
+    int min_yy = 174 * 174 - far_x * far_x;
+    int max_yy = 176 * 176 - near_x * near_x;
     fill_solid(pixels, (unsigned)band->width * band->height, 0x1083);
     for (int y = band->y; y < band->y + band->height; ++y, pixels += band->width * 2) {
         int dy = y - scene->cy, yy = dy * dy;
-        if (yy <= 176 * 176) {
+        if (yy >= min_yy && yy <= max_yy) {
             int outer = circle_extent(176 * 176 - yy);
             if (yy >= 174 * 174) {
                 span(band, pixels, cx - outer, cx + outer, 0x526b);
@@ -98,16 +105,16 @@ static esp_err_t repaint_touch(baji_board_t *board, const baji_board_info_t *inf
                                scene_t *scene, baji_touch_sample_t old)
 {
     baji_rect_t a = mark_bounds(info, old), b = mark_bounds(info, scene->touch);
-    if (!old.pressed) return baji_board_paint(board, b, paint, scene);
-    if (!scene->touch.pressed) return baji_board_paint(board, a, paint, scene);
+    if (!old.pressed) return baji_board_paint_round(board, b, paint, scene);
+    if (!scene->touch.pressed) return baji_board_paint_round(board, a, paint, scene);
     int x = a.x < b.x ? a.x : b.x, y = a.y < b.y ? a.y : b.y;
     int right = a.x+a.width > b.x+b.width ? a.x+a.width : b.x+b.width;
     int bottom = a.y+a.height > b.y+b.height ? a.y+a.height : b.y+b.height;
     // Nearby samples share one transfer. A long drag must not dirty the entire diagonal.
     if ((right-x)*(bottom-y) <= a.width*a.height + b.width*b.height)
-        return baji_board_paint(board, (baji_rect_t){x, y, right-x, bottom-y}, paint, scene);
-    esp_err_t err = baji_board_paint(board, a, paint, scene);
-    return err == ESP_OK ? baji_board_paint(board, b, paint, scene) : err;
+        return baji_board_paint_round(board, (baji_rect_t){x, y, right-x, bottom-y}, paint, scene);
+    const baji_rect_t dirty[] = {a, b};
+    return baji_board_paint_round_regions(board, dirty, 2, paint, scene);
 }
 
 static void report_power(baji_peripherals_t *io)
@@ -129,7 +136,7 @@ esp_err_t baji_board_check_run(baji_board_t *board, const baji_board_info_t *inf
 {
     scene_t scene = {.cx = info->width/2, .cy = info->height/2};
     int64_t start = esp_timer_get_time();
-    esp_err_t err = baji_board_paint(board, (baji_rect_t){0, 0, info->width, info->height}, paint, &scene);
+    esp_err_t err = baji_board_paint_round(board, (baji_rect_t){0, 0, info->width, info->height}, paint, &scene);
     if (err != ESP_OK) return err;
     ESP_LOGI(TAG, "first RGB565 frame incl. last DMA: %lld us", (long long)(esp_timer_get_time()-start));
     err = baji_board_set_brightness(board, 45);

@@ -33,7 +33,8 @@ esp_err_t baji_display_set_brightness(uint8_t percent);
  * next successful write/brightness/deinit drains it. A failed submission does
  * not borrow the proposed buffer. If draining an earlier write times out,
  * keep its buffer and call wait() again. To pipeline, prepare the next strip
- * in a second buffer while the first one transfers. */
+ * in a second buffer while the first one transfers. Call wait() at batch
+ * end, before going idle, to release the SPI bus and its frequency lock. */
 esp_err_t baji_display_write_rect(uint16_t x, uint16_t y, uint16_t width, uint16_t height,
                                   const void *rgb565_be, size_t bytes);
 esp_err_t baji_display_wait(void);

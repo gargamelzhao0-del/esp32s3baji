@@ -20,14 +20,17 @@ _Static_assert(BAJI_DISPLAY_WIDTH == BAJI_LCD_WIDTH && BAJI_DISPLAY_HEIGHT == BA
 _Static_assert(BAJI_DISPLAY_MAX_TRANSFER_BYTES <= 32768, "one ESP32-S3 DMA transaction per strip");
 
 enum { CMD_CASET = 0x2a, CMD_RASET = 0x2b, CMD_RAMWR = 0x2c, CMD_RAMWRC = 0x3c,
-       CMD_BRIGHTNESS = 0x51, IO_TIMEOUT_MS = 250 };
+       CMD_BRIGHTNESS = 0x51, IO_TIMEOUT_MS = 250,
+       /* At 40 MHz on four lines, at most 51.2 us of payload while polling. */
+       SHORT_TRANSFER_BYTES = 1024 };
 
 static struct {
     spi_device_handle_t device;
     spi_transaction_t color;
-    bool bus_owned, reset_owned, ready, pending;
+    bool bus_owned, reset_owned, ready, batch_locked;
+    enum { COLOR_IDLE, COLOR_QUEUED, COLOR_POLLING } pending;
     /* next_y == 0 means there is no open column window to continue. */
-    uint16_t previous_x, previous_width, next_y;
+    uint16_t previous_x, previous_width, window_y, next_y;
 } panel;
 
 static TaskHandle_t owner;
@@ -116,7 +119,7 @@ static esp_err_t release_hardware(void)
         if (err != ESP_OK) return err;
         panel.reset_owned = false;
     }
-    panel.next_y = 0;
+    panel.previous_width = panel.next_y = 0;
     portENTER_CRITICAL(&owner_lock);
     owner = NULL;
     portEXIT_CRITICAL(&owner_lock);
@@ -163,7 +166,12 @@ esp_err_t baji_display_init(uint8_t brightness_percent)
 
 static esp_err_t wait_pending(void)
 {
-    if (!panel.pending) return ESP_OK;
+    if (panel.pending == COLOR_IDLE) return ESP_OK;
+    if (panel.pending == COLOR_POLLING) {
+        esp_err_t err = spi_device_polling_end(panel.device, pdMS_TO_TICKS(IO_TIMEOUT_MS));
+        if (err == ESP_OK) panel.pending = COLOR_IDLE;
+        return err;
+    }
     spi_transaction_t *done = NULL;
     esp_err_t err = spi_device_get_trans_result(panel.device, &done, pdMS_TO_TICKS(IO_TIMEOUT_MS));
     if (done != &panel.color) {
@@ -171,14 +179,31 @@ static esp_err_t wait_pending(void)
          * or return the old buffer to the caller until SPI hands it back. */
         return err == ESP_OK ? ESP_ERR_INVALID_STATE : err;
     }
-    panel.pending = false;
-    if (err != ESP_OK) panel.next_y = 0;
+    panel.pending = COLOR_IDLE;
+    if (err != ESP_OK) panel.previous_width = panel.next_y = 0;
+    return err;
+}
+
+/* A timed-out transfer still owns its descriptor. A polling transfer also
+ * requires polling_end to finish before IDF permits releasing the bus. */
+static void unlock_if_idle(void)
+{
+    if (panel.batch_locked && panel.pending == COLOR_IDLE) {
+        spi_device_release_bus(panel.device);
+        panel.batch_locked = false;
+    }
+}
+
+static esp_err_t finish_batch(void)
+{
+    esp_err_t err = wait_pending();
+    unlock_if_idle();
     return err;
 }
 
 esp_err_t baji_display_wait(void)
 {
-    return owns_display() && panel.ready ? wait_pending() : ESP_ERR_INVALID_STATE;
+    return owns_display() && panel.ready ? finish_batch() : ESP_ERR_INVALID_STATE;
 }
 
 static esp_err_t address_range(uint8_t reg, uint16_t first, uint16_t last)
@@ -197,16 +222,36 @@ esp_err_t baji_display_write_rect(uint16_t x, uint16_t y, uint16_t width, uint16
         ((uintptr_t)rgb565_be & 3) || !esp_ptr_dma_capable(rgb565_be) ||
         !esp_ptr_dma_capable((const uint8_t *)rgb565_be + bytes - 1)) return ESP_ERR_INVALID_ARG;
     esp_err_t err = wait_pending();
-    if (err != ESP_OK) return err;
+    if (err != ESP_OK) {
+        unlock_if_idle();
+        return err;
+    }
 
-    bool continuation = panel.next_y && panel.next_y == y &&
-                        panel.previous_x == x && panel.previous_width == width;
+    bool same_columns = panel.previous_x == x && panel.previous_width == width;
+    bool same_rows = panel.previous_width && panel.window_y == y;
+    bool continuation = same_columns && panel.next_y && panel.next_y == y;
+    /* An unsuccessful partial window update must not be reused on retry. */
+    panel.previous_width = 0;
     panel.next_y = 0;
     if (!continuation) {
-        err = address_range(CMD_CASET, x + BAJI_LCD_X_GAP, x + width - 1 + BAJI_LCD_X_GAP);
-        if (err == ESP_OK)
+        /* Batch the address commands with color. After an explicit wait a
+         * lone RAMWRC needs no extra acquisition around its single transfer. */
+        if (!panel.batch_locked) {
+            err = spi_device_acquire_bus(panel.device, portMAX_DELAY);
+            if (err != ESP_OK) return err;
+            panel.batch_locked = true;
+        }
+        if (!same_columns)
+            err = address_range(CMD_CASET, x + BAJI_LCD_X_GAP, x + width - 1 + BAJI_LCD_X_GAP);
+        /* A changed column range alone can restart at the stored row. Even
+         * identical rectangles need one address command before a new RAMWR. */
+        if (err == ESP_OK && (same_columns || !same_rows))
             err = address_range(CMD_RASET, y + BAJI_LCD_Y_GAP, BAJI_LCD_HEIGHT - 1 + BAJI_LCD_Y_GAP);
-        if (err != ESP_OK) return err;
+        if (err != ESP_OK) {
+            unlock_if_idle();
+            return err;
+        }
+        panel.window_y = y;
     }
 
     panel.color = (spi_transaction_t) {
@@ -216,12 +261,20 @@ esp_err_t baji_display_write_rect(uint16_t x, uint16_t y, uint16_t width, uint16
         .length = bytes * 8,
         .tx_buffer = rgb565_be,
     };
-    err = spi_device_queue_trans(panel.device, &panel.color, pdMS_TO_TICKS(IO_TIMEOUT_MS));
+    /* Both paths launch DMA and return with the source borrowed. The short
+     * path avoids queue/ISR/task handoff. Long waits block the calling task. */
+    bool short_transfer = bytes <= SHORT_TRANSFER_BYTES;
+    if (short_transfer)
+        err = spi_device_polling_start(panel.device, &panel.color, portMAX_DELAY);
+    else
+        err = spi_device_queue_trans(panel.device, &panel.color, pdMS_TO_TICKS(IO_TIMEOUT_MS));
     if (err == ESP_OK) {
-        panel.pending = true;
+        panel.pending = short_transfer ? COLOR_POLLING : COLOR_QUEUED;
         panel.previous_x = x;
         panel.previous_width = width;
         panel.next_y = y + height < BAJI_LCD_HEIGHT ? y + height : 0;
+    } else {
+        unlock_if_idle();
     }
     return err;
 }
@@ -231,7 +284,7 @@ esp_err_t baji_display_set_brightness(uint8_t percent)
     if (percent > 100) return ESP_ERR_INVALID_ARG;
     esp_err_t err = baji_display_wait();
     if (err != ESP_OK) return err;
-    panel.next_y = 0;
+    panel.previous_width = panel.next_y = 0;
     uint8_t value = percent * 255 / 100;
     return control(CMD_BRIGHTNESS, &value, 1);
 }
@@ -240,7 +293,7 @@ esp_err_t baji_display_deinit(void)
 {
     if (!owns_display()) return ESP_ERR_INVALID_STATE;
     if (panel.ready) {
-        esp_err_t err = wait_pending();
+        esp_err_t err = finish_batch();
         if (err != ESP_OK) return err;
         err = control(0x28, NULL, 0);
         if (err != ESP_OK) return err;
