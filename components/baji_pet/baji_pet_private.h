@@ -19,7 +19,9 @@ typedef struct {
 _Static_assert(sizeof(header_t)==24 && sizeof(pose_t)==48 && sizeof(range_t)==8 &&
                sizeof(baji_rect_t)==8 && sizeof(patch_t)==4,"Asset layout");
 
+typedef struct motion_art motion_art_t;
 struct baji_pet {
+    motion_art_t *motion;
     uint8_t *decoded;
     const pose_t *poses;
     const uint16_t *maps;
@@ -30,5 +32,15 @@ struct baji_pet {
     const uint16_t *rows16;
     const uint8_t *pixel_bank[2];
     unsigned pose, gaze;
-    uint16_t selected[CELLS];
+    uint16_t *selected; /* Legacy BPT1/BPT2 physical tile map. */
 };
+
+esp_err_t pet_motion_open(baji_pet_t *p,size_t length);
+void pet_motion_close(motion_art_t *m);
+const int16_t *pet_motion_head(const motion_art_t *m,baji_pet_state_t s);
+void pet_motion_select(motion_art_t *m,baji_pet_state_t s,unsigned gaze);
+size_t pet_motion_damage(const motion_art_t *m,baji_pet_state_t before,unsigned g0,
+                         baji_pet_state_t after,unsigned g1,baji_rect_t *areas,size_t capacity);
+void pet_motion_paint(motion_art_t *m,const baji_rect_t *band,uint8_t *out);
+
+void pet_add_rect(baji_rect_t *areas,size_t *count,size_t capacity,baji_rect_t r);

@@ -9,7 +9,7 @@ import zlib
 
 import serial
 
-DEFAULT_ASSET = Path(__file__).resolve().parents[3] / "components/baji_pet/assets/scene.bpz"
+DEFAULT_ASSET = Path(__file__).resolve().parents[3] / "components/baji_pet/assets/motion.bpz"
 STAGES = {"idle": 180, "drag": 180, "pat": 240}
 
 
@@ -20,6 +20,8 @@ def verify_stage(fields):
         raise ValueError(f"Unexpected stage counters for {name}")
     if not (0 < int(fields["sent"]) < ticks) or int(fields["unchanged_sent"]):
         raise ValueError(f"Unchanged frames were redrawn or expected draws are missing in {name}")
+    if int(fields["subject_millihz"]) < 36000:
+        raise ValueError(f"Subject motion below 36 visible changes/s in {name}")
     if int(fields["pose_changes"]) <= 0:
         raise ValueError(f"No pose changes in {name}")
     if (int(fields["pat_start"]), int(fields["pat_end"])) != ((1, 1) if name == "pat" else (0, 0)):
@@ -76,7 +78,7 @@ def upload(connection, asset, log, timeout):
         elif message == "PET_FIRST":
             first = int(fields["sent"]) == 1 and int(fields["us"]) > 0
         elif message == "PET_SCHEDULE":
-            scheduled = fields["ok"] == "1"
+            scheduled = fields["ok"] == "1" and 46000 <= int(fields["subject_millihz"]) <= 50000
         elif message == "PET_STAGE":
             name = fields["name"]
             stages.append(name)

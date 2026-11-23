@@ -2,7 +2,7 @@ Codex 白龙娘近景像素角色
 
 原角色设定：ZipZipPipe。角色动画立绘：CrossPet。
 本项目在原动作的基础上转绘近景像素帧，制作摸头和凝视表现，合成天空、网格及屏幕信息，并转换为设备用 RGB565 图像。
-角色衍生素材（包括 scene.bpz 和 authoring/reference.zip 中的角色像素）采用 CC BY-NC-SA 4.0。
+角色衍生素材（包括 motion.bpz、scene.bpz 和 authoring/reference.zip 中的角色像素）采用 CC BY-NC-SA 4.0。
 https://github.com/lokicorvus/crosspet/tree/8954eb8f7f69fcfb8d35e9deceeb78e10c804402
 https://creativecommons.org/licenses/by-nc-sa/4.0/
 原作随包声明见 design/pixel-badge/licenses/CrossPet.md。

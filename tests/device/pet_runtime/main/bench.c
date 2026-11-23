@@ -13,6 +13,7 @@
 #include "pet_app.h"
 #include "pet_player.h"
 #include "schedule_check.h"
+#include "pet_probe.h"
 
 static bool read_exact(void *buffer, size_t size)
 {
@@ -65,7 +66,8 @@ typedef struct {
     bool sent, gaze_only;
 } sample_t;
 typedef struct {
-    unsigned draws, missing, late, poses, gazes, gaze_only, pat_start, pat_end, unchanged_draw;
+    unsigned draws, visible, missing, late, poses, gazes, gaze_only, pat_start, pat_end, unchanged_draw;
+    unsigned slowest_us, slow_select, slow_bus, old_sample, next_sample, slow_clip;
     int64_t first_us, last_us;
 } stage_t;
 static sample_t samples[TOTAL];
@@ -189,7 +191,7 @@ static esp_err_t measure(pet_player_t *player, baji_board_t *board, bool *functi
     baji_vsync_edge_t anchor;
     esp_err_t err = baji_vsync_wait(baji_vsync_snapshot().seq, 150, &anchor);
     if (err != ESP_OK) return err;
-    uint32_t seq = anchor.seq;
+    uint32_t seq = anchor.seq, signature = pet_probe_signature();
     unsigned offset = 0;
     for (unsigned phase = 0; phase < 3; ++phase) {
         stage_t *s = &stages[phase];
@@ -210,11 +212,16 @@ static esp_err_t measure(pet_player_t *player, baji_board_t *board, bool *functi
             baji_vsync_edge_t done = baji_vsync_snapshot();
             if (err != ESP_OK) return err;
             baji_pet_state_t next = player->shown;
-            bool pose = old.clip != next.clip || old.frame != next.frame;
+            bool pose = old.clip != next.clip || old.frame != next.frame || old.phase != next.phase;
             bool gaze = old.gaze_x != next.gaze_x || old.gaze_y != next.gaze_y;
             bool gaze_draw = gaze && !pose && sent;
             samples[offset+i] = (sample_t){done.observed_us-edge.edge_us, done.observed_us-start,
                                            sent, gaze_draw};
+            if (sent) {
+                uint32_t current = pet_probe_signature();
+                s->visible += current != signature;
+                signature = current;
+            }
             s->draws += sent;
             s->poses += pose;
             s->gazes += gaze;
@@ -223,6 +230,15 @@ static esp_err_t measure(pet_player_t *player, baji_board_t *board, bool *functi
             s->pat_end += old.clip == BAJI_PET_PAT && next.clip != BAJI_PET_PAT;
             s->unchanged_draw += sent && !pose && !gaze;
             s->late += done.seq != seq;
+            unsigned duration=done.observed_us-edge.edge_us;
+            if (sent && duration>s->slowest_us) {
+                s->slowest_us=duration;
+                s->slow_select=pet_probe_bus_start()-start;
+                s->slow_bus=done.observed_us-pet_probe_bus_start();
+                s->old_sample=old.frame*baji_pet_substeps(player->art,old.clip)+old.phase;
+                s->next_sample=next.frame*baji_pet_substeps(player->art,next.clip)+next.phase;
+                s->slow_clip=next.clip;
+            }
         }
         offset += counts[phase];
     }
@@ -238,12 +254,16 @@ static esp_err_t measure(pet_player_t *player, baji_board_t *board, bool *functi
         distribution_t noop = distribution(samples+offset, n, NOOP);
         distribution_t gaze = distribution(samples+offset, n, GAZE_ONLY);
         printf("PET_STAGE name=%s ticks=%u sent=%u noop=%u missed=%u late=%u span_us=%u "
-               "pose_changes=%u gaze_changes=%u gaze_only_sent=%u pat_start=%u pat_end=%u unchanged_sent=%u "
+               "subject_changes=%u subject_millihz=%u pose_changes=%u gaze_changes=%u gaze_only_sent=%u pat_start=%u pat_end=%u unchanged_sent=%u "
                "te_draw_p50=%u te_draw_p95=%u te_draw_max=%u noop_p95=%u noop_max=%u "
                "te_gaze_p95=%u te_gaze_max=%u\n",
                labels[phase], n, s->draws, n-s->draws, s->missing, s->late, (unsigned)(s->last_us-s->first_us),
+               s->visible, (unsigned)(s->visible*INT64_C(1000000000)/(s->last_us-s->first_us)),
                s->poses, s->gazes, s->gaze_only, s->pat_start, s->pat_end, s->unchanged_draw,
                active.p50, active.p95, active.max, noop.p95, noop.max, gaze.p95, gaze.max);
+        printf("PET_PEAK name=%s old=%u next=%u clip=%u select_us=%u bus_us=%u\n",
+               labels[phase], s->old_sample,s->next_sample,s->slow_clip,s->slow_select,s->slow_bus);
+        *functional &= s->visible*INT64_C(1000000) >= 36*(s->last_us-s->first_us);
         *functional &= s->poses > 0 && s->draws > 0 && s->draws < n && s->unchanged_draw == 0;
         *functional &= s->pat_start == (phase == 2) && s->pat_end == (phase == 2);
         if (phase == 0) *functional &= !s->gazes;
@@ -274,6 +294,7 @@ void app_main(void)
         pet_player_t player;
         baji_input_t input = {0};
         bool sent = false, functional = false, on_time = false;
+        pet_probe_enable(true);
         int64_t start = esp_timer_get_time();
         pet_player_init(&player, art, &info, start);
         err = pet_player_tick(&player, board, &input, start, &sent);
@@ -286,11 +307,12 @@ void app_main(void)
             esp_err_t closed = baji_vsync_close();
             if (err == ESP_OK) err = closed;
         }
-        if (err == ESP_OK && functional && on_time)
+        if (err == ESP_OK && functional)
             err = check_runtime_schedule(board, &info, art);
         printf("PET_END ok=%d functional=%d deadlines=%d err=%d\n",
                err == ESP_OK && functional && on_time, functional, on_time, err);
         if (err == ESP_OK && functional) {
+            pet_probe_enable(false);
             puts("PET_LIVE");
             err = pet_app_run_loaded(board, &info, art);
             printf("PET_LIVE_END err=%d\n", err);

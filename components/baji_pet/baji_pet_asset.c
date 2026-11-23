@@ -82,7 +82,8 @@ esp_err_t baji_pet_open_data(baji_pet_t **out, const void *packed, size_t size)
     uint32_t meta[3];
     memcpy(meta,bytes+4,sizeof(meta));
     bool compact = memcmp(bytes,"BPT2",4) == 0;
-    if ((!compact && memcmp(bytes,"BPT1",4)) || meta[0]<sizeof(header_t) || meta[0]>MAX_RAW ||
+    bool motion = memcmp(bytes,"BPH5",4) == 0;
+    if ((!compact && !motion && memcmp(bytes,"BPT1",4)) || meta[0]<sizeof(header_t) || meta[0]>MAX_RAW ||
         meta[1] != size-16) return ESP_ERR_INVALID_RESPONSE;
 
     baji_pet_t *p = heap_caps_calloc(1,sizeof(*p),MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);
@@ -98,7 +99,15 @@ esp_err_t baji_pet_open_data(baji_pet_t **out, const void *packed, size_t size)
                                                TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
         err = ESP_ERR_INVALID_RESPONSE;
         if (result == TINFL_STATUS_DONE && input == meta[1] && output == meta[0] &&
-            esp_rom_crc32_le(0,p->decoded,output)==meta[2] && bind_tables(p,output,compact)) {
+            esp_rom_crc32_le(0,p->decoded,output)==meta[2]) {
+            err = motion ? pet_motion_open(p,output) :
+                  bind_tables(p,output,compact) ? ESP_OK : ESP_ERR_INVALID_RESPONSE;
+        }
+        if (err == ESP_OK && !motion) {
+            p->selected = heap_caps_malloc(CELLS*sizeof(*p->selected),MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);
+            if (!p->selected) err = ESP_ERR_NO_MEM;
+        }
+        if (err == ESP_OK) {
             p->pose = UINT_MAX;
             baji_pet_select(p,(baji_pet_state_t){0});
             *out=p;
@@ -117,8 +126,8 @@ esp_err_t baji_pet_open(baji_pet_t **out)
     *out = NULL;
     return ESP_ERR_INVALID_STATE;
 #else
-    extern const uint8_t start[] asm("_binary_scene_bpz_start");
-    extern const uint8_t end[] asm("_binary_scene_bpz_end");
+    extern const uint8_t start[] asm("_binary_motion_bpz_start");
+    extern const uint8_t end[] asm("_binary_motion_bpz_end");
     return baji_pet_open_data(out,start,(size_t)(end-start));
 #endif
 }
@@ -126,6 +135,8 @@ esp_err_t baji_pet_open(baji_pet_t **out)
 void baji_pet_close(baji_pet_t *p)
 {
     if (p) {
+        heap_caps_free(p->selected);
+        pet_motion_close(p->motion);
         heap_caps_free(p->decoded);
         heap_caps_free(p);
     }

@@ -1,6 +1,6 @@
 /* Runs inside the existing web renderer. The host calls capturePose once per
  * pose, keeping each transaction and the browser canvas memory bounded. */
-async function setupPetCapture() {
+async function setupPetCapture(motion = false) {
   const lcd = new PixelBadge(document.createElement("canvas"));
   lcd.resize(400);
   const output = document.createElement("canvas");
@@ -44,8 +44,36 @@ async function setupPetCapture() {
   }
   const missing = {percent: null, text: "--"};
   const scale = 466 / 184;
-  window.capturePose = ([action, frame]) => {
-    const clip = PIXEL_CLIPS[action];
+  const strip = document.createElement("canvas");
+  strip.width = 368;
+  strip.height = 368 + 5 * 48;
+  const atlas = strip.getContext("2d");
+  const crc = new Uint32Array(256);
+  for (let i=0; i<256; ++i) {
+    let value = i;
+    for (let bit=0; bit<8; ++bit) value = (value>>>1) ^ ((value&1) ? 0xedb88320 : 0);
+    crc[i] = value;
+  }
+  function wireChecksum() {
+    const bytes = ctx.getImageData(0,0,466,466).data;
+    let value = -1;
+    for (let i=0; i<bytes.length; i+=4) {
+      const redGreen = (bytes[i]&0xf8) | bytes[i+1]>>>5;
+      const greenBlue = (bytes[i+1]&0x1c)<<3 | bytes[i+2]>>>3;
+      value = crc[(value^redGreen)&255] ^ (value>>>8);
+      value = crc[(value^greenBlue)&255] ^ (value>>>8);
+    }
+    return (~value)>>>0;
+  }
+  window.capturePose = ([action, frame, phase = 0, steps = 1]) => {
+    const original = PIXEL_CLIPS[action];
+    let clip = original;
+    if (motion) {
+      const next = frame+1 < original.frames ? original.anchors[frame+1] : PIXEL_CLIPS.idle.anchors[0];
+      const anchors = original.anchors.slice();
+      anchors[frame] = anchors[frame].map((v,i) => v + (next[i]-v) * phase/steps);
+      clip = {...original, anchors, offset:frame*steps+phase-frame};
+    }
     const [fx, fy, nx, ny] = clip.anchors[frame];
     const size = Math.hypot(nx-fx, ny-fy) / 132;
     const variants = [];
@@ -56,6 +84,23 @@ async function setupPetCapture() {
           tick:0, motion:true, skyMode:"dusk", helpers:0, gazeX:gx/2, gazeY:gy,
           sparks:[], contact:null, starToy:null};
         lcd.draw(current);
+        if (motion) {
+          ctx.fillStyle = "black";
+          ctx.fillRect(0,0,466,466);
+          ctx.drawImage(lcd.canvas,0,0,466,466);
+          variants.push(wireChecksum());
+          if (gx === 0 && gy === 0) {
+            atlas.fillStyle = "black";
+            atlas.fillRect(0, 0, 368, 368);
+            atlas.drawImage(lcd.canvas,0,0);
+          }
+          const g = (gy+1)*5+gx+2;
+          atlas.fillStyle = "black";
+          const x = (g%3)*112, y = 368+Math.floor(g/3)*48;
+          atlas.fillRect(x, y, 112, 48);
+          atlas.drawImage(lcd.canvas,128,176,112,48,x,y,112,48);
+          continue;
+        }
         ctx.fillStyle = "black";
         ctx.fillRect(0,0,466,466);
         ctx.drawImage(lcd.canvas,0,0,466,466);
@@ -63,7 +108,7 @@ async function setupPetCapture() {
       }
     }
     const head = lcd.facePoint("close", clip, frame, fx, fy);
-    return {variants, head:[head.sx*scale, head.sy*scale, 91*size/0.75/2.75*scale,
+    return {variants, packed:motion && strip.toDataURL().split(",")[1], head:[head.sx*scale, head.sy*scale, 91*size/0.75/2.75*scale,
       75*size/0.75/2.75*scale].map(Math.round)};
   };
   return [PIXEL_CLIPS.idle.frames,PIXEL_CLIPS.pat.frames,PIXEL_CLIPS.idle.fps,PIXEL_CLIPS.pat.fps];

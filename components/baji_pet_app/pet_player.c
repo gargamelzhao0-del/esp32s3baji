@@ -43,7 +43,7 @@ int64_t pet_player_next_update(const pet_player_t *p, const baji_input_t *input,
     if (gaze.gaze_x != p->shown.gaze_x || gaze.gaze_y != p->shown.gaze_y)
         return now;
     int64_t origin = p->patting ? p->pat_since : p->idle_since;
-    unsigned fps = baji_pet_fps(p->shown.clip);
+    unsigned fps = baji_pet_fps(p->shown.clip) * baji_pet_substeps(p->art,p->shown.clip);
     int64_t next_frame = (now - origin) * fps / 1000000 + 1;
     return origin + (next_frame * 1000000 + fps - 1) / fps;
 }
@@ -61,25 +61,31 @@ esp_err_t pet_player_tick(pet_player_t *p, baji_board_t *board,
     }
     baji_pet_state_t next = {.clip = BAJI_PET_IDLE};
     if (p->patting) {
-        unsigned frame = (uint64_t)(now - p->pat_since) * baji_pet_fps(BAJI_PET_PAT) / 1000000;
+        unsigned steps = baji_pet_substeps(p->art,BAJI_PET_PAT);
+        uint64_t sample = (uint64_t)(now - p->pat_since) * (baji_pet_fps(BAJI_PET_PAT)*steps) / 1000000;
+        uint64_t frame = sample / steps;
         if (frame < baji_pet_frame_count(BAJI_PET_PAT)) {
             next.clip = BAJI_PET_PAT;
             next.frame = frame;
+            next.phase = sample % steps;
         } else {
             p->patting = false;
             p->idle_since = now;
         }
     }
-    if (!p->patting)
-        next.frame = ((uint64_t)(now - p->idle_since) * baji_pet_fps(BAJI_PET_IDLE) / 1000000)
-                     % baji_pet_frame_count(BAJI_PET_IDLE);
+    if (!p->patting) {
+        unsigned steps = baji_pet_substeps(p->art,BAJI_PET_IDLE);
+        uint64_t sample = (uint64_t)(now - p->idle_since) * (baji_pet_fps(BAJI_PET_IDLE)*steps) / 1000000;
+        next.frame = sample / steps % baji_pet_frame_count(BAJI_PET_IDLE);
+        next.phase = sample % steps;
+    }
     next.gaze_x = p->shown.gaze_x;
     next.gaze_y = p->shown.gaze_y;
     update_gaze(&next, input);
 
     /* The display retains its last frame. Keep even failed/partial submissions
      * dirty until a later complete redraw from the latest scene succeeds. */
-    if (p->have_frame && (p->shown.clip != next.clip || p->shown.frame != next.frame ||
+    if (p->have_frame && (p->shown.clip != next.clip || p->shown.frame != next.frame || p->shown.phase != next.phase ||
                           p->shown.gaze_x != next.gaze_x || p->shown.gaze_y != next.gaze_y)) {
         /* Preserve separate authored windows and both eyes until the
          * transfer planner has seen them all and can price the merges. */

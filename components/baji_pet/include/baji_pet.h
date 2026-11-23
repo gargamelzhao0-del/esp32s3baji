@@ -16,6 +16,7 @@ typedef struct {
     baji_pet_clip_t clip;
     uint8_t frame;
     int8_t gaze_x, gaze_y;
+    uint8_t phase; /* In-between samples within one original frame. */
 } baji_pet_state_t;
 
 /* Opens the bundled artwork, or a complete BPZ asset supplied by the caller.
@@ -25,6 +26,8 @@ esp_err_t baji_pet_open_data(baji_pet_t **out, const void *packed, size_t size);
 void baji_pet_close(baji_pet_t *pet);
 unsigned baji_pet_frame_count(baji_pet_clip_t clip);
 unsigned baji_pet_fps(baji_pet_clip_t clip);
+/* Actual sample rate is authored fps times the substeps in this artwork. */
+unsigned baji_pet_substeps(const baji_pet_t *pet, baji_pet_clip_t clip);
 
 /* Frames wrap in their clip. Gaze saturates at +/-2 horizontal, +/-1 vertical. */
 void baji_pet_select(baji_pet_t *pet, baji_pet_state_t state);

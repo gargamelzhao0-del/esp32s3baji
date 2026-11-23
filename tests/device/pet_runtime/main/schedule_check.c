@@ -1,4 +1,5 @@
 #include "schedule_check.h"
+#include "pet_probe.h"
 #include "baji_runtime.h"
 #include "baji_vsync.h"
 #include "esp_timer.h"
@@ -12,7 +13,8 @@ typedef struct {
     SemaphoreHandle_t changed, joined;
     portMUX_TYPE lock;
     bool armed, consumed, rescue, eye_only;
-    unsigned calls, draws, skipped_poses, late, extra_static;
+    unsigned calls, draws, visible, skipped_poses, late, extra_static;
+    uint32_t signature;
     uint32_t first_seq, last_seq;
     int64_t first_edge, last_edge, max_draw_us, frozen_us;
     int64_t published_us, wake_us, wake_dma_us;
@@ -75,7 +77,10 @@ static esp_err_t render(void *arg, const baji_input_t *touch, int64_t now, int64
     esp_err_t err = pet_player_tick(&s->player, s->board, &input, now, &sent);
     if (err != ESP_OK) return err;
     *next = pet_player_next_update(&s->player, &input, now);
-    if (first) return ESP_OK;
+    if (first) {
+        s->signature=pet_probe_signature();
+        return ESP_OK;
+    }
     baji_vsync_edge_t end = baji_vsync_snapshot();
     if (!edge.edge_us) return ESP_ERR_INVALID_STATE;
     if (!s->calls) {
@@ -84,11 +89,19 @@ static esp_err_t render(void *arg, const baji_input_t *touch, int64_t now, int64
     }
     ++s->calls;
     s->draws += sent;
+    if (sent) {
+        uint32_t signature=pet_probe_signature();
+        if (s->calls>1) s->visible += signature!=s->signature;
+        s->signature=signature;
+    }
     s->late += end.seq != edge.seq;
     s->last_seq = edge.seq;
     s->last_edge = edge.edge_us;
-    unsigned count = baji_pet_frame_count(BAJI_PET_IDLE);
-    s->skipped_poses += (s->player.shown.frame + count - before.frame) % count > 1;
+    unsigned steps = baji_pet_substeps(s->player.art,BAJI_PET_IDLE);
+    unsigned count = baji_pet_frame_count(BAJI_PET_IDLE)*steps;
+    unsigned old_sample = before.frame*steps + before.phase;
+    unsigned sample = s->player.shown.frame*steps + s->player.shown.phase;
+    if (s->calls > 1) s->skipped_poses += (sample + count - old_sample) % count > 1;
     if (sent && end.observed_us - edge.edge_us > s->max_draw_us)
         s->max_draw_us = end.observed_us - edge.edge_us;
     if (s->last_edge - s->first_edge >= (int64_t)BAJI_SCHEDULE_CHECK_MS * 1000) {
@@ -120,14 +133,15 @@ esp_err_t check_runtime_schedule(baji_board_t *board, const baji_board_info_t *i
     unsigned edges = s.last_seq - s.first_seq;
     unsigned render_mhz = span > 0 ? (s.calls-1)*INT64_C(1000000000)/span : 0;
     unsigned panel_mhz = span > 0 ? edges*INT64_C(1000000000)/span : 0;
-    bool ok = err == ESP_OK && render_mhz >= 11500 && render_mhz <= 12500 &&
+    unsigned subject_mhz=span>0 ? s.visible*INT64_C(1000000000)/span : 0;
+    bool ok = subject_mhz>=46000 && subject_mhz<=50000 && err == ESP_OK && render_mhz >= 46000 && render_mhz <= 50000 &&
               panel_mhz >= 55000 && panel_mhz <= 63000 && s.draws == s.calls &&
               !s.skipped_poses && !s.late && !s.extra_static && !s.rescue && s.eye_only &&
               s.wake_us >= 0 && s.wake_dma_us <= 25000;
     printf("PET_SCHEDULE ok=%d span_us=%u edges=%u callbacks=%u draws=%u callback_millihz=%u "
-           "panel_millihz=%u skipped_poses=%u late=%u max_te_dma_us=%u extra_static=%u "
+           "panel_millihz=%u subject_changes=%u subject_millihz=%u skipped_poses=%u late=%u max_te_dma_us=%u extra_static=%u "
            "rescue=%d eye_only=%d event_callback_us=%u event_dma_us=%u err=%d\n",
-           ok, (unsigned)span, edges, s.calls, s.draws, render_mhz, panel_mhz, s.skipped_poses,
+           ok, (unsigned)span, edges, s.calls, s.draws, render_mhz, panel_mhz,s.visible,subject_mhz, s.skipped_poses,
            s.late, (unsigned)s.max_draw_us, s.extra_static, s.rescue, s.eye_only,
            (unsigned)s.wake_us, (unsigned)s.wake_dma_us, err);
     return err != ESP_OK ? err : ok ? ESP_OK : ESP_ERR_INVALID_RESPONSE;
