@@ -4,7 +4,7 @@
 
 本项目让圆屏角色跟随电脑上的 AI Agent 工作：**客户端决定主题，实际模型决定角色，生命周期事件决定姿态；额度、上下文与电量独立显示。**
 
-ESP32-S3 固件默认启动近景像素白龙娘。手指在圆屏上移动时她会看向触点，点按额头会播放一次摸头表演。固件保留 G1 色条、触摸十字和电源诊断入口。浏览器原型可通过本机预览桥跟随 Codex CLI 事件或 BAJI 快照。[板级接口与上板检查](docs/06-hardware-and-environment.md)
+ESP32-S3 固件默认启动 DeepSeek 鲸鱼娘，首屏与检视台相同，在晴海背景中循环播放喂饭动作。可以在圆屏上切换六套动画、十二种 Agent 姿态、四个时段和两种视距。GPT 白龙娘和 G1 板级自检分别保留构建入口。浏览器原型另外支持从本机预览桥接收 Codex CLI 事件或 BAJI 快照。[鲸鱼娘圆屏与操作](docs/16-deepseek-device.md) · [板级接口与上板检查](docs/06-hardware-and-environment.md)
 
 ## 先看这三个入口
 
@@ -33,6 +33,7 @@ ESP32-S3 固件默认启动近景像素白龙娘。手指在圆屏上移动时�
 
 ```text
 main/                       板卡启动、应用选择和可选 G1 诊断
+components/baji_deepseek/    鲸鱼娘的触屏控制、动画时钟、网页圆屏素材与局部绘制
 components/baji_pet_app/     摸头、视线、动作节拍和场景提交
 components/baji_runtime/     按需唤醒显示任务，汇集触摸及应用更新事件
 components/baji_graphics/    共享的像素矩形和 RGB565 绘制回调
@@ -55,7 +56,7 @@ docs/                       开发规格与验证记录
 reference/original-template 原 HelloWorld / README / 测试备份
 ```
 
-工程使用的 48 张美术源文件已包含在 `assets/ai-girls`，保留上游原始字节与逐文件 SHA-256。GPT 网页模型另外内嵌一张立绘用于离线绘制。设备角色 UI、资源包和 Agent 传输按 G2–G3 接入。
+工程使用的 48 张基础立绘和鲸鱼娘的像素、高清衍生素材都在 `assets/ai-girls`。基础立绘保留上游原始字节与逐文件 SHA-256。设备端可以独立播放角色和处理触摸；实时 Agent 数据传输在后续应用阶段接入。
 
 ## 克隆后预览
 
@@ -88,6 +89,9 @@ python -m unittest discover -s host/tests -v
 # 构建 1.75C 电子宠物固件
 .\tools\build.ps1
 
+# 构建 GPT 白龙娘固件
+.\tools\build.ps1 -Character GPT
+
 # 生成演示帧文件，不向设备发送
 python tools/replay.py protocol/fixtures/codex-flow.jsonl --output .local/codex-demo.frames
 ```
@@ -104,7 +108,7 @@ VS Code 已选用 ESP-IDF 5.5.4。普通 `idf.py build` 和 IDE 的构建按钮�
 
 用 `.\tools\build.ps1 -BoardCheck` 可以单独构建色条、触摸十字和电源诊断固件。使用 IDF 开发终端时也可在 `menuconfig → Electronic badge` 中启用 G1。角色节拍和局部刷新可通过 RAM 基准独立复测。[上板检查步骤](docs/06-hardware-and-environment.md) · [角色互动基准](tests/device/pet_runtime/README.md)
 
-设备内置待机、视线与摸头画面。Agent 实时额度和上下文、更多动作、续航和整机功耗仍在后续阶段。
+鲸鱼娘的十二种 Agent 姿态可以在屏上逐项检视。Agent 实时传输、额度和上下文数据，以及续航和整机功耗，仍在后续阶段。
 
 ## 素材来源
 

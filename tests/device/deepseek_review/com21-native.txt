@@ -1,0 +1,7 @@
+pack_sha256=acd4d9547e2982d7912c28cb6947461cda82bc18705d88f498cfde16aa91c879 reference_sha256=7a291c78083227c0a1b78d618df0e35fda4221b0444470846686ff1b1cb9f415
+DSK_READY max=8257536
+DSK_RECEIVE bytes=3627694 cases=16
+DSK_ASSET bytes=3627694 crc=23567223
+DSK_BOARD w=466 h=466 touch=0 power=0 free_psram=4714532
+DSK_HD_PIXELS cases=16 mismatch=0 elapsed_ms=2694 gallery_dma=16 err=0
+DSK_NATIVE_OK

@@ -1,0 +1,9 @@
+pack_sha256=24f3aadb38975644326ac583b57bf9060bfa47e31cc15dc6756c600db23d2485 reference_sha256=e3fab7f8433b82e3d5ffcd60bcf5ffb9bf0bc16851df786ccf7f09e2131cf159
+DSK_READY max=8257536
+DSK_RECEIVE bytes=4891198 cases=3696
+DSK_ASSET bytes=4891198 crc=bd728bdf
+DSK_BOARD w=466 h=466 touch=0 power=0 free_psram=3374308
+DSK_PIXELS cases=3696 mismatch=0 elapsed_ms=188578
+DSK_PANEL frames=18 min_us=29042 mean_us=30031 max_us=30974
+DSK_LIVE
+DSK_LIVE_OK frames=46 partial=45 max_partial_us=16691 span_us=4024474

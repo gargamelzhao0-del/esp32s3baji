@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="icon" href="data:," />
+<title>DeepSeek 鲸鱼娘 — 双版本形象素材检视台（像素主力版 vs 正常高清备用版）</title>
+<style>
+  :root {
+    --bg: #0b1120;
+    --panel: #131d34;
+    --panel2: #192642;
+    --border: #2a426e;
+    --accent: #72c0ea;
+    --mint: #8ee0dc;
+    --glow: #cbf7f0;
+    --text: #eaf4ff;
+    --muted: #93b0d4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px 24px 40px;
+    background: radial-gradient(circle at 20% 0%, #152546 0%, var(--bg) 55%);
+    color: var(--text);
+    font: 14px/1.55 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+    gap: 12px; padding-bottom: 14px; margin-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: .3px; color: var(--glow); }
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; }
+  .badge {
+    padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    background: rgba(114, 192, 234, .14); border: 1px solid rgba(114, 192, 234, .42);
+    color: #c3effc;
+  }
+  .badge.primary { background: rgba(142, 224, 220, .18); border-color: var(--mint); color: var(--glow); }
+  .attrib { font-size: 12px; color: var(--muted); width: 100%; }
+
+  .grid-main {
+    display: grid; grid-template-columns: minmax(380px, 1.05fr) minmax(380px, 1fr);
+    gap: 18px; align-items: start;
+  }
+  @media (max-width: 960px) { .grid-main { grid-template-columns: 1fr; } }
+
+  .card {
+    background: linear-gradient(180deg, rgba(25, 38, 66, .92), rgba(19, 29, 52, .96));
+    border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, .35);
+  }
+  .card h2 {
+    margin: 0 0 12px; font-size: 15px; display: flex; align-items: center; justify-content: space-between;
+    color: var(--glow);
+  }
+  .card h2 span.tag {
+    font-size: 11px; padding: 2px 8px; border-radius: 6px;
+    background: rgba(114, 192, 234, .16); color: #98dcf6; font-weight: 500;
+  }
+
+  .stage-wrap {
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    padding: 12px; border-radius: 14px; background: rgba(8, 13, 25, .7);
+    border: 1px solid rgba(114, 192, 234, .18);
+  }
+  .bezel {
+    position: relative; width: 368px; height: 368px; border-radius: 50%;
+    padding: 0; display: grid; place-items: center;
+    background: radial-gradient(circle at 30% 25%, #24385c, #0f1728 70%);
+    box-shadow: 0 0 0 4px #2a426e, 0 0 32px rgba(114, 192, 234, .22), inset 0 0 16px rgba(0,0,0,.6);
+  }
+  #badgeCanvas {
+    width: 368px; height: 368px; border-radius: 50%;
+    image-rendering: pixelated; image-rendering: crisp-edges;
+  }
+  .cloud-overlay {
+    position: absolute; inset: 0; pointer-events: none;
+    clip-path: circle(44.5% at 50% 50%);
+  }
+  .cloud-bubble {
+    position: absolute; left: 50.5%; top: 15.5%;
+    min-width: 78px; max-width: 126px; padding: 6px 12px;
+    background: linear-gradient(180deg, #f7fdff, #dff5ff);
+    color: #203159; font-weight: 700; font-size: 13px; text-align: center;
+    border-radius: 18px; border: 2px solid #72c0ea;
+    box-shadow: 0 4px 12px rgba(14, 34, 68, .35);
+    animation: cloudFloat 2.4s ease-in-out infinite;
+    white-space: nowrap;
+  }
+  .cloud-bubble::before, .cloud-bubble::after {
+    content: ""; position: absolute; background: #eaf9ff; border: 1.5px solid #72c0ea; border-radius: 50%;
+  }
+  .cloud-bubble::before { width: 9px; height: 9px; left: 10px; bottom: -8px; }
+  .cloud-bubble::after { width: 5px; height: 5px; left: 4px; bottom: -14px; }
+  @keyframes cloudFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+
+  .hud-line {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center;
+    font-size: 12px; color: var(--muted);
+  }
+  .hud-line strong { color: var(--glow); }
+
+  .section-lbl {
+    margin: 12px 0 6px; font-size: 12px; font-weight: 600; color: var(--mint);
+    letter-spacing: .3px;
+  }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  button {
+    cursor: pointer; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel2); color: var(--text);
+    padding: 6px 10px; font: inherit; font-size: 12px;
+    transition: all .15s ease;
+  }
+  button:hover { border-color: var(--accent); background: #21345a; }
+  button.active {
+    background: linear-gradient(135deg, #2b629c, #2f8b9c);
+    border-color: var(--glow); color: #fff; font-weight: 600;
+    box-shadow: 0 0 12px rgba(142, 224, 220, .32);
+  }
+
+  .hd-stage {
+    position: relative; width: 340px; height: 340px; border-radius: 16px;
+    background: radial-gradient(circle at 50% 65%, rgba(114, 192, 234, .22), rgba(16, 26, 48, .92) 72%);
+    border: 1px solid rgba(114, 192, 234, .26);
+    display: grid; place-items: center; overflow: hidden;
+  }
+  .hd-stage img {
+    width: 320px; height: 320px; object-fit: contain;
+    animation: hdBreathe 2.8s ease-in-out infinite;
+    filter: drop-shadow(0 8px 18px rgba(0, 0, 0, .42));
+  }
+  .hd-stage.paused img { animation-play-state: paused; }
+  @keyframes hdBreathe {
+    0%, 100% { transform: translateY(0) scaleY(1); }
+    50% { transform: translateY(-4px) scaleY(1.015); }
+  }
+  .guide-x, .guide-y {
+    position: absolute; pointer-events: none; display: none;
+  }
+  .hd-stage.guides .guide-x {
+    display: block; left: 47.06%; top: 0; bottom: 0; width: 1px; background: rgba(142, 224, 220, .55);
+  }
+  .hd-stage.guides .guide-y {
+    display: block; left: 0; right: 0; bottom: 3.5%; height: 1px; background: rgba(245, 216, 158, .65);
+  }
+
+  .sheet-viewer {
+    margin-top: 10px; border-radius: 12px; overflow: hidden;
+    border: 1px solid var(--border); background: #0d1527;
+  }
+  .sheet-viewer img { width: 100%; display: block; cursor: zoom-in; }
+
+  .props-grid {
+    margin-top: 18px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px;
+  }
+  @media (max-width: 960px) { .props-grid { grid-template-columns: 1fr; } }
+
+  .prop-list { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .prop-item {
+    background: rgba(11, 18, 34, .78); border: 1px solid rgba(114, 192, 234, .22);
+    border-radius: 10px; padding: 10px 12px; text-align: center;
+  }
+  .prop-item img { image-rendering: pixelated; display: block; margin: 0 auto 6px; }
+  .prop-item span { font-size: 11px; color: var(--muted); }
+
+  .palette-bar {
+    display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; margin-top: 8px;
+  }
+  .swatch { height: 18px; border-radius: 4px; border: 1px solid rgba(255,255,255,.15); }
+
+  .lightbox {
+    position: fixed; inset: 0; background: rgba(6, 10, 20, .88);
+    display: none; place-items: center; padding: 24px; z-index: 99; cursor: zoom-out;
+  }
+  .lightbox.open { display: grid; }
+  .lightbox img { max-width: 94vw; max-height: 92vh; border-radius: 12px; border: 2px solid var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>DeepSeek 鲸鱼娘（深蓝女仆）· 双版本形象素材检视台</h1>
+    <div class="attrib">CC BY-NC-SA 4.0 · 原型「溟月」上善无形 · 女仆设定 ZipZipPipe · 12 态基础立绘 CrossPet · 舞台：汐光海港 (Tide Harbor)</div>
+  </div>
+  <div class="badges">
+    <span class="badge primary">主开发版：V1 像素 v2 精品版 · 6 套专属互动 · 0 针孔 · 0 裂缝</span>
+    <span class="badge">备用版：V2 高清 12 态 + 6 专属透明姿态 (680×680 RGBA)</span>
+  </div>
+</header>
+
+<div class="grid-main">
+  <!-- LEFT: Version 1 Pixel Primary -->
+  <section class="card">
+    <h2>Version 1 · 像素风格主力开发版 <span class="tag">184×184 AMOLED 实景仿真</span></h2>
+    <div class="stage-wrap">
+      <div class="bezel">
+        <canvas id="badgeCanvas" width="184" height="184"></canvas>
+        <div class="cloud-overlay">
+          <div id="cloudBubble" class="cloud-bubble">准备就绪~</div>
+        </div>
+      </div>
+      <div class="hud-line">
+        <span>模式：<strong id="hudMode">clip: idle</strong></span>
+        <span>帧：<strong id="hudFrame">0 / 8</strong></span>
+        <span>视距：<strong id="hudView">full</strong></span>
+        <span>时段：<strong id="hudPhase">day</strong></span>
+        <button id="btnPlayPause">暂停</button>
+        <button id="btnPrev">◀ 上一帧</button>
+        <button id="btnNext">下一帧 ▶</button>
+      </div>
+    </div>
+
+    <div class="section-lbl">① 6 套专属像素动画与 DeepSeek 特色互动（点击实时播放，右侧联动高清专属原画）</div>
+    <div class="btn-row" id="clipBtns"></div>
+
+    <div class="section-lbl">② 12 态 Agent 状态（同步联动右侧 V2 高清立绘）</div>
+    <div class="btn-row" id="stateBtns"></div>
+
+    <div class="section-lbl">③ 视距 &amp; 汐光海港 4 时段海洋舞台（验证深蓝女仆裙对比度）</div>
+    <div class="btn-row">
+      <button id="viewFull" class="active">全身 Full (5.15)</button>
+      <button id="viewClose">特写 Close (3.55)</button>
+      <button data-phase="dawn">晨雾 Dawn</button>
+      <button data-phase="day" class="active">晴海 Day</button>
+      <button data-phase="dusk">灯塔 Dusk</button>
+      <button data-phase="night">荧光夜海 Night</button>
+    </div>
+  </section>
+
+  <!-- RIGHT: Version 2 Normal HD Backup -->
+  <section class="card">
+    <h2>Version 2 · 正常高清动画备用版 <span class="tag">680×680 头心对齐 + 骨骼设定</span></h2>
+    <div class="stage-wrap">
+      <div id="hdStage" class="hd-stage guides">
+        <img id="hdPoseImg" src="../../../normal/deepseek/v1/poses/idle.png" alt="DeepSeek HD Pose" />
+        <div class="guide-x"></div>
+        <div class="guide-y"></div>
+      </div>
+      <div class="hud-line">
+        <span>高清联动姿态：<strong id="hdPoseName">idle.png (680×680)</strong></span>
+        <button id="btnToggleGuides" class="active">头心/脚底参考线</button>
+        <button id="btnToggleHdAnim" class="active">呼吸动效</button>
+      </div>
+    </div>
+
+    <div class="section-lbl">④ V2 高清角色设定图集（点击图片可全屏放大）</div>
+    <div class="btn-row" id="sheetBtns"></div>
+    <div class="sheet-viewer">
+      <img id="sheetPreview" src="../../../normal/deepseek/v1/deepseek-signature-interactions-sheet.png" alt="V2 HD Concept Sheet" />
+    </div>
+  </section>
+</div>
+
+<div class="props-grid">
+  <section class="card">
+    <h2>原生像素道具 &amp; 16×16 UI 图标 <span class="tag">3× 像素无损放大</span></h2>
+    <div class="prop-list">
+      <div class="prop-item"><img src="props/rice-bowl.png" width="84" height="72" alt="rice bowl" /><span>白米饭碗 28×24</span></div>
+      <div class="prop-item"><img src="props/mega-rice-basin.png" width="138" height="108" alt="mega basin" /><span>巨型大饭盆 46×36</span></div>
+      <div class="prop-item"><img src="props/weight-scale.png" width="90" height="66" alt="weight scale" /><span>红线体重秤 30×22</span></div>
+      <div class="prop-item"><img src="props/wave-pillow.png" width="102" height="72" alt="wave pillow" /><span>浪花抱枕 34×24</span></div>
+      <div class="prop-item"><img src="props/jellyfish-2f.png" width="144" height="78" alt="jellyfish" /><span>荧光小水母 2f</span></div>
+      <div class="prop-item"><img src="props/icons-16x16.png" width="224" height="32" alt="icons 16x16" /><span>7 枚 16×16 徽章图标 (2×)</span></div>
+    </div>
+  </section>
+  <section class="card">
+    <h2>40 色「Ocean-Maid 深海女仆」索引调色板 <span class="tag">0 针孔 · ESP32 友好</span></h2>
+    <div id="paletteBar" class="palette-bar"></div>
+    <p style="font-size:12px;color:var(--muted);margin:10px 0 0;">
+      索引 <code>0</code> 保留为透明色，索引 <code>1..40</code> 覆盖深海藏青女仆裙、蓝青渐变长发、鲸鱼头鳍与分叉尾、暖奶油肤色与桃粉腮红、金边蝴蝶结、白米饭与荧光水母青光。
+    </p>
+  </section>
+</div>
+
+<div id="lightbox" class="lightbox"><img id="lightboxImg" src="../../../normal/deepseek/v1/deepseek-signature-interactions-sheet.png" alt="zoom" /></div>
+
+<script>
+(() => {
+  const TILE_W = 138, TILE_H = 132, COLS = 8;
+  const POSES = [
+    ["idle", "待机", 4, "准备就绪~"],
+    ["thinking", "深度思考", 6, "思考中…"],
+    ["reading", "查文件", 6, "看代码~"],
+    ["writing", "写代码", 6, "敲代码中"],
+    ["running", "运行中", 4, "全速运行!"],
+    ["searching", "检索中", 6, "找线索~"],
+    ["asking", "等确认", 4, "要确认嘛?"],
+    ["happy", "完成啦", 0, "完成啦✦"],
+    ["oops", "出错了", 1, "晕乎乎…"],
+    ["tired", "限流饿了", 0, "想吃饭饭"],
+    ["compact", "压缩中", 4, "压紧行李"],
+    ["sleeping", "休眠中", 5, "呼噜呼噜"],
+  ];
+  const CLIPS = [
+    { id: "idle", label: "🌊 待机呼吸 (8f)", file: "deepseek-idle-anim.png", frames: 8, fps: 6, icon: 4, hdSrc: "../../../normal/deepseek/v1/poses/idle.png", hdLbl: "poses/idle.png", bubble: "在岗待命~" },
+    { id: "feed-rice", label: "🍚 喂白米饭+大饭盆 (12f)", file: "deepseek-feed-rice.png", frames: 12, fps: 7, icon: 0, hdSrc: "../../../normal/deepseek/v1/signature-poses/feed_mega_basin.png", hdLbl: "signature-poses/feed_mega_basin.png", bubble: "白饭真香!" },
+    { id: "sulk-weigh", label: "⚖️ 称体重·才不胖 (10f)", file: "deepseek-sulk-weigh.png", frames: 10, fps: 7, icon: 1, hdSrc: "../../../normal/deepseek/v1/signature-poses/sulk_weigh.png", hdLbl: "signature-poses/sulk_weigh.png", bubble: "才不胖!!" },
+    { id: "ahoge-splash", label: "💧 弹呆毛喷水花 (8f)", file: "deepseek-ahoge-splash.png", frames: 8, fps: 8, icon: 2, hdSrc: "../../../normal/deepseek/v1/signature-poses/ahoge_spout.png", hdLbl: "signature-poses/ahoge_spout.png", bubble: "噗咻水花~" },
+    { id: "jellyfish-play", label: "🪼 逗荧光小水母 (8f)", file: "deepseek-jellyfish-play.png", frames: 8, fps: 7, icon: 3, hdSrc: "../../../normal/deepseek/v1/signature-poses/jellyfish_play.png", hdLbl: "signature-poses/jellyfish_play.png", bubble: "水母发光✦" },
+    { id: "deepsleep-nap", label: "💤 浪花抱枕休眠 (8f)", file: "deepseek-deepsleep-nap.png", frames: 8, fps: 4, icon: 5, hdSrc: "../../../normal/deepseek/v1/signature-poses/wave_pillow_nap.png", hdLbl: "signature-poses/wave_pillow_nap.png", bubble: "没摸鱼zz" },
+  ];
+  const HD_SHEETS = [
+    { label: "6大特色互动图", file: "../../../normal/deepseek/v1/deepseek-signature-interactions-sheet.png" },
+    { label: "2头身三视图+拆件", file: "../../../normal/deepseek/v1/deepseek-normal-rig-turnaround.png" },
+    { label: "2.5头身全身备选", file: "../../../normal/deepseek/v1/deepseek-normal-fullbody-sheet.png" },
+    { label: "12态对齐校验图", file: "../../../normal/deepseek/v1/normal-12-poses-aligned.png" },
+  ];
+  const PALETTE = (
+    "20243a 2c3456 3b4774 4d6096 637bb4 7f99cf a3bbe3 " +
+    "2f64a0 3e83c4 4ea6dc 5cc8ea 7ee2f4 b4f3fc ebfbff " +
+    "c5cfe2 dbe2f0 ecf1f9 f8fafe ffffff " +
+    "475274 606f96 8192b8 b5c2da " +
+    "fff0e6 f6dfd4 ebc9bf e4a6ae f493a6 e65f77 b83d54 " +
+    "7e5d40 b58858 e0b77c f7da92 fff3bd e3d8ce " +
+    "2f8d9c 50bebf 86e8de cefaf2"
+  ).split(" ");
+
+  const PHASES = {
+    dawn: { sky: [[0,[54,72,118]],[48,[96,126,168]],[84,[176,198,220]],[108,[238,214,206]]], mist:[176,232,238], st:[122,196,216], sb:[78,138,174], foam:[235,250,255], sun:[144,62,"#fff0cc"], stars:14, bio:false },
+    day:  { sky: [[0,[52,112,178]],[46,[88,160,216]],[82,[144,212,238]],[108,[206,242,248]]], mist:[196,246,250], st:[108,198,228], sb:[62,138,188], foam:[244,252,255], sun:[146,48,"#fff6d4"], stars:0, bio:false },
+    dusk: { sky: [[0,[38,44,86]],[44,[74,76,128]],[78,[158,118,152]],[106,[232,168,162]]], mist:[152,214,226], st:[102,164,196], sb:[54,94,136], foam:[246,218,216], sun:[142,82,"#ffd0a4"], stars:42, bio:false },
+    night:{ sky: [[0,[16,24,52]],[44,[24,38,78]],[80,[36,68,112]],[108,[58,116,148]]], mist:[118,224,224], st:[54,136,162], sb:[26,62,98], foam:[176,248,242], sun:null, stars:88, bio:true },
+  };
+
+  const canvas = document.getElementById("badgeCanvas");
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+
+  const imgs = {};
+  function loadImg(key, src) {
+    const im = new Image();
+    im.src = src;
+    imgs[key] = im;
+  }
+  loadImg("states", "deepseek-states-atlas.png");
+  loadImg("icons", "props/icons-16x16.png");
+  CLIPS.forEach(c => loadImg("clip:" + c.id, c.file));
+
+  let state = {
+    mode: "clip", // "clip" | "state"
+    clipId: "feed-rice",
+    poseIdx: 0,
+    view: "full",
+    phase: "day",
+    frame: 0,
+    playing: true,
+    lastTick: 0,
+  };
+
+  const plates = {};
+  function getPlate(phase) {
+    if (plates[phase]) return plates[phase];
+    const c = document.createElement("canvas");
+    c.width = 184; c.height = 184;
+    const g = c.getContext("2d");
+    const th = PHASES[phase];
+    for (let i = 1; i < th.sky.length; i++) {
+      const [y0, c0] = th.sky[i - 1], [y1, c1] = th.sky[i];
+      for (let y = y0; y < y1; y++) {
+        const t = (Math.floor((y - y0) / 3) * 3) / Math.max(1, y1 - y0);
+        const rgb = [0,1,2].map(k => Math.round(c0[k] + (c1[k] - c0[k]) * t));
+        g.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+        g.fillRect(0, y, 184, 1);
+      }
+    }
+    let seed = 7331;
+    for (let i = 0; i < th.stars; i++) {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      const sx = 14 + (seed % 156);
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      const sy = 14 + (seed % 74);
+      g.fillStyle = (seed & 3) === 0 ? "#ebfaff" : "rgba(188,218,245,0.85)";
+      g.fillRect(sx, sy, 1, 1);
+    }
+    if (th.sun) {
+      g.fillStyle = th.sun[2];
+      g.beginPath(); g.arc(th.sun[0], th.sun[1], 6, 0, Math.PI * 2); g.fill();
+    } else {
+      g.fillStyle = "#f5f6dc";
+      g.beginPath(); g.arc(145, 43, 7, 0, Math.PI * 2); g.fill();
+      g.fillStyle = `rgb(${th.sky[1][1].join(",")})`;
+      g.beginPath(); g.arc(149, 41, 6, 0, Math.PI * 2); g.fill();
+    }
+    // Lighthouse
+    g.fillStyle = "#40567a"; g.fillRect(132, 96, 42, 12);
+    g.fillStyle = "#eef4fa"; g.fillRect(146, 78, 6, 18);
+    g.fillStyle = "#5286bc"; g.fillRect(146, 82, 6, 3); g.fillRect(146, 89, 6, 3);
+    g.fillStyle = "#fff2b6"; g.fillRect(145, 74, 8, 4);
+    // Luminous aqua sea mist horizon
+    for (let y = 88; y < 114; y++) {
+      const a = Math.max(0, 0.68 * (1 - Math.abs(y - 103) / 16));
+      g.fillStyle = `rgba(${th.mist.join(",")},${a.toFixed(2)})`;
+      g.fillRect(0, y, 184, 1);
+    }
+    // Ocean waves
+    for (let y = 106; y < 184; y++) {
+      const t = (Math.floor((y - 106) / 4) * 4) / 78;
+      const rgb = [0,1,2].map(k => Math.round(th.st[k] + (th.sb[k] - th.st[k]) * t));
+      g.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+      g.fillRect(0, y, 184, 1);
+    }
+    for (const [ry, sp] of [[110,42],[118,56],[126,48],[135,62],[145,52]]) {
+      g.fillStyle = `rgba(${th.foam.join(",")},0.58)`;
+      g.fillRect(92 - sp, ry, sp * 2, 1);
+    }
+    if (th.bio) {
+      for (const [bx, by] of [[30,128],[44,142],[146,132],[156,118],[64,148],[126,146]]) {
+        g.fillStyle = "rgba(142,224,220,0.45)"; g.fillRect(bx - 1, by - 1, 3, 3);
+        g.fillStyle = "#ebfaff"; g.fillRect(bx, by, 1, 1);
+      }
+    }
+    plates[phase] = c;
+    return c;
+  }
+
+  function renderFrame() {
+    ctx.clearRect(0, 0, 184, 184);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(92, 92, 82, 0, Math.PI * 2);
+    ctx.clip();
+
+    ctx.drawImage(getPlate(state.phase), 0, 0);
+
+    // Draw sprite tile (138x132)
+    let sheet = null, idx = 0, total = 1, iconIdx = 4, label = "IDLE";
+    if (state.mode === "clip") {
+      const clip = CLIPS.find(c => c.id === state.clipId) || CLIPS[0];
+      sheet = imgs["clip:" + clip.id];
+      total = clip.frames;
+      idx = state.frame % total;
+      iconIdx = clip.icon;
+      label = clip.id.toUpperCase();
+    } else {
+      sheet = imgs["states"];
+      total = POSES.length;
+      idx = state.poseIdx;
+      iconIdx = POSES[idx][2];
+      label = POSES[idx][0].toUpperCase();
+    }
+
+    if (sheet && sheet.complete && sheet.naturalWidth > 0) {
+      const rowsPer = Math.ceil(total / COLS);
+      const r = Math.floor(idx / COLS) + (state.view === "close" ? rowsPer : 0);
+      const c = idx % COLS;
+      const oy = state.view === "close" ? 22 : 18;
+      ctx.drawImage(sheet, c * TILE_W, r * TILE_H, TILE_W, TILE_H, 23, oy, TILE_W, TILE_H);
+    }
+
+    // Top HUD header
+    ctx.fillStyle = "rgba(18,28,52,0.75)";
+    ctx.fillRect(54, 13, 76, 11);
+    ctx.fillStyle = "#cbf7f0";
+    ctx.font = "bold 8px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(">_ DEEPSEEK", 92, 21);
+
+    // Left 19x19 pixel enamel medallion
+    ctx.fillStyle = "rgba(24,40,68,0.9)";
+    ctx.fillRect(15, 78, 19, 19);
+    ctx.strokeStyle = "#8ee0dc";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(15.5, 78.5, 18, 18);
+    const ic = imgs["icons"];
+    if (ic && ic.complete && ic.naturalWidth > 0) {
+      ctx.drawImage(ic, iconIdx * 16, 0, 16, 16, 17, 80, 16, 16);
+    }
+
+    // Bottom status capsule
+    ctx.fillStyle = "rgba(18,30,54,0.86)";
+    ctx.fillRect(52, 154, 80, 13);
+    ctx.strokeStyle = "rgba(114,192,234,0.85)";
+    ctx.strokeRect(52.5, 154.5, 79, 12);
+    ctx.fillStyle = "#ebfaff";
+    ctx.fillText(label.slice(0, 12), 92, 163);
+    ctx.restore();
+
+    // Update HUD text
+    document.getElementById("hudMode").textContent = state.mode === "clip" ? `clip: ${state.clipId}` : `state: ${POSES[state.poseIdx][0]}`;
+    document.getElementById("hudFrame").textContent = `${idx + 1} / ${total}`;
+    document.getElementById("hudView").textContent = state.view;
+    document.getElementById("hudPhase").textContent = state.phase;
+  }
+
+  function syncUi() {
+    document.querySelectorAll("#clipBtns button").forEach(b => b.classList.toggle("active", state.mode === "clip" && b.dataset.clip === state.clipId));
+    document.querySelectorAll("#stateBtns button").forEach(b => b.classList.toggle("active", state.mode === "state" && Number(b.dataset.idx) === state.poseIdx));
+    document.getElementById("viewFull").classList.toggle("active", state.view === "full");
+    document.getElementById("viewClose").classList.toggle("active", state.view === "close");
+    document.querySelectorAll("[data-phase]").forEach(b => b.classList.toggle("active", b.dataset.phase === state.phase));
+    document.getElementById("btnPlayPause").textContent = state.playing ? "暂停" : "播放";
+
+    // Sync bubble & V2 HD pose (uses bespoke transparent 680x680 signature pose when playing a signature clip!)
+    let hdSrc = "../../../normal/deepseek/v1/poses/idle.png", hdLbl = "poses/idle.png", bubble = "在岗待命~";
+    if (state.mode === "clip") {
+      const clip = CLIPS.find(c => c.id === state.clipId) || CLIPS[0];
+      hdSrc = clip.hdSrc;
+      hdLbl = clip.hdLbl;
+      bubble = clip.bubble;
+    } else {
+      const pKey = POSES[state.poseIdx][0];
+      hdSrc = `../../../normal/deepseek/v1/poses/${pKey}.png`;
+      hdLbl = `poses/${pKey}.png`;
+      bubble = POSES[state.poseIdx][3];
+    }
+    document.getElementById("cloudBubble").textContent = bubble;
+    document.getElementById("hdPoseImg").src = hdSrc;
+    document.getElementById("hdPoseName").textContent = `${hdLbl} (680×680 透明对齐)`;
+    renderFrame();
+  }
+
+  // Build clip buttons
+  const clipWrap = document.getElementById("clipBtns");
+  CLIPS.forEach(c => {
+    const btn = document.createElement("button");
+    btn.textContent = c.label;
+    btn.dataset.clip = c.id;
+    btn.onclick = () => { state.mode = "clip"; state.clipId = c.id; state.frame = 0; state.playing = true; syncUi(); };
+    clipWrap.appendChild(btn);
+  });
+
+  // Build 12 state buttons
+  const stWrap = document.getElementById("stateBtns");
+  POSES.forEach(([id, zh], idx) => {
+    const btn = document.createElement("button");
+    btn.textContent = `${idx + 1}. ${zh} (${id})`;
+    btn.dataset.idx = idx;
+    btn.onclick = () => { state.mode = "state"; state.poseIdx = idx; syncUi(); };
+    stWrap.appendChild(btn);
+  });
+
+  // Build HD sheet buttons
+  const shWrap = document.getElementById("sheetBtns");
+  const shImg = document.getElementById("sheetPreview");
+  HD_SHEETS.forEach((s, i) => {
+    const btn = document.createElement("button");
+    btn.textContent = s.label;
+    if (i === 0) btn.classList.add("active");
+    btn.onclick = () => {
+      shWrap.querySelectorAll("button").forEach(x => x.classList.remove("active"));
+      btn.classList.add("active");
+      shImg.src = s.file;
+    };
+    shWrap.appendChild(btn);
+  });
+
+  // Lightbox zoom
+  const lb = document.getElementById("lightbox"), lbImg = document.getElementById("lightboxImg");
+  shImg.onclick = () => { lbImg.src = shImg.src; lb.classList.add("open"); };
+  lb.onclick = () => lb.classList.remove("open");
+
+  // Controls
+  document.getElementById("viewFull").onclick = () => { state.view = "full"; syncUi(); };
+  document.getElementById("viewClose").onclick = () => { state.view = "close"; syncUi(); };
+  document.querySelectorAll("[data-phase]").forEach(b => {
+    b.onclick = () => { state.phase = b.dataset.phase; syncUi(); };
+  });
+  document.getElementById("btnPlayPause").onclick = () => { state.playing = !state.playing; syncUi(); };
+  document.getElementById("btnPrev").onclick = () => {
+    state.playing = false;
+    const total = state.mode === "clip" ? (CLIPS.find(c => c.id === state.clipId)?.frames || 8) : POSES.length;
+    if (state.mode === "clip") state.frame = (state.frame - 1 + total) % total;
+    else state.poseIdx = (state.poseIdx - 1 + total) % total;
+    syncUi();
+  };
+  document.getElementById("btnNext").onclick = () => {
+    state.playing = false;
+    const total = state.mode === "clip" ? (CLIPS.find(c => c.id === state.clipId)?.frames || 8) : POSES.length;
+    if (state.mode === "clip") state.frame = (state.frame + 1) % total;
+    else state.poseIdx = (state.poseIdx + 1) % total;
+    syncUi();
+  };
+  document.getElementById("btnToggleGuides").onclick = (e) => {
+    const st = document.getElementById("hdStage");
+    st.classList.toggle("guides");
+    e.target.classList.toggle("active", st.classList.contains("guides"));
+  };
+  document.getElementById("btnToggleHdAnim").onclick = (e) => {
+    const st = document.getElementById("hdStage");
+    st.classList.toggle("paused");
+    e.target.classList.toggle("active", !st.classList.contains("paused"));
+  };
+
+  // Palette swatches
+  const pBar = document.getElementById("paletteBar");
+  PALETTE.forEach((hex, i) => {
+    const d = document.createElement("div");
+    d.className = "swatch";
+    d.style.background = "#" + hex;
+    d.title = `Index ${i + 1}: #${hex}`;
+    pBar.appendChild(d);
+  });
+
+  function loop(ts) {
+    if (state.mode === "clip" && state.playing) {
+      const clip = CLIPS.find(c => c.id === state.clipId) || CLIPS[0];
+      const stepMs = 1000 / clip.fps;
+      if (ts - state.lastTick >= stepMs) {
+        state.frame = (state.frame + 1) % clip.frames;
+        state.lastTick = ts;
+        renderFrame();
+      }
+    } else {
+      renderFrame();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  syncUi();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

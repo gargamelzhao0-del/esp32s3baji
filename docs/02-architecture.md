@@ -21,6 +21,7 @@
 | components/baji_graphics、baji_scene_damage | 约定物理像素矩形、RGB565 回调和有界变化区域，接口独立于板卡 |
 | components/baji_board、baji_display、baji_peripherals、baji_vsync | 板卡生命周期和条带缓冲、面板传输、触摸与电源、扫描同步 |
 | components/baji_runtime | 管理显示调度与触摸读取任务，等待应用期限或外部事件，处理重试及退出 |
+| components/baji_deepseek | 默认鲸鱼娘应用。将触屏操作映射为检视台命令，按动画和气泡的下一次变化调度 RGB565 局部绘制 |
 | components/baji_pet、baji_pet_app | 载入并校验素材，绘制 RGB565 像素；上层播放器处理动作、触点与视线 |
 | components/baji_core | 已实现纯 C 状态投影、序号去重、连接 TTL、指标 TTL、姿态选择 |
 | contracts/baji_ports.h | 资源、输入、UI、传输接口草案。硬件接口使用 `baji_board.h` |

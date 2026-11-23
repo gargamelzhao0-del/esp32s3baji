@@ -3,6 +3,9 @@
 *.ps1 text eol=crlf
 *.png -text
 *.webp -text
+*.dsk -text
+*.hds -text
+*.hda -text
 
 # This upstream source record is verified against its original byte hash.
 assets/ai-girls/sources/crosspet/LICENSE.md -text

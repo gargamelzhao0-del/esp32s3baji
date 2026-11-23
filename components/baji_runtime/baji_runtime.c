@@ -41,6 +41,12 @@ static void read_input(void *context)
         }
         if (touch.pressed == previous.pressed &&
             (!touch.pressed || (touch.x == previous.x && touch.y == previous.y))) continue;
+        /* The CST9217's release packet contains no coordinates. Preserve
+         * the last drag point even if a whole swipe fits between callbacks. */
+        if (!touch.pressed) {
+            touch.x = previous.x;
+            touch.y = previous.y;
+        }
         portENTER_CRITICAL(&r->lock);
         if (touch.pressed && !previous.pressed) {
             r->latest.presses++;

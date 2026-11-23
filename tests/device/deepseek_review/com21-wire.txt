@@ -1,0 +1,9 @@
+pack_sha256=9c7f12e0a8e4097ecaf20d5ceed4fa1433be0024e19c7a68869a6a8bceaabdf3 reference_sha256=cf5ed1d0edbdbc5cc25123bd1134c5ea7652aedfc61cc75e4f7f3cf4b0817a86 motion_sha256=4c4971d7219d30c9d5dda397e0b75e6bfe644ccc4a2b33daec1c17aaf1f0ff5e motion_reference_sha256=fb4804e34aefa2582fe5cddf20d9ff78904871d719ca56fc216dcc7bec986f01
+DSK_READY max=8257536
+DSK_RECEIVE bytes=2241299 cases=16
+DSK_ASSET bytes=2241299 crc=347f6aed
+DSK_BOARD w=466 h=466 touch=0 power=0 free_psram=6090788
+DSK_HD_PIXELS cases=16 mismatch=0 elapsed_ms=1889 gallery_dma=16 err=0
+DSK_MOTION pages=272 stages=544 mismatch=0 max_select_us=29444 max_dma_us=12546 warm_select_max_us=29444 warm_dma_max_us=12543 warm_pair_max_us=41975 err=0
+DSK_BREATH cycles=3 steps=96 expected=96 skipped=0 past_next=4 max_us=38610 err=0
+DSK_NATIVE_OK

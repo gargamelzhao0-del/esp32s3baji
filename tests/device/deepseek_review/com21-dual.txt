@@ -1,0 +1,13 @@
+pack_sha256=24f3aadb38975644326ac583b57bf9060bfa47e31cc15dc6756c600db23d2485 reference_sha256=e3fab7f8433b82e3d5ffcd60bcf5ffb9bf0bc16851df786ccf7f09e2131cf159 hd_sha256=9c7f12e0a8e4097ecaf20d5ceed4fa1433be0024e19c7a68869a6a8bceaabdf3 hd_records_sha256=9f751c482f654ce7a21fe29528629acdcf2045c8a37b3fed243b94fd25be23a2
+DSK_READY max=8257536
+DSK_RECEIVE bytes=4891198 cases=636
+DSK_ASSET bytes=4891198 crc=bd728bdf
+DSK_HD_RECEIVE bytes=2241299 cases=628
+DSK_HD_ASSET bytes=2241299 crc=347f6aed
+DSK_BOARD w=466 h=466 touch=0 power=0 free_psram=1097564
+DSK_PIXELS cases=636 mismatch=0 elapsed_ms=32378
+DSK_PANEL frames=18 min_us=29041 mean_us=30030 max_us=30972
+DSK_HD_PIXELS cases=628 mismatch=0 elapsed_ms=72011 err=0
+DSK_SWITCH hd=1 pixel=1
+DSK_LIVE
+DSK_LIVE_OK frames=44 partial=43 max_partial_us=16976 span_us=4031014

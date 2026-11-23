@@ -1,0 +1,223 @@
+{
+  "character_id": "deepseek-whale-girl",
+  "display_name": "DeepSeek 鲸鱼娘（深蓝女仆）",
+  "version": "pixel-v2",
+  "primary_for_dev": true,
+  "license": "CC BY-NC-SA 4.0",
+  "attribution": "原型「溟月」上善无形 · 女仆设定 ZipZipPipe · 基础12态立绘 CrossPet",
+  "tile_size": [
+    138,
+    132
+  ],
+  "badge_geometry": {
+    "face_side": 184,
+    "face_radius": 82,
+    "origin_x": 23,
+    "origin_y_full": 18,
+    "origin_y_close": 22
+  },
+  "crops_on_680": {
+    "full": [
+      -30.0,
+      -24.0,
+      5.15
+    ],
+    "close": [
+      76.0,
+      -6.0,
+      3.55
+    ]
+  },
+  "palette_40_v2": [
+    "#20243a",
+    "#2c3456",
+    "#3b4774",
+    "#4d6096",
+    "#637bb4",
+    "#7f99cf",
+    "#a3bbe3",
+    "#2f64a0",
+    "#3e83c4",
+    "#4ea6dc",
+    "#5cc8ea",
+    "#7ee2f4",
+    "#b4f3fc",
+    "#ebfbff",
+    "#c5cfe2",
+    "#dbe2f0",
+    "#ecf1f9",
+    "#f8fafe",
+    "#ffffff",
+    "#475274",
+    "#606f96",
+    "#8192b8",
+    "#b5c2da",
+    "#fff0e6",
+    "#f6dfd4",
+    "#ebc9bf",
+    "#e4a6ae",
+    "#f493a6",
+    "#e65f77",
+    "#b83d54",
+    "#7e5d40",
+    "#b58858",
+    "#e0b77c",
+    "#f7da92",
+    "#fff3bd",
+    "#e3d8ce",
+    "#2f8d9c",
+    "#50bebf",
+    "#86e8de",
+    "#cefaf2"
+  ],
+  "poses_order": [
+    "idle",
+    "thinking",
+    "reading",
+    "writing",
+    "running",
+    "searching",
+    "asking",
+    "happy",
+    "oops",
+    "tired",
+    "compact",
+    "sleeping"
+  ],
+  "state_atlases": {
+    "deepseek-states-full.png": "af59a4763549d53424e1138043a6532999d672c2b6769645b491d11ec2fbbd3b",
+    "deepseek-states-close.png": "28f5ab2c5e6efcdb74f0ae905a83398698a9074952dd74e860e209a4128ec133",
+    "deepseek-states-atlas.png": "417b4174c49288a1b4f43f9cc257dd4fa448fe45f5785247bf64c723c643faa3"
+  },
+  "clips": {
+    "idle": {
+      "file": "deepseek-idle-anim.png",
+      "frames": 8,
+      "cols": 8,
+      "fps": 6,
+      "loop": true,
+      "tile_size": [
+        138,
+        132
+      ],
+      "views": [
+        "full",
+        "close"
+      ],
+      "sha256": "38410217b74daee5769c0bcbb282d62dd85ad81533843402cf6eb7b4fa9d265b"
+    },
+    "feed-rice": {
+      "file": "deepseek-feed-rice.png",
+      "frames": 12,
+      "cols": 8,
+      "fps": 7,
+      "loop": false,
+      "tile_size": [
+        138,
+        132
+      ],
+      "views": [
+        "full",
+        "close"
+      ],
+      "sha256": "c1ec2cd5af9a5fb9d0ad514befcd690c6994cfe02e2fe9995205c6a5995861f4"
+    },
+    "sulk-weigh": {
+      "file": "deepseek-sulk-weigh.png",
+      "frames": 10,
+      "cols": 8,
+      "fps": 7,
+      "loop": false,
+      "tile_size": [
+        138,
+        132
+      ],
+      "views": [
+        "full",
+        "close"
+      ],
+      "sha256": "0c8e8a5f6d1fc83e8a86446d21ad0f9bac79e282c941f8ea880cebd86584070b"
+    },
+    "ahoge-splash": {
+      "file": "deepseek-ahoge-splash.png",
+      "frames": 8,
+      "cols": 8,
+      "fps": 8,
+      "loop": false,
+      "tile_size": [
+        138,
+        132
+      ],
+      "views": [
+        "full",
+        "close"
+      ],
+      "sha256": "c9c088d1f5e826e447d9813651b0fea3acf134e5701d52110476c6233ee7a4a7"
+    },
+    "jellyfish-play": {
+      "file": "deepseek-jellyfish-play.png",
+      "frames": 8,
+      "cols": 8,
+      "fps": 7,
+      "loop": false,
+      "tile_size": [
+        138,
+        132
+      ],
+      "views": [
+        "full",
+        "close"
+      ],
+      "sha256": "a4064546a660f88053f15577e33f1a6010d283fba1f79df210639877a1c6b188"
+    },
+    "deepsleep-nap": {
+      "file": "deepseek-deepsleep-nap.png",
+      "frames": 8,
+      "cols": 8,
+      "fps": 4,
+      "loop": true,
+      "tile_size": [
+        138,
+        132
+      ],
+      "views": [
+        "full",
+        "close"
+      ],
+      "sha256": "493a714d11c9f937e40d62725822f5c1335c5d8379f78831c79433bb6c0b1b86"
+    }
+  },
+  "props_and_icons": {
+    "props/rice-bowl.png": "809bd4cf0a29f56ff14c807350384ed3f5587b862bb96db575d7f34d9c00501d",
+    "props/mega-rice-basin.png": "db3b25f20f5bb0dbdb6dcec704d49aa422c79f8727b54a88e71dab79f94d7e0f",
+    "props/weight-scale.png": "d033cdf7be426dda4294ca5085a225ac3c3a4915b95f6d0e0f3a5ddfefc8835f",
+    "props/jellyfish-2f.png": "ffd8c2725525b9ab817c8d0766fd0c57e3d563f0b39a35d4fb389b79d29ab7f0",
+    "props/wave-pillow.png": "98b72fb56b7ac487fe8b04e0cd4795d3d8a2465e07ef85ba2fd573e04cf62baa",
+    "props/icons-16x16.png": "dcf129bf7ced381dfb5426fc2b0dbc68dec9df1dff4621a9cfd59e6cfe5fc059"
+  },
+  "icon_order_16x16": [
+    "rice-bowl",
+    "scale-sulk",
+    "splash-drop",
+    "jellyfish",
+    "whale-tail",
+    "wave-sleep",
+    "star-think"
+  ],
+  "stage_theme": "tide-harbor-4-phases",
+  "normal_hd_backup_dir": "../../../normal/deepseek/v1",
+  "normal_hd_signature_poses": {
+    "signature-poses/feed_munch.png": "7db48c19c2af3b38c7532d87837d8a167b379d6cd4d90f591c7925a94d522915",
+    "signature-poses/feed_mega_basin.png": "925bf03e6c1ac34e4edb16d4daa33c25c06066782482ac58dd6db305cc914c64",
+    "signature-poses/sulk_weigh.png": "b625c302959ac63bc491d2ea8788aa85b85f4bfd821df275079e316837c5f130",
+    "signature-poses/ahoge_spout.png": "29168552ddaade9d24254c3bcc348242cf9166255b19c07bb926b9d39e8cc69d",
+    "signature-poses/jellyfish_play.png": "42b6e581944e5d9a909af8a7006ed189552abe7b32e96999b77eccfa24d40e12",
+    "signature-poses/wave_pillow_nap.png": "75f74592ccb2d2f26e4f3da3bc890e083b23cb8e4878e149889c17a566a1feec"
+  },
+  "normal_hd_sheets": {
+    "normal-12-poses-aligned.png": "b0427e68bafdb282c7d5501773c060c62b48fc65fed2a47a73a777e979aa4672",
+    "deepseek-signature-interactions-sheet.png": "7fd4cf2f5fb96d292111e5dc04f2375bc734bef1f3ce060851dc251735040635",
+    "deepseek-normal-rig-turnaround.png": "8d0b84125497f8fb8dcfe438d954b71541fcb97b4a762f200524ed910c033e3a",
+    "deepseek-normal-fullbody-sheet.png": "f3791cd2afedd1ca15d054db534b475f250e93d9145c885d234f78b375cb79ca"
+  }
+}

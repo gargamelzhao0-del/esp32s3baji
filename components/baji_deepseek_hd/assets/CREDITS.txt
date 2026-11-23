@@ -1,0 +1,8 @@
+DeepSeek 鲸鱼娘 · 高清备用舞台
+
+角色原型「溟月」由上善无形设计，深蓝女仆设定来自 ZipZipPipe，12 态基础立绘来自 CrossPet。
+设备素材取自 assets/ai-girls/pixel/deepseek/v1/review.html 右侧的联动立绘与四张设定图集；Chromium 合成角色、投影和参考线后转换为 RGB565。各项源图路径见 authoring/sources.tsv。
+scene.hds、scene-ram.hds 和 motion.hda 中的衍生角色素材采用知识共享署名－非商业性使用－相同方式共享 4.0 国际许可。
+https://creativecommons.org/licenses/by-nc-sa/4.0/
+https://github.com/lokicorvus/crosspet/tree/8954eb8f7f69fcfb8d35e9deceeb78e10c804402
+原作声明见 design/pixel-badge/licenses/CrossPet.md。

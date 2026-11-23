@@ -1,6 +1,6 @@
 # 1.75C 板卡驱动与 MotoNav 移植记录
 
-目标板为 Waveshare ESP32-S3-Touch-AMOLED-1.75C。官方资料和 MotoNav 同型号设备记录一致，芯片为双核 ESP32-S3R8，外接 32 MiB Flash，封装内有 8 MiB PSRAM。C 型 BSP 标记 `BSP_CAPS_SDCARD=0`。宠物固件将角色素材与应用一起打包，factory 分区从 `0x10000` 开始，大小为 4 MiB。带电池和不带电池是两种销售配置，电量由 PMIC 现场上报。[分区表](../partitions.csv) · [微雪板卡页](https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/)
+目标板为 Waveshare ESP32-S3-Touch-AMOLED-1.75C。官方资料和 MotoNav 同型号设备记录一致，芯片为双核 ESP32-S3R8，外接 32 MiB Flash，封装内有 8 MiB PSRAM。C 型 BSP 标记 `BSP_CAPS_SDCARD=0`。双模式固件的 factory 应用分区位于 `0x10000`，容量 12 MiB；其后 `0xc10000` 的 18 MiB 数据分区存放高清呼吸真帧。带电池和不带电池是两种销售配置，电量由 PMIC 现场上报。[分区表](../partitions.csv) · [微雪板卡页](https://docs.waveshare.net/ESP32-S3-Touch-AMOLED-1.75C/)
 
 ## 参考工程读到的实际链路
 

@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.22)
+get_filename_component(BADGE_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+set(EXTRA_COMPONENT_DIRS "${BADGE_ROOT}/components")
+set(BAJI_DEEPSEEK_EXTERNAL_ASSET ON CACHE BOOL "Receive the production pack over USB" FORCE)
+set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/../pet_runtime/sdkconfig.defaults")
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+idf_build_set_property(MINIMAL_BUILD ON)
+project(deepseek_review)

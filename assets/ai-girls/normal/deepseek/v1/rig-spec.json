@@ -1,0 +1,405 @@
+{
+  "character_id": "deepseek-whale-girl",
+  "version": "normal-hd-v2",
+  "license": "CC BY-NC-SA 4.0",
+  "attribution": "原型「溟月」上善无形 · 女仆设定 ZipZipPipe · 12态基础立绘 CrossPet (commit 8954eb8f7f69fcfb8d35e9deceeb78e10c804402)",
+  "canvas": {
+    "width": 680,
+    "height": 680,
+    "target_face_x": 320.0,
+    "target_feet_y": 656
+  },
+  "z_order_layers": [
+    "whale_tail_back",
+    "back_hair_gradient",
+    "back_waist_bow",
+    "body_maid_dress",
+    "apron_whale_emblem",
+    "arms_hands",
+    "head_face_base",
+    "cheek_blush_layer",
+    "eyes_expression_swap",
+    "mouth_swap",
+    "front_bangs_wave",
+    "whale_head_fins_L_R",
+    "side_blue_ribbon",
+    "maid_lace_headdress",
+    "curling_ahoge",
+    "foreground_props_rice_scale_pillow",
+    "fx_water_jellyfish_sparkles"
+  ],
+  "pivots_680": {
+    "root_feet": [
+      320,
+      656
+    ],
+    "torso_chest": [
+      320,
+      448
+    ],
+    "head_neck": [
+      320,
+      352
+    ],
+    "face_center": [
+      320,
+      284
+    ],
+    "curling_ahoge_root": [
+      316,
+      118
+    ],
+    "left_head_fin_root": [
+      202,
+      248
+    ],
+    "right_head_fin_root": [
+      438,
+      248
+    ],
+    "whale_tail_root": [
+      392,
+      515
+    ]
+  },
+  "signature_poses_680": {
+    "signature-poses/feed_munch.png": "7db48c19c2af3b38c7532d87837d8a167b379d6cd4d90f591c7925a94d522915",
+    "signature-poses/feed_mega_basin.png": "925bf03e6c1ac34e4edb16d4daa33c25c06066782482ac58dd6db305cc914c64",
+    "signature-poses/sulk_weigh.png": "b625c302959ac63bc491d2ea8788aa85b85f4bfd821df275079e316837c5f130",
+    "signature-poses/ahoge_spout.png": "29168552ddaade9d24254c3bcc348242cf9166255b19c07bb926b9d39e8cc69d",
+    "signature-poses/jellyfish_play.png": "42b6e581944e5d9a909af8a7006ed189552abe7b32e96999b77eccfa24d40e12",
+    "signature-poses/wave_pillow_nap.png": "75f74592ccb2d2f26e4f3da3bc890e083b23cb8e4878e149889c17a566a1feec"
+  },
+  "concept_sheets": {
+    "normal-12-poses-aligned.png": "b0427e68bafdb282c7d5501773c060c62b48fc65fed2a47a73a777e979aa4672",
+    "deepseek-signature-interactions-sheet.png": "7fd4cf2f5fb96d292111e5dc04f2375bc734bef1f3ce060851dc251735040635",
+    "deepseek-normal-rig-turnaround.png": "8d0b84125497f8fb8dcfe438d954b71541fcb97b4a762f200524ed910c033e3a",
+    "deepseek-normal-fullbody-sheet.png": "f3791cd2afedd1ca15d054db534b475f250e93d9145c885d234f78b375cb79ca"
+  },
+  "poses": {
+    "idle": {
+      "source_size": [
+        616,
+        640
+      ],
+      "offset": [
+        57,
+        19
+      ],
+      "face_center": [
+        319.8,
+        355.9
+      ],
+      "anchors": [
+        319.8,
+        247.9,
+        319.8,
+        369.9,
+        171.8,
+        327.9,
+        469.8,
+        327.9,
+        547.8,
+        533.9
+      ],
+      "sha256": "02baf9f6b23ab543fc72a9f917d7f2a41b1b00a48640a316c32ab0421b8621e2"
+    },
+    "thinking": {
+      "source_size": [
+        563,
+        640
+      ],
+      "offset": [
+        79,
+        19
+      ],
+      "face_center": [
+        320.3,
+        329.5
+      ],
+      "anchors": [
+        320.3,
+        221.5,
+        320.3,
+        343.5,
+        172.3,
+        301.5,
+        470.3,
+        301.5,
+        548.3,
+        507.5
+      ],
+      "sha256": "49af2400a930e73f22719d46c9c4ea9d0821992f834158c2f3cf35d980dbecf3"
+    },
+    "reading": {
+      "source_size": [
+        575,
+        640
+      ],
+      "offset": [
+        75,
+        19
+      ],
+      "face_center": [
+        319.9,
+        335.9
+      ],
+      "anchors": [
+        319.9,
+        227.9,
+        319.9,
+        349.9,
+        171.9,
+        307.9,
+        469.9,
+        307.9,
+        547.9,
+        513.9
+      ],
+      "sha256": "f92dc39b069f334fba1dc64b2398dded2ae537d242345b6e2e462bd9688c31b0"
+    },
+    "writing": {
+      "source_size": [
+        588,
+        640
+      ],
+      "offset": [
+        67,
+        19
+      ],
+      "face_center": [
+        320.0,
+        342.5
+      ],
+      "anchors": [
+        320.0,
+        234.5,
+        320.0,
+        356.5,
+        172.0,
+        314.5,
+        470.0,
+        314.5,
+        548.0,
+        520.5
+      ],
+      "sha256": "0d79402c71ddefb54c809150716884ebf805d90109f34f7553e16414b18f24c1"
+    },
+    "running": {
+      "source_size": [
+        587,
+        640
+      ],
+      "offset": [
+        64,
+        19
+      ],
+      "face_center": [
+        319.6,
+        339.0
+      ],
+      "anchors": [
+        319.6,
+        231.0,
+        319.6,
+        353.0,
+        171.6,
+        311.0,
+        469.6,
+        311.0,
+        547.6,
+        517.0
+      ],
+      "sha256": "b453e8a703a4e65f55cff26c0f085997b6b410d37db2c306f9cfcd8f624a7b9b"
+    },
+    "searching": {
+      "source_size": [
+        585,
+        640
+      ],
+      "offset": [
+        58,
+        19
+      ],
+      "face_center": [
+        319.6,
+        338.0
+      ],
+      "anchors": [
+        319.6,
+        230.0,
+        319.6,
+        352.0,
+        171.6,
+        310.0,
+        469.6,
+        310.0,
+        547.6,
+        516.0
+      ],
+      "sha256": "ebbf05dcfbc2993b33a5ff6d35badf7daabc0b25c4d190750c20caba02145eef"
+    },
+    "asking": {
+      "source_size": [
+        569,
+        640
+      ],
+      "offset": [
+        65,
+        19
+      ],
+      "face_center": [
+        320.0,
+        314.9
+      ],
+      "anchors": [
+        320.0,
+        206.9,
+        320.0,
+        328.9,
+        172.0,
+        286.9,
+        470.0,
+        286.9,
+        548.0,
+        492.9
+      ],
+      "sha256": "ac91a523589c729d15601806e0466bc3b4abaf3a6ec2970c268d1061377778f1"
+    },
+    "happy": {
+      "source_size": [
+        581,
+        640
+      ],
+      "offset": [
+        58,
+        5
+      ],
+      "face_center": [
+        320.2,
+        285.8
+      ],
+      "anchors": [
+        320.2,
+        177.8,
+        320.2,
+        299.8,
+        172.2,
+        257.8,
+        470.2,
+        257.8,
+        548.2,
+        463.8
+      ],
+      "sha256": "93b4992f540ebd34538825c8994903430b5f41519bcbb7ef05eb6f1e4ba08dca"
+    },
+    "oops": {
+      "source_size": [
+        552,
+        640
+      ],
+      "offset": [
+        64,
+        19
+      ],
+      "face_center": [
+        319.6,
+        333.0
+      ],
+      "anchors": [
+        319.6,
+        225.0,
+        319.6,
+        347.0,
+        171.6,
+        305.0,
+        469.6,
+        305.0,
+        547.6,
+        511.0
+      ],
+      "sha256": "f6c6049770a15e87d0e0fae3106281c08a638c4d90070a4a38f7c5c5cb7faefd"
+    },
+    "tired": {
+      "source_size": [
+        572,
+        640
+      ],
+      "offset": [
+        83,
+        19
+      ],
+      "face_center": [
+        320.4,
+        320.8
+      ],
+      "anchors": [
+        320.4,
+        212.8,
+        320.4,
+        334.8,
+        172.4,
+        292.8,
+        470.4,
+        292.8,
+        548.4,
+        498.8
+      ],
+      "sha256": "97d42fe6f00954d4090b6243931fb0bfde44acf9291bd27b7c17fb948d9bff9b"
+    },
+    "compact": {
+      "source_size": [
+        554,
+        640
+      ],
+      "offset": [
+        115,
+        19
+      ],
+      "face_center": [
+        319.7,
+        287.3
+      ],
+      "anchors": [
+        319.7,
+        179.3,
+        319.7,
+        301.3,
+        171.7,
+        259.3,
+        469.7,
+        259.3,
+        547.7,
+        465.3
+      ],
+      "sha256": "da43aa33f78ca6107195e852f590196b89ceb3f5c6dcab6cd3cfb574134232b7"
+    },
+    "sleeping": {
+      "source_size": [
+        555,
+        640
+      ],
+      "offset": [
+        86,
+        19
+      ],
+      "face_center": [
+        319.8,
+        313.8
+      ],
+      "anchors": [
+        319.8,
+        205.8,
+        319.8,
+        327.8,
+        171.8,
+        285.8,
+        469.8,
+        285.8,
+        547.8,
+        491.8
+      ],
+      "sha256": "d1eb6ca32e203430c3b403beb9748492a04bc56327e756f0edcca755c043fd11"
+    }
+  }
+}

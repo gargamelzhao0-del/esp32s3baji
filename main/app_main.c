@@ -1,8 +1,10 @@
 #include "sdkconfig.h"
 #if defined(BAJI_G1_ONLY) || defined(CONFIG_BAJI_BOARD_CHECK)
 #include "board_check.h"
-#else
+#elif defined(BAJI_GPT_PET)
 #include "pet_app.h"
+#else
+#include "baji_deepseek_app.h"
 #endif
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -26,8 +28,10 @@ void app_main(void)
         ESP_LOGW("baji", "flash size unknown: %s", esp_err_to_name(info.flash_status));
 #if defined(BAJI_G1_ONLY) || defined(CONFIG_BAJI_BOARD_CHECK)
     err = baji_board_check_run(board, &info);
-#else
+#elif defined(BAJI_GPT_PET)
     err = pet_app_run(board, &info);
+#else
+    err = deepseek_app_run(board, &info);
 #endif
     ESP_LOGE("baji", "display application stopped: %s", esp_err_to_name(err));
     // app_main's task is deleted when it returns. Keep the owner alive until
