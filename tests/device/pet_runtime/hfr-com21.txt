@@ -13,3 +13,9 @@ PET_PEAK name=pat old=28 next=29 clip=1 select_us=2329 bus_us=14007
 PET_SCHEDULE ok=1 span_us=60012723 edges=3530 callbacks=2882 draws=2882 callback_millihz=48006 panel_millihz=58820 subject_changes=2881 subject_millihz=48006 skipped_poses=0 late=0 max_te_dma_us=15060 extra_static=0 rescue=0 eye_only=1 event_callback_us=5357 event_dma_us=5588 err=0
 PET_END ok=1 functional=1 deadlines=1 err=0
 PET_LIVE
+
+Final interactive handoff after all DeepSeek runs: same BPH5 SHA256, abbreviated schedule qualification.
+PET_ASSET bytes=2372976 crc32=1adbe007 ok=1
+PET_SCHEDULE ok=1 span_us=3349464 edges=197 callbacks=162 draws=162 callback_millihz=48067 panel_millihz=58815 subject_changes=161 subject_millihz=48067 skipped_poses=0 late=0 max_te_dma_us=15103 extra_static=0 rescue=0 eye_only=1 event_callback_us=3841 event_dma_us=4089 err=0
+PET_END ok=1 functional=1 deadlines=1 err=0
+PET_LIVE
