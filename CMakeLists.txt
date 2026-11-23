@@ -2,6 +2,16 @@
 # CMakeLists in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.22)
 set(PROJECT_VER "0.1.0")
+option(BAJI_WIRELESS "Enable the Wi-Fi and BLE agent bridge" ON)
+if(BAJI_G1_ONLY)
+    set(BAJI_WIRELESS OFF)
+endif()
+if(BAJI_WIRELESS)
+    if(NOT SDKCONFIG_DEFAULTS)
+        set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_SOURCE_DIR}/sdkconfig.defaults")
+    endif()
+    list(APPEND SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_SOURCE_DIR}/config/sdkconfig.wireless.defaults")
+endif()
 
 # Keep the old preparation sdkconfig and other build profiles isolated.
 if(NOT DEFINED SDKCONFIG)
@@ -11,6 +21,7 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 # "Trim" the build. Include the minimal set of components, main, and anything it depends on.
 idf_build_set_property(MINIMAL_BUILD ON)
 idf_build_set_property(BAJI_G1_ONLY "${BAJI_G1_ONLY}")
+idf_build_set_property(BAJI_WIRELESS "${BAJI_WIRELESS}")
 set(BAJI_CHARACTER "DeepSeek" CACHE STRING "Default badge character (DeepSeek or GPT)")
 set_property(CACHE BAJI_CHARACTER PROPERTY STRINGS DeepSeek GPT)
 if(NOT BAJI_CHARACTER MATCHES "^(DeepSeek|GPT)$")

@@ -9,6 +9,10 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#if defined(BAJI_WIRELESS) && !defined(BAJI_G1_ONLY) && !defined(CONFIG_BAJI_BOARD_CHECK)
+#include "baji_connectivity.h"
+#define BAJI_CONNECTED_APP 1
+#endif
 
 void app_main(void)
 {
@@ -26,7 +30,27 @@ void app_main(void)
         ESP_LOGI("baji", "physical flash=%u bytes", (unsigned)info.flash_bytes);
     else
         ESP_LOGW("baji", "flash size unknown: %s", esp_err_to_name(info.flash_status));
-#if defined(BAJI_G1_ONLY) || defined(CONFIG_BAJI_BOARD_CHECK)
+#ifdef BAJI_CONNECTED_APP
+    err = baji_connectivity_start();
+    if (err != ESP_OK) ESP_LOGW("baji", "wireless startup: %s", esp_err_to_name(err));
+    const baji_agent_feed_t *feed = baji_connectivity_feed();
+#ifdef BAJI_GPT_PET
+    err = pet_app_run_connected(board, &info, feed);
+#else
+    err = deepseek_app_run_connected(board, &info, feed);
+#endif
+    esp_err_t stop = baji_connectivity_stop();
+    if (err == ESP_ERR_NO_MEM) {
+        /* Asset and UI allocations happen after radio bring-up. If internal
+         * RAM is under pressure, release the radios and reopen local play. */
+        ESP_LOGW("baji", "display memory pressure, restarting local pet");
+#ifdef BAJI_GPT_PET
+        err = pet_app_run(board, &info);
+#else
+        err = deepseek_app_run(board, &info);
+#endif
+    }
+#elif defined(BAJI_G1_ONLY) || defined(CONFIG_BAJI_BOARD_CHECK)
     err = baji_board_check_run(board, &info);
 #elif defined(BAJI_GPT_PET)
     err = pet_app_run(board, &info);
@@ -42,4 +66,11 @@ void app_main(void)
         last_cleanup = err;
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
+#ifdef BAJI_CONNECTED_APP
+    while (stop != ESP_OK) {
+        ESP_LOGW("baji","wireless cleanup: %s",esp_err_to_name(stop));
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        stop = baji_connectivity_stop();
+    }
+#endif
 }

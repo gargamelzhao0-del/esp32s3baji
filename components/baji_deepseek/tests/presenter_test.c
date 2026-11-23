@@ -9,7 +9,17 @@
 #include <stdlib.h>
 
 static bool fail_dma, fail_decode, last_full;
-static unsigned transfers, opened_hd, closed_hd;
+static unsigned transfers, opened_hd, closed_hd, hd_item;
+static int64_t next_update;
+static baji_agent_display_t agent = {
+    .has_session = true, .view = {.connection = BAJI_ONLINE, .phase = BAJI_TOOL, .pose = "reading"}
+};
+static bool read_feed(void *context, uint64_t now_ms, baji_agent_display_t *out)
+{
+    assert(context == &agent && now_ms < UINT64_MAX);
+    *out = agent;
+    return true;
+}
 static uint16_t token;
 static int64_t now;
 static baji_input_t input;
@@ -47,6 +57,7 @@ bool dsh_canvas_select_blend(dsh_canvas_t *c, dsh_view_t view, unsigned mix)
     (void)mix;
     c->image = NULL;
     if (fail_decode) { fail_decode = false; return false; }
+    hd_item = view.item;
     c->view = view;
     c->image = &token;
     return true;
@@ -83,8 +94,7 @@ esp_err_t baji_board_paint_round_regions(baji_board_t *board, const baji_rect_t 
 static esp_err_t tick(int delta)
 {
     now += delta;
-    int64_t next = now;
-    return deepseek_app_tick(app, &input, now, &next);
+    return deepseek_app_tick(app, &input, now, &next_update);
 }
 static void hold(void)
 {
@@ -130,8 +140,30 @@ int main(int argc, char **argv)
     assert(last_full);
     hold();
     assert(!deepseek_app_is_hd(app) && closed_hd == 1);
+    baji_agent_feed_t feed = {.context = &agent, .read = read_feed, .changed = &token};
+    assert(deepseek_app_attach_feed(app, &feed) == ESP_OK);
+    assert(tick(0) == ESP_OK); /* pixel stage can select the real reading state */
+    hold();
+    assert(hd_item == DSK_CLIPS + 2);
+    unsigned prev = transfers;
+    assert(tick(1000) == ESP_OK && transfers == prev && next_update <= now + 250000);
+    agent.view.pose = "writing";
+    assert(tick(0) == ESP_OK && hd_item == DSK_CLIPS + 3);
+    tap(230, 230, true);
+    assert(hd_item < DSK_CLIPS);
+    unsigned local_item = hd_item;
+    assert(tick(10000) == ESP_OK && hd_item == local_item);
+    assert(tick(2100000) == ESP_OK && hd_item == DSK_CLIPS + 3);
+    agent.view.connection = BAJI_OFFLINE;
+    assert(tick(0) == ESP_OK && hd_item == local_item);
+    assert(next_update == INT64_MAX); /* paused HD now waits on touch or a fresh snapshot */
+    agent.view.connection = BAJI_ONLINE;
+    agent.view.pose = "asking";
+    assert(tick(0) == ESP_OK && hd_item == DSK_CLIPS + 6);
+    agent.has_session = false;
+    assert(tick(0) == ESP_OK && hd_item == local_item);
     deepseek_app_close(app);
     free(pack);
-    puts("Presenter recovers partial transfer and discarded HD decode before returning to pixel mode");
+    puts("Presenter recovers partial transfer and discarded HD decode and projects Agent poses across local interactions, timeout and reconnect");
     return 0;
 }

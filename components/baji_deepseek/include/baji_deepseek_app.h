@@ -2,11 +2,14 @@
 #include <stddef.h>
 #include "baji_board.h"
 #include "baji_input.h"
+#include "baji_agent_feed.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+esp_err_t deepseek_app_run_connected(baji_board_t *board, const baji_board_info_t *info,
+                                     const baji_agent_feed_t *feed);
 esp_err_t deepseek_app_run(baji_board_t *board, const baji_board_info_t *info);
 /* The caller owns the immutable buffer for the entire synchronous run. */
 esp_err_t deepseek_app_run_loaded(baji_board_t *board, const baji_board_info_t *info,
@@ -28,6 +31,8 @@ esp_err_t deepseek_app_open_motion(deepseek_app_t **out, baji_board_t *board,
                                   const baji_board_info_t *info, const void *pixel, size_t pixel_bytes,
                                   const void *hd, size_t hd_bytes, const void *motion, size_t motion_bytes,
                                   int64_t now_us);
+/* Attach once on the display owner. The feed context must outlive the presenter. */
+esp_err_t deepseek_app_attach_feed(deepseek_app_t *app, const baji_agent_feed_t *feed);
 esp_err_t deepseek_app_tick(void *app, const baji_input_t *input, int64_t now_us, int64_t *next);
 bool deepseek_app_is_hd(const deepseek_app_t *app);
 void deepseek_app_close(deepseek_app_t *app);

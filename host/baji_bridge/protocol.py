@@ -19,6 +19,12 @@ def _unique_object(pairs):
         result[key] = value
     return result
 
+def decode_object(text: str) -> dict:
+    value = json.loads(text, parse_constant=_reject_constant, object_pairs_hook=_unique_object)
+    if not isinstance(value, dict):
+        raise ValueError("Expected object")
+    return value
+
 def encode(message: dict) -> bytes:
     body = json.dumps(message, ensure_ascii=False, separators=(",", ":"),
                       allow_nan=False).encode("utf-8")
@@ -37,11 +43,7 @@ def decode(line: bytes) -> dict:
         raise ValueError("Invalid CRC encoding")
     if int(crc, 16) != zlib.crc32(payload):
         raise ValueError("CRC mismatch")
-    value = json.loads(payload.decode("utf-8"), parse_constant=_reject_constant,
-                       object_pairs_hook=_unique_object)
-    if not isinstance(value, dict):
-        raise ValueError("Expected object")
-    return value
+    return decode_object(payload.decode("utf-8"))
 
 class LineDecoder:
     """Drops overlong lines until LF; unrelated ESP log lines are ignored."""

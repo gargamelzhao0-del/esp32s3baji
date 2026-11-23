@@ -8,6 +8,9 @@
 typedef struct {
     baji_pet_t *art;
     baji_damage_t damage;
+    baji_paint_fn paint;
+    void *paint_context;
+    int8_t rest_gaze_x, rest_gaze_y;
     baji_pet_state_t shown;
     bool have_frame, patting;
     uint32_t last_press;

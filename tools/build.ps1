@@ -4,6 +4,7 @@ param(
     [string]$IdfPath,
     [string]$PythonEnvironment,
     [switch]$BoardCheck,
+    [switch]$Offline,
     [ValidateSet('DeepSeek', 'GPT')][string]$Character = 'DeepSeek',
     [ValidateRange(1, 64)][int]$Jobs = 4
 )
@@ -29,6 +30,8 @@ $aliasDrive = $null
 $root = $projectRoot
 $characterName = if ($Character -eq 'GPT') { 'GPT' } else { 'DeepSeek' }
 $profileName = if ($BoardCheck) { 'g1' } elseif ($characterName -eq 'GPT') { 'pet' } else { 'deepseek' }
+$wireless = !$Offline -and !$BoardCheck
+if ($wireless) { $profileName += '-wireless' }
 $buildName = "build-firmware-$profileName-native"
 try {
     # Keep CMake, GCC specs and response files on the same ASCII path.
@@ -70,7 +73,7 @@ try {
     if ($BoardCheck) { $defaults += ";$($root.TrimEnd('/','\'))/config/sdkconfig.board-check.defaults" }
     & $cmake -G Ninja -S $root -B $buildDir "-DPYTHON=$python" "-DCMAKE_MAKE_PROGRAM=$ninja" `
         -DPYTHON_DEPS_CHECKED=1 -DESP_PLATFORM=1 -DCCACHE_ENABLE=OFF -DIDF_TARGET=esp32s3 `
-        "-DSDKCONFIG=$buildDir/sdkconfig" "-DSDKCONFIG_DEFAULTS=$defaults" "-DBAJI_G1_ONLY=$([int]$BoardCheck.IsPresent)" "-DBAJI_CHARACTER=$characterName"
+        "-DSDKCONFIG=$buildDir/sdkconfig" "-DSDKCONFIG_DEFAULTS=$defaults" "-DBAJI_G1_ONLY=$([int]$BoardCheck.IsPresent)" "-DBAJI_CHARACTER=$characterName" "-DBAJI_WIRELESS=$([int]$wireless)"
     if ($LASTEXITCODE -ne 0) { throw 'Firmware CMake configuration failed.' }
     & $cmake --build $buildDir --parallel $Jobs
     if ($LASTEXITCODE -ne 0) { throw 'Firmware compilation failed.' }

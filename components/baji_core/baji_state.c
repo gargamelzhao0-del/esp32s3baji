@@ -57,6 +57,7 @@ baji_view_t baji_state_view(const baji_state_t *state, uint64_t now) {
     uint64_t elapsed = now >= state->received_ms ? now - state->received_ms : 0;
     view.connection = elapsed >= BAJI_LINK_TIMEOUT_MS ? BAJI_OFFLINE : BAJI_ONLINE;
     view.phase = state->snapshot.phase;
+    view.outcome = state->snapshot.outcome;
     view.animate = view.connection == BAJI_ONLINE;
     switch (view.phase) {
         case BAJI_WORKING:
@@ -65,10 +66,10 @@ baji_view_t baji_state_view(const baji_state_t *state, uint64_t now) {
         case BAJI_ERROR: view.pose = "oops"; break;
         case BAJI_LIMITED: view.pose = "tired"; break;
         case BAJI_ENDED:
-            if (state->snapshot.outcome == BAJI_SUCCEEDED &&
-                now >= state->phase_since_ms &&
+            if (now >= state->phase_since_ms &&
                 now - state->phase_since_ms < BAJI_ENDED_EFFECT_MS) {
-                view.pose = "happy";
+                if (view.outcome == BAJI_SUCCEEDED) view.pose = "happy";
+                else if (view.outcome == BAJI_FAILED) view.pose = "oops";
             }
             break;
         default: break;
@@ -78,6 +79,8 @@ baji_view_t baji_state_view(const baji_state_t *state, uint64_t now) {
                        (uint64_t)q.age_ms + elapsed < q.ttl_ms;
     view.context_known = view.connection == BAJI_ONLINE && c.known &&
                          (uint64_t)c.age_ms + elapsed < c.ttl_ms;
+    view.quota_estimated = view.quota_known && q.estimated;
+    view.context_estimated = view.context_known && c.estimated;
     view.quota_used_permille = q.used_permille;
     view.context_used_permille = c.used_permille;
     return view;

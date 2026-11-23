@@ -1,0 +1,4 @@
+{"type":"agent.state","session":"demo","turn":"t1","model":"local-demo","phase":"working","activity":"thinking","quota":{"used_pct":15,"ttl_ms":30000},"context":{"used_pct":41,"ttl_ms":12000,"quality":"estimated"}}
+{"type":"agent.state","session":"demo","turn":"t1","model":"local-demo","phase":"tool","activity":"reading","quota":{"used_pct":15,"ttl_ms":30000},"context":{"used_pct":43,"ttl_ms":12000,"quality":"estimated"}}
+{"type":"agent.state","session":"demo","turn":"t1","model":"local-demo","phase":"waiting","quota":{"used_pct":15,"ttl_ms":30000}}
+{"type":"agent.state","session":"demo","turn":"t1","model":"local-demo","phase":"ended","outcome":"succeeded","context":{"used_pct":46,"ttl_ms":12000}}

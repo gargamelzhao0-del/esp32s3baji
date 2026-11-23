@@ -3,7 +3,8 @@
 void pet_player_init(pet_player_t *player, baji_pet_t *art,
                      const baji_board_info_t *info, int64_t now_us)
 {
-    *player = (pet_player_t){.art = art, .idle_since = now_us};
+    *player = (pet_player_t){.art = art, .idle_since = now_us,
+                             .paint = baji_pet_paint, .paint_context = art};
     baji_damage_init(&player->damage, info->width, info->height);
     baji_damage_mark(&player->damage, 0, 0, info->width, info->height);
 }
@@ -20,26 +21,26 @@ static int gaze_axis(int position, int center, int spacing, int limit, int previ
     return previous;
 }
 
-static int toward_center(int gaze)
+static int toward(int gaze, int target)
 {
-    return gaze - (gaze > 0) + (gaze < 0);
+    return gaze - (gaze > target) + (gaze < target);
 }
 
-static void update_gaze(baji_pet_state_t *next, const baji_input_t *input)
+static void update_gaze(const pet_player_t *p, baji_pet_state_t *next, const baji_input_t *input)
 {
     if (input->touch.pressed) {
         next->gaze_x = gaze_axis(input->touch.x, 233, 75, 2, next->gaze_x);
         next->gaze_y = gaze_axis(input->touch.y, 233, 102, 1, next->gaze_y);
     } else {
-        next->gaze_x = toward_center(next->gaze_x);
-        next->gaze_y = toward_center(next->gaze_y);
+        next->gaze_x = toward(next->gaze_x, p->rest_gaze_x);
+        next->gaze_y = toward(next->gaze_y, p->rest_gaze_y);
     }
 }
 
 int64_t pet_player_next_update(const pet_player_t *p, const baji_input_t *input, int64_t now)
 {
     baji_pet_state_t gaze = p->shown;
-    update_gaze(&gaze, input);
+    update_gaze(p, &gaze, input);
     if (gaze.gaze_x != p->shown.gaze_x || gaze.gaze_y != p->shown.gaze_y)
         return now;
     int64_t origin = p->patting ? p->pat_since : p->idle_since;
@@ -81,7 +82,7 @@ esp_err_t pet_player_tick(pet_player_t *p, baji_board_t *board,
     }
     next.gaze_x = p->shown.gaze_x;
     next.gaze_y = p->shown.gaze_y;
-    update_gaze(&next, input);
+    update_gaze(p, &next, input);
 
     /* The display retains its last frame. Keep even failed/partial submissions
      * dirty until a later complete redraw from the latest scene succeeds. */
@@ -97,7 +98,7 @@ esp_err_t pet_player_tick(pet_player_t *p, baji_board_t *board,
     if (p->damage.count) {
         baji_pet_select(p->art, next);
         esp_err_t err = baji_board_paint_round_regions(board, p->damage.regions,
-                                                        p->damage.count, baji_pet_paint, p->art);
+                                                        p->damage.count, p->paint, p->paint_context);
         if (err != ESP_OK) return err;
         baji_damage_clear(&p->damage);
         *submitted = true;

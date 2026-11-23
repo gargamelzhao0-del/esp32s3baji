@@ -47,11 +47,13 @@ def main():
         presenter = Path(tmp) / "presenter.exe"
         includes = [headers, repo_tests / "runtime", repo_tests / "display", COMPONENT,
                     *(COMPONENT.parent / c / "include" for c in
-                      ("baji_board", "baji_peripherals", "baji_runtime", "baji_scene_damage", "baji_deepseek_hd"))]
+                      ("baji_board", "baji_peripherals", "baji_runtime", "baji_scene_damage", "baji_deepseek_hd",
+                       "baji_agent_port", "baji_core", "baji_agent_ui"))]
         subprocess.run(flags + ["-DBAJI_DEEPSEEK_EXTERNAL_ASSET", "-DESP_ERR_NOT_SUPPORTED=0x106",
                        *["-I" + str(path) for path in includes],
                        str(COMPONENT / "deepseek_app.c"), str(COMPONENT / "deepseek_controls.c"),
                        str(COMPONENT.parent / "baji_scene_damage/baji_scene_damage.c"),
+                       str(COMPONENT.parent / "baji_agent_ui/agent_ui.c"),
                        str(HERE / "presenter_test.c"), "-o", str(presenter)], check=True)
         subprocess.run([str(presenter), str(options.pack)], check=True)
         subprocess.run(flags + [str(HERE / "render.c"), "-o", str(renderer)], check=True)

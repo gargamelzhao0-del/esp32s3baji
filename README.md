@@ -4,7 +4,7 @@
 
 本项目让圆屏角色跟随电脑上的 AI Agent 工作：**客户端决定主题，实际模型决定角色，生命周期事件决定姿态；额度、上下文与电量独立显示。**
 
-ESP32-S3 固件默认启动 DeepSeek 鲸鱼娘，首屏与检视台相同，在晴海背景中循环播放喂饭动作。可以在圆屏上切换六套动画、十二种 Agent 姿态、四个时段和两种视距。GPT 白龙娘单独构建，待机、摸头以 48 Hz 采样，并随触摸改变视线。两个角色都按圆屏实际扫描时刻选择姿势。G1 板级自检另有构建入口。浏览器原型另外支持从本机预览桥接收 Codex CLI 事件或 BAJI 快照。[鲸鱼娘圆屏与操作](docs/16-deepseek-device.md) · [板级接口与上板检查](docs/06-hardware-and-environment.md)
+ESP32-S3 固件默认启动 DeepSeek 鲸鱼娘，首屏与检视台相同，在晴海背景中循环播放喂饭动作。可以在圆屏上切换六套动画、十二种 Agent 姿态、四个时段和两种视距。GPT 白龙娘单独构建，待机、摸头以 48 Hz 采样，并随触摸改变视线。两个角色都按圆屏实际扫描时刻选择姿势。无线固件通过 BLE 或 Wi-Fi 接收电脑发送的模型状态和额度，离线构建和 G1 板级自检另有入口。[无线配对与 Agent 接入](docs/17-wireless-agent.md) · [鲸鱼娘圆屏与操作](docs/16-deepseek-device.md) · [板级接口与上板检查](docs/06-hardware-and-environment.md)
 
 ## 先看这三个入口
 
@@ -28,6 +28,7 @@ ESP32-S3 固件默认启动 DeepSeek 鲸鱼娘，首屏与检视台相同，在�
 | [07 开发与验收](docs/07-roadmap-and-acceptance.md) | 工作包、顺序、指标、风险关闭 |
 | [08 验证记录](docs/08-validation-log.md) | 已测试的结果与没有测试的部分 |
 | [09 决策记录](docs/09-decisions.md) | 为什么采用这些技术选择 |
+| [17 无线与 Agent 接入](docs/17-wireless-agent.md) | USB 配对、BLE、Wi-Fi、通用事件示例及显示链路 |
 
 ## 当前工程
 
@@ -45,8 +46,15 @@ components/baji_display/     CO5300 QSPI 与 DMA 传输
 components/baji_peripherals/ 共享 I2C、CST9217、AXP2101
 components/baji_board_profile/ 固定板型的引脚和尺寸
 components/baji_core/        C 状态投影、序号与 TTL、姿态选择
+components/baji_ble/         NimBLE GATT 外设、分片收包
+components/baji_wifi/        Wi-Fi 热点、路由器连接和 HTTP 入口
+components/baji_link/        两种无线驱动共用的握手和接收接口
+components/baji_agent/       签名校验、发送流绑定和快照发布
+components/baji_agent_port/  应用侧状态读取及变化通知接口
+components/baji_agent_ui/    模型、状态、剩余额度及上下文绘制
+components/baji_connectivity/ 无线生命周期、USB 配对与本机配置
 contracts/                  后续 UI、资源、输入、传输的接口草案
-host/baji_bridge/           Python 分帧、适配器类型与浏览器的只读状态投影
+host/baji_bridge/           本机事件适配、浏览器投影、USB 配对和无线发送
 protocol/                   JSON Schema + 17 条人工场景消息
 assets/                     4 角色 × 12 姿态、来源与许可、动效配方
 design/                     可点击的本地圆屏原型和预览图
@@ -56,7 +64,7 @@ docs/                       开发规格与验证记录
 reference/original-template 原 HelloWorld / README / 测试备份
 ```
 
-工程使用的 48 张基础立绘和鲸鱼娘的像素、高清衍生素材都在 `assets/ai-girls`。基础立绘保留上游原始字节与逐文件 SHA-256。设备端可以独立播放角色和处理触摸；实时 Agent 数据传输在后续应用阶段接入。
+工程使用的 48 张基础立绘和鲸鱼娘的像素、高清衍生素材都在 `assets/ai-girls`。基础立绘保留上游原始字节与逐文件 SHA-256。设备可独立播放角色并处理触摸，也可由电脑上的 Agent 驱动。完整的事件序列见[通用 Agent 示例](host/examples/agent-state.jsonl)。
 
 ## 克隆后预览
 
@@ -108,7 +116,7 @@ VS Code 已选用 ESP-IDF 5.5.4。普通 `idf.py build` 和 IDE 的构建按钮�
 
 用 `.\tools\build.ps1 -BoardCheck` 可以单独构建色条、触摸十字和电源诊断固件。使用 IDF 开发终端时也可在 `menuconfig → Electronic badge` 中启用 G1。角色节拍和局部刷新可通过 RAM 基准独立复测。[上板检查步骤](docs/06-hardware-and-environment.md) · [角色互动基准](tests/device/pet_runtime/README.md)
 
-鲸鱼娘的十二种 Agent 姿态可以在屏上逐项检视。Agent 实时传输、额度和上下文数据，以及续航和整机功耗，仍在后续阶段。
+鲸鱼娘的十二种 Agent 姿态可以在屏上逐项检视。无线版的主机回归、跨语言状态验证和两种角色的接入方式见[无线与 Agent 接入](docs/17-wireless-agent.md)。无线共存时的实机刷新率与连续运行功耗需单独测量。
 
 ## 素材来源
 

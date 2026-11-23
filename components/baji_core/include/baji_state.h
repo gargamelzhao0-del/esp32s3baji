@@ -58,8 +58,10 @@ typedef struct {
     bool animate;
     bool quota_known;
     bool context_known;
+    bool quota_estimated, context_estimated;
     uint16_t quota_used_permille;
     uint16_t context_used_permille;
+    baji_outcome_t outcome;
 } baji_view_t;
 
 void baji_state_init(baji_state_t *state);

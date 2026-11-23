@@ -15,6 +15,15 @@ static const baji_rect_t pose = {160, 84, 26, 18}, eyes = {200, 204, 32, 8};
 unsigned baji_pet_fps(baji_pet_clip_t clip) { return clip == BAJI_PET_PAT ? 16 : 10; }
 unsigned baji_pet_frame_count(baji_pet_clip_t clip) { return clip == BAJI_PET_PAT ? 8 : 6; }
 
+/* This fixture stores one pose per frame. The connected-player suite also
+ * exercises authored in-between poses at the full display cadence. */
+unsigned baji_pet_substeps(const baji_pet_t *art, baji_pet_clip_t clip)
+{
+    (void)art;
+    (void)clip;
+    return 1;
+}
+
 void baji_pet_select(baji_pet_t *art, baji_pet_state_t state) { art->selected = state; }
 
 bool baji_pet_forehead(const baji_pet_t *art, baji_pet_state_t state, uint16_t x, uint16_t y)
