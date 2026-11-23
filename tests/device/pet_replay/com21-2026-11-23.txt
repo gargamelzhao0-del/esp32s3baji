@@ -1,0 +1,88 @@
+[pet-replay-final.log]
+REPLAY_BEGIN rgb565 138x132-to-276x264
+REPLAY_VERIFY clip=heartHug compressed_bytes=18265 verified=1
+REPLAY_COST clip=heartHug mode=full n=48 bytes=6994944 p50=8491 p95=8497 max=8497
+REPLAY_COST clip=heartHug mode=box n=48 bytes=3767760 p50=4886 p95=6256 max=6259
+REPLAY_COST clip=heartHug mode=bands n=48 bytes=2527728 p50=3897 p95=4392 max=4392
+REPLAY_TE clip=heartHug frames=300 edges=300 span_us=5079912 late=0 skipped=0 te_dma_p50=3901 te_dma_p95=4407 te_dma_max=4418 wake_p95=8 wake_max=13
+REPLAY_VERIFY clip=sneeze compressed_bytes=33142 verified=1
+REPLAY_COST clip=sneeze mode=full n=48 bytes=6994944 p50=8487 p95=8492 max=8492
+REPLAY_COST clip=sneeze mode=box n=48 bytes=6743232 p50=8240 p95=8321 max=8326
+REPLAY_COST clip=sneeze mode=bands n=48 bytes=5433024 p50=7669 p95=7831 max=7836
+REPLAY_TE clip=sneeze frames=300 edges=300 span_us=5081905 late=0 skipped=0 te_dma_p50=7676 te_dma_p95=7834 te_dma_max=7844 wake_p95=8 wake_max=12
+REPLAY_END err=0
+
+[composite-native.log]
+ROOM_READY bytes=203865
+ROOM_VERIFIED frames=10 frame_bytes=434312
+ROOM_TILE_CHECK frames=10 ok=1
+ROOM_FRAME mode=0 idx=0 bytes=364680 p50_us=19306 max_us=19323 diff_p50_us=1
+ROOM_FRAME mode=0 idx=1 bytes=364680 p50_us=19308 max_us=19323 diff_p50_us=1
+ROOM_FRAME mode=0 idx=2 bytes=364680 p50_us=19309 max_us=19321 diff_p50_us=1
+ROOM_FRAME mode=0 idx=3 bytes=364680 p50_us=19305 max_us=19322 diff_p50_us=1
+ROOM_FRAME mode=0 idx=4 bytes=364680 p50_us=19307 max_us=19321 diff_p50_us=1
+ROOM_FRAME mode=0 idx=5 bytes=364680 p50_us=19305 max_us=19317 diff_p50_us=1
+ROOM_FRAME mode=0 idx=6 bytes=364680 p50_us=19307 max_us=19315 diff_p50_us=1
+ROOM_FRAME mode=0 idx=7 bytes=364680 p50_us=19310 max_us=19317 diff_p50_us=1
+ROOM_FRAME mode=0 idx=8 bytes=364680 p50_us=19308 max_us=19317 diff_p50_us=0
+ROOM_FRAME mode=0 idx=9 bytes=364680 p50_us=19306 max_us=19323 diff_p50_us=1
+ROOM_FRAME mode=1 idx=0 bytes=317592 p50_us=16743 max_us=16751 diff_p50_us=1
+ROOM_FRAME mode=1 idx=1 bytes=190240 p50_us=10288 max_us=10297 diff_p50_us=1
+ROOM_FRAME mode=1 idx=2 bytes=217408 p50_us=11470 max_us=11476 diff_p50_us=1
+ROOM_FRAME mode=1 idx=3 bytes=218784 p50_us=11529 max_us=11535 diff_p50_us=1
+ROOM_FRAME mode=1 idx=4 bytes=227688 p50_us=11977 max_us=11982 diff_p50_us=1
+ROOM_FRAME mode=1 idx=5 bytes=99400 p50_us=5649 max_us=5653 diff_p50_us=1
+ROOM_FRAME mode=1 idx=6 bytes=142800 p50_us=7842 max_us=7843 diff_p50_us=1
+ROOM_FRAME mode=1 idx=7 bytes=224000 p50_us=11816 max_us=11822 diff_p50_us=1
+ROOM_FRAME mode=1 idx=8 bytes=283800 p50_us=15205 max_us=15206 diff_p50_us=1
+ROOM_FRAME mode=1 idx=9 bytes=277528 p50_us=14611 max_us=14617 diff_p50_us=1
+ROOM_FRAME mode=2 idx=0 bytes=292592 p50_us=16503 max_us=16524 diff_p50_us=1
+ROOM_FRAME mode=2 idx=1 bytes=151552 p50_us=9340 max_us=9345 diff_p50_us=1
+ROOM_FRAME mode=2 idx=2 bytes=178560 p50_us=10366 max_us=10374 diff_p50_us=1
+ROOM_FRAME mode=2 idx=3 bytes=166912 p50_us=10926 max_us=10939 diff_p50_us=1
+ROOM_FRAME mode=2 idx=4 bytes=186616 p50_us=11436 max_us=11444 diff_p50_us=1
+ROOM_FRAME mode=2 idx=5 bytes=69120 p50_us=4744 max_us=4756 diff_p50_us=1
+ROOM_FRAME mode=2 idx=6 bytes=67584 p50_us=4826 max_us=4832 diff_p50_us=1
+ROOM_FRAME mode=2 idx=7 bytes=174080 p50_us=10972 max_us=10984 diff_p50_us=1
+ROOM_FRAME mode=2 idx=8 bytes=29088 p50_us=2889 max_us=2895 diff_p50_us=1
+ROOM_FRAME mode=2 idx=9 bytes=135680 p50_us=8801 max_us=8807 diff_p50_us=1
+ROOM_FRAME mode=3 idx=0 bytes=317592 p50_us=25151 max_us=25161 diff_p50_us=8408
+ROOM_FRAME mode=3 idx=1 bytes=190240 p50_us=23201 max_us=23207 diff_p50_us=12913
+ROOM_FRAME mode=3 idx=2 bytes=217408 p50_us=24406 max_us=24416 diff_p50_us=12936
+ROOM_FRAME mode=3 idx=3 bytes=218784 p50_us=24169 max_us=24174 diff_p50_us=12646
+ROOM_FRAME mode=3 idx=4 bytes=227688 p50_us=24998 max_us=25000 diff_p50_us=13018
+ROOM_FRAME mode=3 idx=5 bytes=99400 p50_us=20008 max_us=20008 diff_p50_us=14357
+ROOM_FRAME mode=3 idx=6 bytes=142800 p50_us=22161 max_us=22162 diff_p50_us=14321
+ROOM_FRAME mode=3 idx=7 bytes=224000 p50_us=23928 max_us=23933 diff_p50_us=12117
+ROOM_FRAME mode=3 idx=8 bytes=283800 p50_us=31315 max_us=31325 diff_p50_us=16111
+ROOM_FRAME mode=3 idx=9 bytes=277528 p50_us=23809 max_us=23820 diff_p50_us=9198
+ROOM_FRAME mode=4 idx=0 bytes=300896 p50_us=18773 max_us=18778 diff_p50_us=2453
+ROOM_FRAME mode=4 idx=1 bytes=173208 p50_us=13831 max_us=13847 diff_p50_us=3785
+ROOM_FRAME mode=4 idx=2 bytes=181304 p50_us=14486 max_us=14496 diff_p50_us=3757
+ROOM_FRAME mode=4 idx=3 bytes=192296 p50_us=14731 max_us=14735 diff_p50_us=3664
+ROOM_FRAME mode=4 idx=4 bytes=192632 p50_us=15437 max_us=15447 diff_p50_us=3822
+ROOM_FRAME mode=4 idx=5 bytes=83720 p50_us=9844 max_us=9848 diff_p50_us=4601
+ROOM_FRAME mode=4 idx=6 bytes=83672 p50_us=9896 max_us=9902 diff_p50_us=4611
+ROOM_FRAME mode=4 idx=7 bytes=203152 p50_us=15162 max_us=15168 diff_p50_us=3574
+ROOM_FRAME mode=4 idx=8 bytes=36368 p50_us=7778 max_us=7785 diff_p50_us=4976
+ROOM_FRAME mode=4 idx=9 bytes=151784 p50_us=13366 max_us=13371 diff_p50_us=3928
+ROOM_END ok=1
+
+[color.log]
+PET_COLOR_START
+PET_COLOR_CRC src=0 rgb565=0b1324af rgb332=f7c925d5 ok=1
+PET_COLOR_CRC src=1 rgb565=fae8147b rgb332=435eab89 ok=1
+PET_COLOR_RESULT bpp=2 n=120 pixels=182340 bytes=364680 dma_p50_us=19308 p95_us=19321 max_us=19324 te_to_dma_p95_us=19328 te_to_dma_max_us=19332 phase_p95_us=8 phase_max_us=14 ended_before_next=0 crossed_edges=120 start_step1=0 step2=119 step_gt2=0 te_period_p50_us=16987 rate_millihz=29435
+PET_COLOR_RESULT bpp=1 n=120 pixels=182340 bytes=182340 dma_p50_us=10148 p95_us=10154 max_us=10160 te_to_dma_p95_us=10161 te_to_dma_max_us=10168 phase_p95_us=8 phase_max_us=13 ended_before_next=120 crossed_edges=0 start_step1=119 step2=0 step_gt2=0 te_period_p50_us=16990 rate_millihz=58857
+PET_COLOR_END ok=1 restored565=1
+
+[psram-dma.log]
+EXT_START
+EXT_BANDS count=17 payload=364680 allocated_span=364952 crc_fnv=64fd9d8f
+EXT_RESULT name=live_internal load=0 samples=40 p50=19258 p95=19274 max=19278 owner_cpu_us_frame=2979 copy_us_frame=0 traffic_copy_KBps=0 underflows=0 err=0 overflow=0
+EXT_RESULT name=stage_double load=0 samples=40 p50=19329 p95=19343 max=19345 owner_cpu_us_frame=7236 copy_us_frame=6181 traffic_copy_KBps=0 underflows=0 err=0 overflow=0
+EXT_RESULT name=external_direct load=0 samples=40 p50=19598 p95=19607 max=19607 owner_cpu_us_frame=1378 copy_us_frame=0 traffic_copy_KBps=0 underflows=0 err=0 overflow=0
+EXT_RESULT name=live_internal load=1 samples=40 p50=19262 p95=19276 max=19277 owner_cpu_us_frame=2978 copy_us_frame=0 traffic_copy_KBps=20197 underflows=0 err=0 overflow=0
+EXT_RESULT name=stage_double load=1 samples=40 p50=19859 p95=19899 max=19900 owner_cpu_us_frame=15465 copy_us_frame=14442 traffic_copy_KBps=15107 underflows=0 err=0 overflow=0
+EXT_RESULT name=external_direct load=1 samples=40 p50=19813 p95=19824 max=19827 owner_cpu_us_frame=1593 copy_us_frame=0 traffic_copy_KBps=15420 underflows=0 err=0 overflow=0
+EXT_DONE hash_match=1 underflows=0
