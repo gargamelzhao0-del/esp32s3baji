@@ -103,7 +103,9 @@ static bool load_anchor(dsh_canvas_t *c, dsh_view_t v, int pinned)
 
 bool dsh_canvas_select_blend(dsh_canvas_t *c, dsh_view_t v, unsigned mix)
 {
-    if (!c || !c->art || v.item >= 18 || v.breath >= ANCHORS || mix > 7 ||
+    if (!c || !c->art || v.item >= 18 || v.sheet >= 4 || v.zoom > 1 ||
+        v.pan_x < -100 || v.pan_x > 100 || v.pan_y < -100 || v.pan_y > 100 ||
+        v.breath >= ANCHORS || mix > 7 ||
         (v.breath == ANCHORS - 1 && mix)) return false;
     if (v.gallery) return dsh_canvas_select(c, v);
     if (!activate(c, v.item)) return false;

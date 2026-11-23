@@ -278,6 +278,8 @@ def check_exact(lib, canvas, render, paint):
                         end = start + 2*box.width
                         retained[start:end] = latest[start:end]
                 assert retained == latest, (item, g, phase)
+            for invalid in (View(item=item, sheet=4), View(item=item, zoom=2), View(item=item, pan_y=101)):
+                assert not lib.dsh_canvas_select_blend(canvas, invalid, 0)
     # A qualifier may supply a single random-access page. Exercise XOR mode
     # with a real browser frame even when the shipping pack fits direct frames.
     entry, item, level = 2, 1, 9

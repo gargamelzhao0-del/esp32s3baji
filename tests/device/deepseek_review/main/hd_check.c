@@ -1,4 +1,5 @@
 #include "hd_check.h"
+#include "live_probe.h"
 #include "breath_trace.h"
 #include "baji_deepseek_app.h"
 #include "baji_deepseek_hd.h"
@@ -11,7 +12,8 @@
 #include "freertos/task.h"
 #include <stdio.h>
 
-esp_err_t hd_check_motion(baji_board_t *board, const void *pack, size_t bytes, bool trace)
+esp_err_t hd_check_motion(baji_board_t *board, const baji_board_info_t *info, const void *pack,
+                          size_t bytes, bool trace, bool feed_only)
 {
     dsh_art_t art;
     if (!dsh_art_open(&art, pack, bytes)) return ESP_ERR_INVALID_RESPONSE;
@@ -26,7 +28,8 @@ esp_err_t hd_check_motion(baji_board_t *board, const void *pack, size_t bytes, b
     unsigned warm_select_max = 0, warm_dma_max = 0;
     dsh_motion_t held[16];
     uint8_t *owned[16] = {0};
-    for (unsigned entry = 1; err == ESP_OK && entry <= 17; ++entry) {
+    const unsigned first = feed_only ? 2 : 1, last = feed_only ? 2 : 17;
+    for (unsigned entry = first; err == ESP_OK && entry <= last; ++entry) {
         for (unsigned level = 1; err == ESP_OK && level <= 16; ++level) {
             printf("DSK_PAGE entry=%u level=%u\n", entry, level);
             uint32_t hdr[4];
@@ -97,7 +100,7 @@ esp_err_t hd_check_motion(baji_board_t *board, const void *pack, size_t bytes, b
     printf("DSK_MOTION pages=%u stages=%u mismatch=%u max_select_us=%u max_dma_us=%u "
            "warm_select_max_us=%u warm_dma_max_us=%u warm_pair_max_us=%u err=%d\n",
            pages, stages, mismatch, unpack_max, dma_max, warm_select_max, warm_dma_max, warm_peak, err);
-    if (trace && err == ESP_OK && !mismatch) err = breath_trace(board, canvas, held);
+    if (trace && err == ESP_OK && !mismatch) err = breath_trace(board, info, canvas, held);
     for (unsigned i = 0; i < 16; ++i) heap_caps_free(owned[i]);
     dsh_canvas_close(canvas);
     heap_caps_free(canvas);
@@ -181,6 +184,39 @@ esp_err_t hd_check_switch(baji_board_t *board, const baji_board_info_t *info, co
         if (err == ESP_OK && deepseek_app_is_hd(app) != (i == 0)) err = ESP_ERR_INVALID_STATE;
     }
     if (err == ESP_OK) puts("DSK_SWITCH hd=1 pixel=1");
+    deepseek_app_close(app);
+    return err;
+}
+
+/* Replay one completed long press, then preserve the real touch counter and
+ * hand control to the same producer, scheduler and paint path as the app. */
+static esp_err_t resumed_hd(void *app, const baji_input_t *real, int64_t now, int64_t *due)
+{
+    baji_input_t input = *real;
+    ++input.presses;
+    return deepseek_app_tick(app, &input, now, due);
+}
+
+esp_err_t hd_check_live(baji_board_t *board, const baji_board_info_t *info, const void *pixels,
+                        size_t pixel_bytes, const void *hd, size_t hd_bytes)
+{
+    deepseek_app_t *app = NULL;
+    esp_err_t err = deepseek_app_open(&app, board, info, pixels, pixel_bytes, hd, hd_bytes, -1);
+    if (err != ESP_OK) return err;
+    baji_input_t input = {.presses=1, .press_x=233, .press_y=233, .touch={true,233,233}};
+    int64_t due, start = esp_timer_get_time();
+    err = deepseek_app_tick(app, &input, start-690000, &due);
+    if (err == ESP_OK) {
+        start = esp_timer_get_time();
+        live_probe_start_hd();
+        err = deepseek_app_tick(app, &input, start, &due);
+        if (err == ESP_OK && !deepseek_app_is_hd(app)) err = ESP_ERR_INVALID_STATE;
+        printf("DSK_HD_ENTER us=%u err=%d\n", (unsigned)(esp_timer_get_time()-start), err);
+    }
+    if (err == ESP_OK) {
+        const baji_runtime_config_t config = {.brightness=45};
+        err = baji_runtime_run(board, info, &config, resumed_hd, app);
+    }
     deepseek_app_close(app);
     return err;
 }

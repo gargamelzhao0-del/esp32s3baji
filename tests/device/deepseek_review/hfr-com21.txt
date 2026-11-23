@@ -1,0 +1,37 @@
+COM21 | ESP32-S3 1.75C | IDF 5.5.4 | RAM downloads only
+Baseline DSK2 feed, uninstrumented product renderer wrapped at the paint/DMA boundary.
+The first frame predates TE setup. Divide scan_edges by span_us for this baseline only.
+Baseline P95 histogram was clipped at 100 ms. body_gap_max_us is uncapped.
+pack_sha256=24f3aadb38975644326ac583b57bf9060bfa47e31cc15dc6756c600db23d2485 reference_sha256=e3fab7f8433b82e3d5ffcd60bcf5ffb9bf0bc16851df786ccf7f09e2131cf159 hd_sha256=9c7f12e0a8e4097ecaf20d5ceed4fa1433be0024e19c7a68869a6a8bceaabdf3 hd_records_sha256=646b3b127f813d148159f8ada6a00629385b64d883e75e877aa9e13153aa9921
+DSK_LIVE_OK frames=2278 partial=2277 max_partial_us=21359 span_us=60067277 pose_steps=392 skipped_poses=0 clip_changes=0 body_changes=392 body_gap_p95_ms=100 body_gap_max_us=159403 scan_edges=3533 scan_span_us=94843376 crossed=312
+
+HDA2 feed exact pages in PSRAM, production TE scheduler, 129-phase breathing and strip damage.
+One cold 2.8 s cycle and twelve warm 2.8 s cycles. Test source in main/breath_trace.c.
+pack_sha256=9c7f12e0a8e4097ecaf20d5ceed4fa1433be0024e19c7a68869a6a8bceaabdf3 reference_sha256=cf5ed1d0edbdbc5cc25123bd1134c5ea7652aedfc61cc75e4f7f3cf4b0817a86 motion_sha256=4c4971d7219d30c9d5dda397e0b75e6bfe644ccc4a2b33daec1c17aaf1f0ff5e motion_reference_sha256=fb4804e34aefa2582fe5cddf20d9ff78904871d719ca56fc216dcc7bec986f01
+DSK_HD_PIXELS cases=16 mismatch=0 elapsed_ms=1889 gallery_dma=16 err=0
+DSK_MOTION pages=16 stages=32 mismatch=0 max_select_us=26070 max_dma_us=12551 warm_select_max_us=26070 warm_dma_max_us=12538 warm_pair_max_us=38601 err=0
+DSK_BREATH cycles=12 steps=1639 body_changes=1639 span_us=33594258 scans=1977 missed_due=24 crossed=203 max_us=17780 seed_us=86031 cold_span_us=2871641 cold_draws=107 cold_changes=106 cold_max_us=86031 select_avg_us=20 select_max_us=28 dma_avg_us=15065 err=0
+DSK_NATIVE_OK
+
+Dual-pack RAM preview, dual-core compact painter via production long-press and runtime. Both packs resident, no HDA in this mode.
+pack_sha256=8134142cebd531e0ef478fe7825f35e246de0802c9f4d901c84acdc287304310 reference_sha256=e3fab7f8433b82e3d5ffcd60bcf5ffb9bf0bc16851df786ccf7f09e2131cf159 hd_sha256=9c7f12e0a8e4097ecaf20d5ceed4fa1433be0024e19c7a68869a6a8bceaabdf3 hd_records_sha256=646b3b127f813d148159f8ada6a00629385b64d883e75e877aa9e13153aa9921
+DSK_BOARD w=466 h=466 touch=0 power=0 free_psram=1109828
+DSK_HD_PIXELS cases=22 mismatch=0 elapsed_ms=2094 gallery_dma=0 err=0
+DSK_SWITCH hd=1 pixel=1
+DSK_HD_ENTER us=68179 err=0
+DSK_HD_COLD clip=1 frames=123 partial=122 max_partial_us=14839 span_us=2829243 pose_steps=18 skipped_poses=1 clip_changes=0 body_changes=122 bubble_only=0 body_gap_p95_ms=35 body_gap_max_us=336910 scan_edges=145 scan_span_us=2466445 crossed=0 prepare_mean_us=2979 prepare_max_us=321959 draw_mean_us=14395
+DSK_HD_LIVE_OK clip=1 frames=1661 partial=1661 max_partial_us=14797 span_us=33626877 pose_steps=236 skipped_poses=0 clip_changes=0 body_changes=1660 bubble_only=0 body_gap_p95_ms=35 body_gap_max_us=138342 scan_edges=1978 scan_span_us=33626875 crossed=0 prepare_mean_us=73 prepare_max_us=158 draw_mean_us=14239
+
+DSK3 full view, day, six production clips in sequence, 30 seconds each (starting at feed).
+pack_sha256=8134142cebd531e0ef478fe7825f35e246de0802c9f4d901c84acdc287304310 reference_sha256=e3fab7f8433b82e3d5ffcd60bcf5ffb9bf0bc16851df786ccf7f09e2131cf159 hd_sha256=9c7f12e0a8e4097ecaf20d5ceed4fa1433be0024e19c7a68869a6a8bceaabdf3 hd_records_sha256=646b3b127f813d148159f8ada6a00629385b64d883e75e877aa9e13153aa9921
+DSK_BOARD w=466 h=466 touch=0 power=0 free_psram=1109828
+DSK_PIXELS cases=18 mismatch=0 elapsed_ms=727
+DSK_PANEL frames=18 min_us=21773 mean_us=22265 max_us=22732
+DSK_HD_PIXELS cases=22 mismatch=0 elapsed_ms=2090 gallery_dma=0 err=0
+DSK_SWITCH hd=1 pixel=1
+DSK_CLIP clip=1 frames=1097 partial=1096 max_partial_us=27467 span_us=30017764 pose_steps=210 skipped_poses=0 clip_changes=0 body_changes=1080 bubble_only=12 body_gap_p95_ms=39 body_gap_max_us=54018 scan_edges=1762 scan_span_us=29956720 crossed=737 prepare_mean_us=649 prepare_max_us=23718 draw_mean_us=18583
+DSK_CLIP clip=2 frames=1215 partial=1215 max_partial_us=30192 span_us=30010949 pose_steps=210 skipped_poses=0 clip_changes=0 body_changes=1096 bubble_only=105 body_gap_p95_ms=43 body_gap_max_us=76326 scan_edges=1764 scan_span_us=29997637 crossed=601 prepare_mean_us=534 prepare_max_us=2616 draw_mean_us=15087
+DSK_CLIP clip=3 frames=1168 partial=1168 max_partial_us=29287 span_us=30010469 pose_steps=240 skipped_poses=0 clip_changes=0 body_changes=1148 bubble_only=9 body_gap_p95_ms=39 body_gap_max_us=45928 scan_edges=1766 scan_span_us=30025068 crossed=736 prepare_mean_us=652 prepare_max_us=2643 draw_mean_us=17080
+DSK_CLIP clip=4 frames=1323 partial=1323 max_partial_us=24497 span_us=30016920 pose_steps=210 skipped_poses=0 clip_changes=0 body_changes=1198 bubble_only=94 body_gap_p95_ms=40 body_gap_max_us=66333 scan_edges=1766 scan_span_us=30016656 crossed=481 prepare_mean_us=509 prepare_max_us=2647 draw_mean_us=13866
+DSK_CLIP clip=5 frames=986 partial=986 max_partial_us=29873 span_us=30014424 pose_steps=120 skipped_poses=0 clip_changes=0 body_changes=935 bubble_only=50 body_gap_p95_ms=41 body_gap_max_us=46511 scan_edges=1765 scan_span_us=30007748 crossed=833 prepare_mean_us=488 prepare_max_us=2536 draw_mean_us=20222
+DSK_LIVE_OK clip=0 frames=978 partial=978 max_partial_us=30927 span_us=30002036 pose_steps=180 skipped_poses=0 clip_changes=0 body_changes=965 bubble_only=12 body_gap_p95_ms=42 body_gap_max_us=45997 scan_edges=1765 scan_span_us=30005457 crossed=836 prepare_mean_us=641 prepare_max_us=2590 draw_mean_us=21323

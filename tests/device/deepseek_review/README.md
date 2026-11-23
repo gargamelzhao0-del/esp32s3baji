@@ -21,4 +21,8 @@ python upload.py --port COM21 --hd ../../../components/baji_deepseek_hd/assets/s
 
 原尺寸高清图集可单独使用一次 RAM 下载。重新执行上面的 `load_ram` 后，运行 `python upload.py --port COM21 --native-gallery ../../../components/baji_deepseek_hd/assets/scene.hds`。此模式只载入正式版 HDS，将四张图集各按适配、居中放大、放大后两个对角平移绘到屏幕，16 幅均与 `sheets-native.crc` 比较。输出 `DSK_NATIVE_OK` 后释放设备，可再下载双模式运行。
 
-要测试实际呼吸节奏，使用 `--native-gallery ../../../components/baji_deepseek_hd/assets/scene-ram.hds --motion ../../../components/baji_deepseek_hd/assets/motion.hda`。程序在 USB 全帧比对时保留喂饭姿势的 16 个压缩页，在闭合 USB 驱动后按 GPIO13 的实际扫描节拍播放三个连续 2.8 秒周期。`DSK_BREATH` 的 `steps` 记录已提交的呼吸档位变化，`skipped` 记录相邻绘制跨过的档位，`past_next` 记录本次传输完成时已越过下个动画变化时刻的次数。完整双模式验收后，也可重新 `load_ram`，仅传 `--hd ../../../components/baji_deepseek_hd/assets/scene-ram.hds --smoke` 以少量场景验证并恢复可交互演示。
+像素动画逐项验收可加 `--all-clips --min-character-hz 30`。程序用生产选片指令依次播放六个动作，每个动作持续 30 秒，输出五行 `DSK_CLIP` 和最后一行 `DSK_LIVE_OK`。生产画笔的 RGB565 输出在角色区（x=106…362、y=166…374，每 4 × 8 像素取一点）与气泡区（x=244…344、y=74…102，每 4 × 4 像素取一点）分别比较。只有整次 DMA 成功才计入记录。`body_changes` 除以实测秒数即角色实际变化率，`bubble_only` 是只有气泡采样变化的提交次数。每行另给出角色两次变化间隔的 P95（毫秒，上限 250）及最大值（微秒），还有面板 TE 边沿数和时长。
+
+高清呼吸测试使用 `--native-gallery ../../../components/baji_deepseek_hd/assets/scene-ram.hds --motion ../../../components/baji_deepseek_hd/assets/motion.hda`；加 `--feed-trace` 可只传喂饭动作 16 个精确页。板上先校验原锚点有无辅助线的两套 CRC，再通过生产 `baji_runtime_run` 的 GPIO13 扫描节拍和唤醒策略播放。独立统计首个 2.8 秒冷周期及此后的 12 个周期（共 33.6 秒）。`DSK_BREATH` 的 `steps` 记录成功绘制次数，`body_changes` 记录角色采样真正发生变化的次数，`missed_due` 记录错过的扫描中本应出现新阶段的次数，`crossed` 记录传输跨过下一次 TE 的次数。仅当前动作的压缩页驻留在 RAM，生产固件从 Flash 读取页面，首次调入须另行计时。完整验收后，可以再执行 `load_ram`，传入 `--hd ../../../components/baji_deepseek_hd/assets/scene-ram.hds --smoke` 进入触屏演示。
+
+对同驻双包演示的高清模式，可加 `--hd-live` 和 `--hd`。验收程序注入一次中央长按，随后将真实触摸输入交还给正在运行的应用。串口分别输出首次进入耗时 `DSK_HD_ENTER`、首个 2.8 秒的 `DSK_HD_COLD` 和 33.6 秒的 `DSK_HD_LIVE_OK`。

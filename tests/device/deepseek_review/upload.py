@@ -1,5 +1,6 @@
 """Send production artwork and browser reference CRCs to the DeepSeek RAM build."""
 import argparse
+from contextlib import nullcontext
 import hashlib
 from pathlib import Path
 import struct
@@ -107,13 +108,16 @@ def motion_pages(path, goldens):
     return pages
 
 
-def qualify(port, pack, records, hd_pack, hd_records, motion, native, log, timeout):
+def qualify(port, pack, records, hd_pack, hd_records, motion, native, log, timeout,
+            *, feed_only=False, min_hz=0, all_clips=False, hd_live=False):
     count = len(records) // (HD_RECORD.size if native else RECORD.size)
     body_crc = zlib.crc32(pack)
     hd_crc = zlib.crc32(hd_pack)
     hd_count = len(hd_records) // HD_RECORD.size
     deadline = time.monotonic() + timeout
     state = "READY"
+    checked_clips = set()
+    clip_errors = []
     while time.monotonic() < deadline:
         line = port.readline().decode("utf-8", "replace").strip()
         if not line:
@@ -130,11 +134,11 @@ def qualify(port, pack, records, hd_pack, hd_records, motion, native, log, timeo
             if len(pack) + len(records) + len(hd_pack) + len(hd_records) > int(fields["max"]):
                 raise ValueError("The board has insufficient PSRAM for the requested packs and fixtures")
             if native:
-                magic = b"DSQM" if motion else b"DSQN"
+                magic = b"DSQB" if feed_only else b"DSQM" if motion else b"DSQN"
             else:
                 magic = b"DSQ3" if motion else b"DSQ2" if hd_pack else b"DSQ1"
             header = struct.pack("<4sIIII", magic, len(pack),
-                                 body_crc, count, zlib.crc32(records))
+                                 body_crc, count | (int(all_clips) << 31) | (int(hd_live) << 30), zlib.crc32(records))
             if hd_pack:
                 header += struct.pack("<IIII", len(hd_pack), hd_crc, hd_count, zlib.crc32(hd_records))
             write_chunks(port, header)
@@ -183,13 +187,16 @@ def qualify(port, pack, records, hd_pack, hd_records, motion, native, log, timeo
             mode, data, c0, c1 = motion[entry,level]
             write_chunks(port, struct.pack("<IIII", mode, len(data), c0, c1) + data)
         elif event == "DSK_MOTION" and state == "MOTION":
-            if (int(fields["pages"]) != 272 or int(fields["stages"]) != 544 or
+            pages = 16 if feed_only else 272
+            if (int(fields["pages"]) != pages or int(fields["stages"]) != 2 * pages or
                     int(fields["mismatch"]) or int(fields["err"])):
                 raise ValueError(f"Exact motion validation failed {fields}")
             state = "BREATH" if native else "SWITCH"
         elif event == "DSK_BREATH" and state == "BREATH":
-            if int(fields["cycles"]) != 3 or int(fields["steps"]) == 0 or int(fields["err"]):
+            if (int(fields["cycles"]) != 12 or int(fields["steps"]) == 0 or int(fields["err"])
+                    or int(fields["span_us"]) < 33_000_000):
                 raise ValueError(f"TE live breathing trace did not complete {fields}")
+            check_hz(fields, min_hz)
             state = "NATIVE"
         elif event == "DSK_SWITCH" and state == "SWITCH":
             if fields != {"hd": "1", "pixel": "1"}:
@@ -197,14 +204,52 @@ def qualify(port, pack, records, hd_pack, hd_records, motion, native, log, timeo
             state = "LIVE"
         elif event == "DSK_LIVE" and state == "LIVE":
             state = "RUNNING"
-        elif event == "DSK_LIVE_OK" and state == "RUNNING":
-            if not (int(fields["frames"]) > int(fields["partial"]) > 0
+        elif event == "DSK_HD_COLD" and state == "RUNNING" and hd_live:
+            if int(fields["span_us"]) < 2_800_000 or not int(fields["body_changes"]):
+                raise ValueError(f"Cold dual-pack HD run incomplete {fields}")
+            state = "HD_HOT"
+        elif event == "DSK_HD_LIVE_OK" and state == "HD_HOT":
+            if int(fields["span_us"]) < 33_600_000 or not int(fields["body_changes"]):
+                raise ValueError(f"Warm dual-pack HD run incomplete {fields}")
+            check_hz(fields, min_hz)
+            return
+        elif event in ("DSK_LIVE_OK", "DSK_CLIP") and state == "RUNNING":
+            if not (int(fields["frames"]) >= int(fields["partial"]) > 0
                     and int(fields["max_partial_us"]) > 0 and int(fields["span_us"]) >= 4_000_000):
                 raise ValueError(f"Incomplete live partial updates {fields}")
-            if "skipped_poses" in fields and (int(fields["skipped_poses"]) or not int(fields["pose_steps"])):
-                raise ValueError(f"Missing or skipped poses during live playback {fields}")
-            return
+            try:
+                if int(fields["skipped_poses"]) or not int(fields["pose_steps"]):
+                    raise ValueError(f"Missing or skipped poses during live playback {fields}")
+                check_hz(fields, min_hz)
+            except ValueError as error:
+                if not all_clips:
+                    raise
+                clip_errors.append(f"clip {fields['clip']}: {error}")
+            if all_clips:
+                if int(fields["span_us"]) < 30_000_000 or int(fields["clip_changes"]):
+                    raise ValueError(f"Clip changed during the measurement or ended early {fields}")
+                clip = int(fields["clip"])
+                if clip in checked_clips:
+                    raise ValueError(f"Duplicate clip measurement {clip}")
+                checked_clips.add(clip)
+            if event == "DSK_LIVE_OK":
+                if all_clips and checked_clips != set(range(6)):
+                    raise ValueError(f"Incomplete clip sweep {checked_clips}")
+                if clip_errors:
+                    raise ValueError("; ".join(clip_errors))
+                return
     raise TimeoutError(f"Timed out waiting for {state}")
+
+
+def check_hz(fields, minimum):
+    changes = int(fields["body_changes"])
+    draws = int(fields.get("frames", fields.get("steps", 0)))
+    scans = int(fields.get("scan_edges", fields.get("scans", 0)))
+    if not (0 < changes <= draws and scans > 0):
+        raise ValueError(f"Incomplete character, DMA, or panel sample {fields}")
+    measured = changes * 1_000_000 / int(fields["span_us"])
+    if measured < minimum:
+        raise ValueError(f"Character changed at {measured:.2f} Hz, below {minimum:.2f} Hz")
 
 
 def main():
@@ -219,12 +264,27 @@ def main():
     parser.add_argument("--hd-sheets", type=Path, default=HD / "tests/sheets.crc")
     parser.add_argument("--motion", type=Path, help="Stream the 272 exact HDA2 or legacy HDA1 frames")
     parser.add_argument("--motion-reference", type=Path, default=HD / "authoring/motion-web.crc")
+    parser.add_argument("--hd-live", action="store_true", help="Measure long-press HD playback in the dual-pack RAM app")
+    parser.add_argument("--all-clips", action="store_true",
+                        help="Cycle through all six pixel animations for 30 seconds each")
+    parser.add_argument("--feed-trace", action="store_true",
+                        help="Stream the feeding pose only for a shorter HD cadence qualification")
+    parser.add_argument("--min-character-hz", type=float, default=0,
+                        help="Fail if the measured actor-region frame rate falls below this value")
     parser.add_argument("--every-bubble", action="store_true")
     parser.add_argument("--smoke", action="store_true",
                         help="Check one sample per pixel/HD item and sheet before interactive handoff")
     parser.add_argument("--timeout", type=int, default=420)
     parser.add_argument("--log", type=Path)
     args = parser.parse_args()
+    if args.hd_live and (not args.hd or args.all_clips):
+        parser.error("--hd-live needs --hd and a single clip")
+    if args.all_clips and args.native_gallery:
+        parser.error("--all-clips is available in pixel mode")
+    if args.feed_trace and not (args.native_gallery and args.motion):
+        parser.error("--feed-trace requires --native-gallery and --motion")
+    if not 0 <= args.min_character_hz <= 120:
+        parser.error("--min-character-hz must be in [0, 120]")
     if args.motion and not (args.hd or args.native_gallery):
         parser.error("--motion requires --hd or --native-gallery")
     if args.native_gallery and args.hd:
@@ -263,14 +323,11 @@ def main():
     port = serial.Serial(port=None, baudrate=115200, timeout=0.25, write_timeout=6)
     port.dtr = port.rts = False
     port.port = args.port
-    with port:
-        if args.log:
-            with args.log.open("w", encoding="utf-8") as log:
-                print(identity, file=log, flush=True)
-                qualify(port, pack, records, hd_pack, hd_records, motion, bool(args.native_gallery), log, args.timeout)
-        else:
-            print(identity)
-            qualify(port, pack, records, hd_pack, hd_records, motion, bool(args.native_gallery), None, args.timeout)
+    with port, (args.log.open("w", encoding="utf-8") if args.log else nullcontext()) as log:
+        print(identity, file=log, flush=True)
+        qualify(port, pack, records, hd_pack, hd_records, motion, bool(args.native_gallery), log,
+                args.timeout, feed_only=args.feed_trace, min_hz=args.min_character_hz,
+                all_clips=args.all_clips, hd_live=args.hd_live)
 
 
 if __name__ == "__main__":

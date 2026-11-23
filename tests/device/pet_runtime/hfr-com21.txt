@@ -1,0 +1,15 @@
+COM21 | 466x466 AMOLED | ESP32-S3, IDF 5.5.4 | RAM download, BPH5 production art
+2372976 bytes SHA256 fd0c12b9940334984bd1119a08cb66c2683f311d2c25933fa2637d3644ea3653
+PET_ASSET bytes=2372976 crc32=1adbe007 ok=1
+PET_FULL n=12 p50=26248 p95=27308 max=27308
+PET_MEMORY free_psram=2752728 free_internal=108075 largest_internal_dma=31744
+PET_FIRST us=21642 sent=1
+PET_STAGE name=idle ticks=180 sent=147 noop=33 missed=0 late=0 span_us=3040888 subject_changes=147 subject_millihz=48341 pose_changes=147 gaze_changes=0 gaze_only_sent=0 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=13041 te_draw_p95=14813 te_draw_max=15036 noop_p95=4 noop_max=4 te_gaze_p95=0 te_gaze_max=0
+PET_PEAK name=idle old=8 next=9 clip=0 select_us=1909 bus_us=13117
+PET_STAGE name=drag ticks=180 sent=153 noop=27 missed=0 late=0 span_us=3041366 subject_changes=153 subject_millihz=50306 pose_changes=147 gaze_changes=29 gaze_only_sent=6 pat_start=0 pat_end=0 unchanged_sent=0 te_draw_p50=13145 te_draw_p95=14831 te_draw_max=15084 noop_p95=4 noop_max=4 te_gaze_p95=306 te_gaze_max=306
+PET_PEAK name=drag old=12 next=13 clip=0 select_us=2063 bus_us=13007
+PET_STAGE name=pat ticks=240 sent=195 noop=45 missed=0 late=0 span_us=4061051 subject_changes=195 subject_millihz=48017 pose_changes=195 gaze_changes=0 gaze_only_sent=0 pat_start=1 pat_end=1 unchanged_sent=0 te_draw_p50=13324 te_draw_p95=15644 te_draw_max=16350 noop_p95=4 noop_max=9 te_gaze_p95=0 te_gaze_max=0
+PET_PEAK name=pat old=28 next=29 clip=1 select_us=2329 bus_us=14007
+PET_SCHEDULE ok=1 span_us=60012723 edges=3530 callbacks=2882 draws=2882 callback_millihz=48006 panel_millihz=58820 subject_changes=2881 subject_millihz=48006 skipped_poses=0 late=0 max_te_dma_us=15060 extra_static=0 rescue=0 eye_only=1 event_callback_us=5357 event_dma_us=5588 err=0
+PET_END ok=1 functional=1 deadlines=1 err=0
+PET_LIVE

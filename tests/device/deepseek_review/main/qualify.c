@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "baji_deepseek_app.h"
+#include "live_probe.h"
 #include "deepseek_review.h"
 #include "driver/usb_serial_jtag.h"
 #include "esp_heap_caps.h"
@@ -25,55 +26,8 @@ typedef struct {
     void *hd;
     uint32_t hd_size, hd_count;
     hd_sample_t *hd_samples;
-    bool motion, native_gallery;
+    bool motion, native_gallery, feed_only, all_clips, hd_live;
 } transfer_t;
-
-/* Observe successful returns from the unmodified production presenter and
- * its actual DMA boundary. Measurement is disabled after one short run. */
-static bool watch_live;
-static dsk_frame_t last_pose;
-static bool have_pose;
-static unsigned pose_steps, skipped_poses, clip_changes;
-bool __real_dsk_canvas_select_blend(dsk_canvas_t *, dsk_frame_t, unsigned);
-bool __wrap_dsk_canvas_select_blend(dsk_canvas_t *canvas, dsk_frame_t frame, unsigned mix)
-{
-    bool ok = __real_dsk_canvas_select_blend(canvas, frame, mix);
-    if (ok && watch_live) {
-        if (have_pose && frame.item != last_pose.item) ++clip_changes;
-        if (have_pose && frame.item == last_pose.item && frame.item < DSK_CLIPS && frame.frame != last_pose.frame) {
-            ++pose_steps;
-            if (frame.frame != (last_pose.frame + 1u) % dsk_clip_frames(frame.item)) ++skipped_poses;
-        }
-        last_pose = frame;
-        have_pose = true;
-    }
-    return ok;
-}
-esp_err_t __real_baji_board_paint_round_regions(baji_board_t *, const baji_rect_t *, size_t,
-                                                baji_paint_fn, void *);
-esp_err_t __wrap_baji_board_paint_round_regions(baji_board_t *board, const baji_rect_t *areas,
-                                                size_t count, baji_paint_fn paint, void *scene)
-{
-    static int64_t first;
-    static unsigned frames, partial, peak;
-    int64_t start = watch_live ? esp_timer_get_time() : 0;
-    esp_err_t err = __real_baji_board_paint_round_regions(board, areas, count, paint, scene);
-    if (!watch_live || err != ESP_OK) return err;
-    int64_t end = esp_timer_get_time();
-    if (frames++ == 0) first = start;
-    if (count && (count != 1 || areas[0].width != WIDTH || areas[0].height != HEIGHT)) {
-        ++partial;
-        unsigned us = (unsigned)(end-start);
-        if (us > peak) peak = us;
-    }
-    if (end-first >= (int64_t)DSK_LIVE_CHECK_MS * 1000) {
-        watch_live = false;
-        printf("DSK_LIVE_OK frames=%u partial=%u max_partial_us=%u span_us=%u "
-               "pose_steps=%u skipped_poses=%u clip_changes=%u\n",
-               frames, partial, peak, (unsigned)(end-first), pose_steps, skipped_poses, clip_changes);
-    }
-    return err;
-}
 
 bool review_usb_read_exact(void *dst, size_t size)
 {
@@ -101,11 +55,15 @@ static esp_err_t receive(transfer_t *data)
         got = usb_serial_jtag_read_bytes(hdr, sizeof hdr, pdMS_TO_TICKS(1000));
     }
     err = ESP_ERR_INVALID_RESPONSE;
-    if (got <= 0 || !review_usb_read_exact((uint8_t *)hdr + got, sizeof(hdr) - got)
-        || !hdr[1] || hdr[1] > limit || !hdr[3] || hdr[3] > MAX_CASES) {
+    if (got <= 0 || !review_usb_read_exact((uint8_t *)hdr + got, sizeof(hdr) - got)) goto done;
+    data->all_clips = (hdr[3] & (1u << 31)) != 0;
+    data->hd_live = (hdr[3] & (1u << 30)) != 0;
+    hdr[3] &= (1u << 30)-1;
+    if (!hdr[1] || hdr[1] > limit || !hdr[3] || hdr[3] > MAX_CASES) {
         goto done;
     }
-    bool motion_alone = memcmp(hdr, "DSQM", 4) == 0;
+    data->feed_only = memcmp(hdr, "DSQB", 4) == 0;
+    bool motion_alone = data->feed_only || memcmp(hdr, "DSQM", 4) == 0;
     data->motion = motion_alone || memcmp(hdr, "DSQ3", 4) == 0;
     bool pair = !motion_alone && (data->motion || memcmp(hdr, "DSQ2", 4) == 0);
     data->native_gallery = motion_alone || memcmp(hdr, "DSQN", 4) == 0;
@@ -233,7 +191,7 @@ void app_main(void)
     if (data.native_gallery) {
         if (err == ESP_OK)
             err = hd_check_pixels(board, data.pack, data.size, (const hd_sample_t *)data.samples, data.count);
-        if (err == ESP_OK && data.motion) err = hd_check_motion(board, data.pack, data.size, true);
+        if (err == ESP_OK && data.motion) err = hd_check_motion(board, &info, data.pack, data.size, true, data.feed_only);
         if (err == ESP_OK) puts("DSK_NATIVE_OK");
         else printf("DSK_FAIL err=%d\n", err);
         if (board) while (baji_board_close(board) != ESP_OK) vTaskDelay(pdMS_TO_TICKS(20));
@@ -245,20 +203,24 @@ void app_main(void)
         dsk_canvas_init(&canvas, &art);
         err = pixels(&canvas, &data);
         if (err == ESP_OK) err = panel(&canvas, board);
+        dsk_canvas_release_motion(&canvas);
     }
     heap_caps_free(data.samples);
     dsk_art_close(&art);
     if (err == ESP_OK && data.hd) {
         err = hd_check_pixels(NULL, data.hd, data.hd_size, data.hd_samples, data.hd_count);
-        if (err == ESP_OK && data.motion) err = hd_check_motion(board, data.hd, data.hd_size, false);
+        if (err == ESP_OK && data.motion) err = hd_check_motion(board, &info, data.hd, data.hd_size, false, false);
         if (err == ESP_OK) err = hd_check_switch(board, &info, data.pack, data.size, data.hd, data.hd_size);
     }
     heap_caps_free(data.hd_samples);
     if (err == ESP_OK) {
         puts("DSK_LIVE");
-        watch_live = true;
-        err = data.hd ? deepseek_app_run_pair(board, &info, data.pack, data.size, data.hd, data.hd_size)
-                      : deepseek_app_run_loaded(board, &info, data.pack, data.size);
+        if (data.hd_live) err = hd_check_live(board, &info, data.pack, data.size, data.hd, data.hd_size);
+        else {
+            live_probe_start(data.all_clips);
+            err = data.hd ? deepseek_app_run_pair(board, &info, data.pack, data.size, data.hd, data.hd_size)
+                          : deepseek_app_run_loaded(board, &info, data.pack, data.size);
+        }
         printf("DSK_LIVE_END err=%d\n", err);
     } else {
         printf("DSK_FAIL err=%d\n", err);
