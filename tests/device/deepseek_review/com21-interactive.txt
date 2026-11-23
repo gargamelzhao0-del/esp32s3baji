@@ -1,0 +1,13 @@
+pack_sha256=24f3aadb38975644326ac583b57bf9060bfa47e31cc15dc6756c600db23d2485 reference_sha256=e3fab7f8433b82e3d5ffcd60bcf5ffb9bf0bc16851df786ccf7f09e2131cf159 hd_sha256=9c7f12e0a8e4097ecaf20d5ceed4fa1433be0024e19c7a68869a6a8bceaabdf3 hd_records_sha256=646b3b127f813d148159f8ada6a00629385b64d883e75e877aa9e13153aa9921
+DSK_READY max=8257536
+DSK_RECEIVE bytes=4891198 cases=18
+DSK_ASSET bytes=4891198 crc=bd728bdf
+DSK_HD_RECEIVE bytes=2241299 cases=22
+DSK_HD_ASSET bytes=2241299 crc=347f6aed
+DSK_BOARD w=466 h=466 touch=0 power=0 free_psram=1109828
+DSK_PIXELS cases=18 mismatch=0 elapsed_ms=915
+DSK_PANEL frames=18 min_us=29458 mean_us=30452 max_us=31407
+DSK_HD_PIXELS cases=22 mismatch=0 elapsed_ms=2090 gallery_dma=0 err=0
+DSK_SWITCH hd=1 pixel=1
+DSK_LIVE
+DSK_LIVE_OK frames=2274 partial=2273 max_partial_us=21250 span_us=60116049 pose_steps=393 skipped_poses=0 clip_changes=0

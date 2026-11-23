@@ -96,14 +96,14 @@ def motion_pages(path, goldens):
         entry, level = i // 16 + 1, i % 16 + 1
         offset, size, mode = struct.unpack_from("<III", data, 12 + i * 12)
         if offset != cursor or not size or size > len(data) - offset or mode > 1:
-            raise ValueError("Invalid HDA1 block")
+            raise ValueError("Invalid HD motion block")
         block = memoryview(data)[offset:offset+size]
         if magic == b"HDA2" and mode:
             raise ValueError("Invalid HDA2 wire-format record")
         pages[entry, level] = (2 if magic == b"HDA2" else mode, block, samples[entry,level,0], samples[entry,level,1])
         cursor += size
     if cursor != len(data):
-        raise ValueError("Trailing data after HDA1 frames")
+        raise ValueError("Trailing data after the HD motion frames")
     return pages
 
 
@@ -217,7 +217,7 @@ def main():
                         help="Validate just the native-resolution production HDS and its 16 gallery views")
     parser.add_argument("--hd-poses", type=Path, default=HD / "tests/poses.crc")
     parser.add_argument("--hd-sheets", type=Path, default=HD / "tests/sheets.crc")
-    parser.add_argument("--motion", type=Path, help="Stream the 272 exact HDA1 frames to the RAM build")
+    parser.add_argument("--motion", type=Path, help="Stream the 272 exact HDA2 or legacy HDA1 frames")
     parser.add_argument("--motion-reference", type=Path, default=HD / "authoring/motion-web.crc")
     parser.add_argument("--every-bubble", action="store_true")
     parser.add_argument("--smoke", action="store_true",
