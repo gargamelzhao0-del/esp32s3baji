@@ -157,6 +157,42 @@ def connection(link):
 
 
 class PublisherTests(unittest.IsolatedAsyncioTestCase):
+    async def test_upstream_heartbeat_is_forwarded_once_and_stale_link_released(self):
+        now = [0.0]
+        state = DeviceState(clock=lambda: now[0])
+        eof, closed = threading.Event(), asyncio.Event()
+        sent = asyncio.Queue()
+        msg = dict(type="snapshot", v=1, seq=1, boot_id="a", bridge_id="b",
+                   session=None, selected_by="none")
+        state.accept(msg)
+        link = SimpleNamespace(hello=AsyncMock(return_value=NONCE), send=sent.put)
+
+        @asynccontextmanager
+        async def connect():
+            try:
+                yield link
+            finally:
+                closed.set()
+
+        job = asyncio.create_task(publish(state, connect, KEY, eof, heartbeat=0.01))
+        try:
+            await asyncio.wait_for(sent.get(), 1)
+            await asyncio.sleep(0.25)
+            self.assertTrue(sent.empty())
+            now[0] = 8.0
+            await asyncio.wait_for(closed.wait(), 1)
+            self.assertEqual(link.hello.await_count, 1)
+            self.assertTrue(state.accept(dict(msg, seq=2)))
+            eof.set()
+            self.assertEqual(await asyncio.wait_for(job, 2), 2)
+            self.assertEqual(link.hello.await_count, 2)
+            self.assertEqual(packet_fields(sent.get_nowait()).seq, 2)
+        finally:
+            if not job.done():
+                job.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await job
+
     async def test_last_revision_arrives_during_ack(self):
         state, eof, packets = DeviceState(), threading.Event(), []
         state.accept(event())

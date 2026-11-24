@@ -31,8 +31,15 @@ static inline const char *esp_err_to_name(int err) { (void)err; return "test"; }
 static inline void discard_log(const char *tag, const char *fmt, ...) { (void)tag; (void)fmt; }
 #define ESP_LOGW(...) discard_log(__VA_ARGS__)
 int xTaskCreate(void (*entry)(void *),const char *,unsigned,void *,int,TaskHandle_t *);
-int ulTaskNotifyTake(int,unsigned);
-void xTaskNotifyGive(TaskHandle_t);
+typedef int BaseType_t;
+enum { eSetBits = 1 };
+typedef enum { USJ_SELECT_READ_NOTIF, USJ_SELECT_WRITE_NOTIF } usj_select_notif_t;
+typedef void (*usj_select_notif_callback_t)(usj_select_notif_t, BaseType_t *);
+void usb_serial_jtag_set_select_notif_callback(usj_select_notif_callback_t);
+void xTaskNotify(TaskHandle_t, uint32_t, int);
+void xTaskNotifyFromISR(TaskHandle_t, uint32_t, int, BaseType_t *);
+void xTaskNotifyWait(uint32_t, uint32_t, uint32_t *, unsigned);
+void vTaskSuspend(void *);
 void vTaskDelete(void *);
 int usb_serial_jtag_read_bytes(void *,uint32_t,unsigned);
 int usb_serial_jtag_write_bytes(const void *,size_t,unsigned);

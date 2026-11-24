@@ -12,7 +12,6 @@
 static struct {
     badge_settings_t settings;
     baji_agent_sync_t *sync;
-    baji_link_endpoint_t endpoint;
     baji_agent_feed_t feed;
     bool ble, wifi, setup, event_owner;
     bool ble_stop_needed, wifi_stop_needed;
@@ -23,14 +22,15 @@ esp_err_t baji_connectivity_start(void)
     if (service.sync) return ESP_ERR_INVALID_STATE;
     esp_err_t err = nvs_flash_init();
     if (err != ESP_OK) return err;
-    // Seed the board's first pairing secret and boot challenge before the
-    // Wi-Fi/BT controller begins using the shared RF entropy source.
+    // Generate the first pairing secret before starting either radio.
+    // The live radio supplies entropy for subsequent handshake challenges.
     bootloader_random_enable();
     err = badge_settings_load(&service.settings);
-    if (err == ESP_OK) err = baji_agent_sync_open(&service.sync,service.settings.key);
     bootloader_random_disable();
     if (err != ESP_OK) return err;
-    service.endpoint = baji_agent_endpoint(service.sync);
+    err = baji_agent_sync_open(&service.sync, service.settings.key);
+    if (err != ESP_OK) return err;
+    baji_link_endpoint_t endpoint = baji_agent_endpoint(service.sync);
     service.feed = baji_agent_feed(service.sync);
     err = badge_setup_start(&service.settings);
     service.setup = err == ESP_OK;
@@ -38,7 +38,7 @@ esp_err_t baji_connectivity_start(void)
     /* A failed start can own callbacks while its own rollback is incomplete.
      * Even this path must stop successfully before the shared endpoint dies. */
     service.ble_stop_needed = true;
-    err = baji_ble_start(&service.endpoint);
+    err = baji_ble_start(&endpoint);
     service.ble = err == ESP_OK;
     if (!service.ble) ESP_LOGW("baji_radio","BLE unavailable: %s",esp_err_to_name(err));
     err = esp_netif_init();
@@ -51,7 +51,7 @@ esp_err_t baji_connectivity_start(void)
         baji_wifi_config_t cfg = {.sta_ssid=service.settings.ssid,.sta_password=service.settings.pass,
             .ap_ssid=service.settings.ap_ssid,.ap_password=service.settings.ap_pass};
         service.wifi_stop_needed = true;
-        err = baji_wifi_start(&service.endpoint,&cfg);
+        err = baji_wifi_start(&endpoint,&cfg);
         service.wifi = err == ESP_OK;
     }
     if (!service.wifi) ESP_LOGW("baji_radio","Wi-Fi unavailable: %s",esp_err_to_name(err));

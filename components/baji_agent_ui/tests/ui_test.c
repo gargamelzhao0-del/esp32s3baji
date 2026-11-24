@@ -63,6 +63,10 @@ int main(int argc, char **argv)
     baji_damage_t damage;
     baji_damage_init(&damage, SIDE, SIDE);
     baji_agent_feed_t feed = {.read = read_feed, .context = &state, .changed = &state};
+    baji_agent_feed_t polling_feed = {.read = read_feed, .context = &state};
+    baji_agent_ui_t *polling = baji_agent_ui_open(&polling_feed);
+    assert(polling && baji_agent_ui_deadline(polling, 1000, INT64_MAX) == 251000);
+    baji_agent_ui_close(polling);
     baji_agent_ui_t *ui = baji_agent_ui_open(&feed);
     assert(ui && baji_agent_ui_update(ui, 0, &damage) == BAJI_CUE_LOCAL && !damage.count);
     assert(baji_agent_ui_deadline(ui, 0, INT64_MAX) == INT64_MAX);
@@ -73,7 +77,7 @@ int main(int argc, char **argv)
     };
     assert(baji_state_apply(&state, &snapshot, 1000) == BAJI_APPLIED);
     assert(baji_agent_ui_update(ui, 1000000, &damage) == BAJI_CUE_READ && damage.count == 2);
-    assert(baji_agent_ui_deadline(ui, 1000000, INT64_MAX) == 1250000);
+    assert(baji_agent_ui_deadline(ui, 1000000, INT64_MAX) == 1500000);
     assert(baji_agent_ui_deadline(ui, 1000000, 1010000) == 1010000);
     check_crops(ui);
     uint16_t numbers[228 * 56];
@@ -84,7 +88,9 @@ int main(int argc, char **argv)
     ++snapshot.seq;
     assert(baji_state_apply(&state, &snapshot, 1100) == BAJI_APPLIED);
     assert(baji_agent_ui_update(ui, 1100000, &damage) == BAJI_CUE_READ && damage.count == 0);
+    assert(baji_agent_ui_deadline(ui, 1100000, INT64_MAX) == 1600000);
     assert(baji_agent_ui_update(ui, 1600000, &damage) == BAJI_CUE_READ && damage.count == 1);
+    assert(baji_agent_ui_deadline(ui, 1600000, INT64_MAX) == 5100000);
     uint16_t expired[228 * 56] = {0};
     baji_agent_ui_paint(ui, &footer, (uint8_t *)expired);
     assert(memcmp(expired, numbers, sizeof(numbers)) != 0); /* unknown and zero differ */

@@ -6,11 +6,13 @@ static dsk_controls_t ui;
 static uint32_t presses;
 static int64_t now;
 static unsigned px, py;
+static unsigned agent_item;
 
 static int64_t contact(bool down, unsigned x, unsigned y, unsigned elapsed)
 {
     now += elapsed;
-    return dsk_controls_tick(&ui, presses, px, py, down, x, y, now);
+    baji_input_t input = {.presses = presses, .press_x = px, .press_y = py, .touch = {down,x,y}};
+    return dsk_controls_tick(&ui, &input, agent_item, now);
 }
 
 static void start(unsigned x, unsigned y)
@@ -51,7 +53,7 @@ int main(void)
     dsk_controls_init(&ui, 7, true, now);
     assert(!ui.hd_mode && ui.pixel.shown.item == 1);
     hold(true);
-    assert(ui.hd.guides && ui.breathing && !ui.hd.gallery && ui.hd.item == 1);
+    assert(ui.hd.guides && ui.breathing && !ui.hd.gallery && ui.visible_item == 1);
     tap(240, 65);
     assert(!ui.hd.guides);
     tap(230, 400);
@@ -71,14 +73,14 @@ int main(void)
     }
     for (int i = 0; i < 129; i++) assert(seen[i]);
     tap(78, 220);
-    assert(ui.hd.item == 6);
+    assert(ui.visible_item == 6);
     tap(78, 220);
-    assert(ui.hd.item == 7);
+    assert(ui.visible_item == 7);
     tap(233, 220);
-    assert(ui.hd.item == 1);
+    assert(ui.visible_item == 1);
     for (int i = 0; i < 18; i++) {
         swipe(270, 220, 130, 215);
-        assert(ui.hd.item == (2 + i) % 18);
+        assert(ui.visible_item == (2 + i) % 18);
     }
     swipe(220, 290, 220, 160);
     assert(ui.hd.gallery && ui.hd.sheet == 0);
@@ -102,6 +104,41 @@ int main(void)
     contact(true, 233, 233, 500000);
     assert(!ui.hd_mode); /* Movement cancelled long press, even after returning. */
     contact(false, 233, 233, 1000);
+    dsk_controls_init(&ui, 7, true, now);
+    baji_input_t sample = {.presses = 1, .press_x = 228, .press_y = 208,
+                           .touch = {false,228,208}, .press_us = now};
+    sample.touch_us = now + 649999;
+    now += 675000;
+    dsk_controls_tick(&ui, &sample, 0, now);
+    assert(!ui.hd_mode && ui.pixel.shown.item == 2);
+    sample.presses++;
+    sample.press_us = now;
+    sample.touch_us = now + 650000;
+    now += 680000;
+    dsk_controls_tick(&ui, &sample, 0, now);
+    assert(ui.hd_mode && ui.pixel.shown.item == 2);
+    /* A real excursion coalesced between renders cancels both hold and tap,
+     * even with the release at exactly the original coordinates. */
+    ui.hd.gallery = true;
+    ui.hd.zoom = 1;
+    sample.presses++;
+    sample.press_us = now;
+    sample.touch_us = now + 800000;
+    sample.travel = 55;
+    now += 820000;
+    dsk_controls_tick(&ui, &sample, 0, now);
+    assert(ui.hd_mode && ui.hd.gallery && ui.hd.zoom);
+
+    dsk_controls_init(&ui, 1, true, now);
+    ui.pixel.motion_steps = 8;
+    agent_item = DSK_CLIPS + 2;
+    presses = 0;
+    assert(contact(false, 0, 0, 0) == INT64_MAX); /* no hidden 56 Hz feeding clock */
+    swipe(230, 220, 125, 220);
+    assert(ui.visible_item == DSK_CLIPS + 3 && !ui.pixel.playing);
+    assert(contact(false, 125, 220, 1600000) == INT64_MAX && ui.visible_item == agent_item);
+    tap(230, 400); /* bottom tap on a remote pose doesn't resume the hidden clip */
+    assert(ui.visible_item == agent_item && !ui.pixel.playing);
     puts("Dual-mode long press, 129 breathing positions, all linked poses, guides, four sheets and zoom/pan passed");
     return 0;
 }

@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import closing, suppress
 import http.client
+import re
 from urllib.parse import urlsplit
 
 
@@ -28,6 +29,7 @@ def _nonce(data: bytes) -> bytes:
 class WifiResponseError(OSError):
     def __init__(self, method: str, path: str, status: int):
         self.status = status
+        self.pairing_rejected = method == "POST" and status == 401
         super().__init__(f"Badge {method} {path} returned HTTP {status}")
 
 
@@ -75,11 +77,22 @@ class WifiTransport:
         await asyncio.to_thread(self._request, "POST", "/v1/state", packet, 204)
 
 
-async def _gatt(operation, timeout: float):
+class BlePairingError(OSError):
+    pairing_rejected = True
+
+
+async def _gatt(operation, timeout: float, *, final_write: bool = False):
     try:
         return await asyncio.wait_for(operation, timeout)
     except Exception as err:
-        # Bleak backends use different platform exception classes.
+        # Only the final BAJI Write Response carries the firmware's HMAC result.
+        # Bleak 3 exposes an ATT enum. Older WinRT and BlueZ backends carry the
+        # code in a labeled error string. An unrelated OS error can also be 128.
+        if final_write:
+            typed_att = type(err).__name__ == "BleakGATTProtocolError" and getattr(err, "code", None) == 0x80
+            legacy_att = re.search(r"\b(?:Protocol Error\s+|ATT error:\s*)0x80\b", str(err), re.IGNORECASE)
+            if typed_att or legacy_att:
+                raise BlePairingError("Badge rejected the signed BLE state") from err
         raise OSError(f"Badge Bluetooth operation failed: {err}") from err
 
 
@@ -96,7 +109,7 @@ class BleTransport:
         try:
             from bleak import BleakClient
         except ImportError as err:
-            raise OSError("Install the optional Bluetooth dependency with python -m pip install bleak") from err
+            raise ImportError("Install the optional Bluetooth dependency with python -m pip install bleak") from err
         async with self._lock:
             if self._client is not None:
                 raise OSError("Badge Bluetooth session already open")
@@ -140,7 +153,8 @@ class BleTransport:
                 stop = min(start + FRAGMENT_DATA, len(packet))
                 flags = int(start == 0) | (int(stop == len(packet)) << 1)
                 fragment = bytes((flags, seq)) + packet[start:stop]
-                await _gatt(client.write_gatt_char(STATE_UUID, fragment, response=True), 5)
+                await _gatt(client.write_gatt_char(STATE_UUID, fragment, response=True), 5,
+                            final_write=stop == len(packet))
 
 
 async def discover_badges(seconds: float) -> list[tuple[str, str]]:

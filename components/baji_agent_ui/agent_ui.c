@@ -22,6 +22,7 @@ struct baji_agent_ui {
     baji_agent_feed_t feed;
     char model[33];
     baji_agent_cue_t cue;
+    int64_t next_change_us;
     int quota, context; /* permille, or -1 for unavailable */
     bool quota_estimated, context_estimated;
     uint16_t top[TOP_W * TOP_H], bottom[BOTTOM_W * BOTTOM_H];
@@ -209,7 +210,10 @@ baji_agent_ui_t *baji_agent_ui_open(const baji_agent_feed_t *feed)
 #else
     baji_agent_ui_t *ui = calloc(1, sizeof(*ui));
 #endif
-    if (ui) ui->feed = *feed;
+    if (ui) {
+        ui->feed = *feed;
+        ui->next_change_us = INT64_MAX;
+    }
     return ui;
 }
 
@@ -222,6 +226,8 @@ baji_agent_cue_t baji_agent_ui_update(baji_agent_ui_t *ui, int64_t now_us, baji_
     if (!ui) return BAJI_CUE_LOCAL;
     baji_agent_display_t state = {0};
     bool visible = ui->feed.read(ui->feed.context, (uint64_t)now_us / 1000, &state);
+    uint64_t at = state.view.next_change_ms;
+    ui->next_change_us = visible && at && at <= INT64_MAX / 1000 ? (int64_t)at * 1000 : INT64_MAX;
     state.model[sizeof(state.model) - 1] = 0;
     bool transition = visible != baji_agent_ui_visible(ui);
     if (transition || (visible && strcmp(state.model, ui->model))) {
@@ -248,10 +254,11 @@ baji_agent_cue_t baji_agent_ui_update(baji_agent_ui_t *ui, int64_t now_us, baji_
 
 int64_t baji_agent_ui_deadline(const baji_agent_ui_t *ui, int64_t now_us, int64_t scene_due)
 {
-    if (ui && (!ui->feed.changed || (ui->cue != BAJI_CUE_LOCAL && ui->cue != BAJI_CUE_OFFLINE))) {
-        int64_t expire = now_us + 250000;
-        if (expire < scene_due) return expire;
-    }
+    if (!ui) return scene_due;
+    if (ui->next_change_us < scene_due) scene_due = ui->next_change_us;
+    /* Providers without a change notification must still be polled. */
+    if (!ui->feed.changed && scene_due > now_us && scene_due - now_us > 250000)
+        return now_us + 250000;
     return scene_due;
 }
 

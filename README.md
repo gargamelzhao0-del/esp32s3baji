@@ -10,7 +10,7 @@ ESP32-S3 固件默认启动 DeepSeek 鲸鱼娘，首屏与检视台相同，在�
 
 1. [产品与范围](docs/00-product-and-scope.md)：首版做什么，每条需求如何认定完成。
 2. 选“工作中”看白龙娘搬桌开机，坐定后点她的小屏幕。在“口袋 → 小剧场”可以一起欢呼、逗尾巴和喂糖和好。[打开圆屏交互原型](design/badge-prototype.html) · [20 秒动作预览](design/gpt-pet/desk-story-preview.webp) · [动作设计与技术调研](docs/10-character-acting.md) · [接入 Agent 事件](design/gpt-pet/README.md#agent-联动)
-3. [开发顺序与验收](docs/07-roadmap-and-acceptance.md)：G0–G5，下一步从板卡独立诊断开始。
+3. [圆屏互动触发手册](docs/18-device-interactions.md)列出两份固件的触摸热区、Agent 触发条件，以及网页和设备各自可以体验的动作。
 
 [Codex 画面预览](design/prototype-desktop.png) · [Claude 画面预览](design/prototype-claude.png) · [用量详情](design/prototype-details.png) · [手机宽度预览](design/prototype-mobile.png)
 
@@ -29,6 +29,7 @@ ESP32-S3 固件默认启动 DeepSeek 鲸鱼娘，首屏与检视台相同，在�
 | [08 验证记录](docs/08-validation-log.md) | 已测试的结果与没有测试的部分 |
 | [09 决策记录](docs/09-decisions.md) | 为什么采用这些技术选择 |
 | [17 无线与 Agent 接入](docs/17-wireless-agent.md) | USB 配对、BLE、Wi-Fi、通用事件示例及显示链路 |
+| [18 圆屏互动触发手册](docs/18-device-interactions.md) | GPT、鲸鱼娘像素及高清模式的手势、动作优先级与远端状态 |
 
 ## 当前工程
 

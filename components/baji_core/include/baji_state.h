@@ -62,6 +62,9 @@ typedef struct {
     uint16_t quota_used_permille;
     uint16_t context_used_permille;
     baji_outcome_t outcome;
+    /* Absolute monotonic deadline for the next time-driven display change.
+     * Zero means the projection stays valid until another snapshot arrives. */
+    uint64_t next_change_ms;
 } baji_view_t;
 
 void baji_state_init(baji_state_t *state);

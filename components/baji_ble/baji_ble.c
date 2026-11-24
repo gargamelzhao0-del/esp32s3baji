@@ -21,6 +21,8 @@ static const ble_uuid128_t service_uuid = BAJI_UUID(0);
 static const ble_uuid128_t hello_uuid = BAJI_UUID(1);
 static const ble_uuid128_t state_uuid = BAJI_UUID(2);
 static const char name[] = "BAJI-S3";
+/* Application-specific ATT errors. Neither asks the OS to pair/bond. */
+enum { BAJI_ATT_BAD_SIGNATURE = 0x80, BAJI_ATT_STREAM_CONFLICT = 0x81 };
 
 /* Only the NimBLE host task accesses peer and the reassembly buffer. The
  * owner joins that task before dropping the borrowed endpoint context. */
@@ -63,8 +65,14 @@ static int write_state(uint16_t conn, uint16_t attr, struct ble_gatt_access_ctxt
     case BAJI_BLE_COMPLETE:
         /* The final Write Response acknowledges authentication and publication.
          * Intermediate responses only acknowledge a fragment. */
-        return endpoint.receive(endpoint.context, rx.data, rx.size) == ESP_OK
-             ? 0 : BLE_ATT_ERR_INSUFFICIENT_AUTHOR;
+        switch (endpoint.receive(endpoint.context, rx.data, rx.size)) {
+        case ESP_OK: return 0;
+        case ESP_ERR_INVALID_CRC: return BAJI_ATT_BAD_SIGNATURE;
+        case ESP_ERR_INVALID_STATE: return BAJI_ATT_STREAM_CONFLICT;
+        case ESP_ERR_INVALID_SIZE:
+        case ESP_ERR_INVALID_ARG: return BLE_ATT_ERR_VALUE_NOT_ALLOWED;
+        default: return BLE_ATT_ERR_UNLIKELY;
+        }
     default:
         return BLE_ATT_ERR_VALUE_NOT_ALLOWED;
     }

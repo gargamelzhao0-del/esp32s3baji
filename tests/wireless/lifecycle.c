@@ -5,6 +5,7 @@
 #include "baji_connectivity.h"
 #include "settings.h"
 #include <assert.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -17,7 +18,16 @@ static const char *usb_rx;
 static uint8_t pair_record[44], station_record[98];
 static size_t pair_len, station_len;
 static void (*usb_reader)(void *);
-static void *usb_context;
+static pthread_t usb_thread;
+static pthread_mutex_t io_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t io_ready = PTHREAD_COND_INITIALIZER;
+static usj_select_notif_callback_t usb_irq;
+static uint32_t notifications;
+
+static void *run_reader(void *arg) {
+    usb_reader(arg);
+    return NULL;
+}
 
 esp_err_t nvs_flash_init(void) { return ESP_OK; }
 esp_err_t nvs_open(const char *s,int mode,nvs_handle_t *h) {
@@ -58,7 +68,7 @@ esp_err_t esp_event_loop_delete_default(void) {
 }
 
 esp_err_t baji_agent_sync_open(baji_agent_sync_t **s,const uint8_t key[32]) {
-    assert(!sync_live && entropy_on && !memcmp(key,pair_record,32));
+    assert(!sync_live && !entropy_on && !memcmp(key,pair_record,32));
     sync_live = true; *s = (void*)&sync_live; return ESP_OK;
 }
 baji_link_endpoint_t baji_agent_endpoint(baji_agent_sync_t *s) {
@@ -96,27 +106,70 @@ esp_err_t usb_serial_jtag_driver_install(usb_serial_jtag_driver_config_t *cfg) {
     assert(!usb_installed && cfg->rx_buffer_size > 64); usb_installed = true; return ESP_OK;
 }
 esp_err_t usb_serial_jtag_driver_uninstall(void) {
-    assert(usb_installed && !console_uses_driver); usb_installed = false; return ESP_OK;
+    assert(usb_installed && !usb_irq && !console_uses_driver); usb_installed = false; return ESP_OK;
 }
 void usb_serial_jtag_vfs_use_nonblocking(void) { assert(usb_installed); console_uses_driver = false; }
 void usb_serial_jtag_vfs_use_driver(void) { assert(usb_installed); console_uses_driver = true; }
 int xTaskCreate(void (*entry)(void *),const char *name,unsigned stack,void *arg,int priority,TaskHandle_t *task) {
     (void)name; (void)stack; (void)priority;
     if (usb_task_failure) return 0;
-    usb_reader = entry; usb_context = arg; *task = &usb_installed; return pdPASS;
+    usb_reader = entry; notifications = 0; *task = &usb_thread;
+    assert(!pthread_create(&usb_thread, NULL, run_reader, arg));
+    return pdPASS;
 }
-void xTaskNotifyGive(TaskHandle_t task) { assert(task); usb_reader(usb_context); }
-int ulTaskNotifyTake(int clear,unsigned wait) { (void)clear; (void)wait; return !usb_rx || !*usb_rx; }
-void vTaskDelete(void *task) { assert(!task); }
+void usb_serial_jtag_set_select_notif_callback(usj_select_notif_callback_t fn) { usb_irq = fn; }
+void xTaskNotify(TaskHandle_t task, uint32_t bits, int action) {
+    assert(task == &usb_thread && action == eSetBits);
+    pthread_mutex_lock(&io_lock);
+    notifications |= bits;
+    pthread_cond_broadcast(&io_ready);
+    pthread_mutex_unlock(&io_lock);
+}
+void xTaskNotifyFromISR(TaskHandle_t task, uint32_t bits, int action, BaseType_t *woken) {
+    *woken = pdTRUE;
+    xTaskNotify(task, bits, action);
+}
+void xTaskNotifyWait(uint32_t before, uint32_t after, uint32_t *out, unsigned wait) {
+    assert(!before && after == UINT32_MAX && (wait == 0 || wait == portMAX_DELAY));
+    pthread_mutex_lock(&io_lock);
+    while (wait && !notifications) pthread_cond_wait(&io_ready, &io_lock);
+    *out = notifications;
+    notifications = 0;
+    pthread_mutex_unlock(&io_lock);
+}
+void vTaskSuspend(void *task) { assert(!task); pthread_exit(NULL); }
+void vTaskDelete(void *task) { assert(task == &usb_thread); assert(!pthread_join(usb_thread, NULL)); }
 int usb_serial_jtag_read_bytes(void *dest,uint32_t limit,unsigned wait) {
-    (void)wait;
-    size_t n = strlen(usb_rx);
+    assert(wait == 0);
+    pthread_mutex_lock(&io_lock);
+    size_t n = usb_rx ? strlen(usb_rx) : 0;
     if (n > limit) n = limit;
-    memcpy(dest,usb_rx,n); usb_rx += n; return (int)n;
+    if (n) { memcpy(dest,usb_rx,n); usb_rx += n; }
+    pthread_mutex_unlock(&io_lock);
+    return (int)n;
 }
 int usb_serial_jtag_write_bytes(const void *data,size_t n,unsigned wait) {
     (void)wait; assert(console_uses_driver && n < sizeof(usb_tx));
-    memcpy(usb_tx,data,n); usb_tx[n] = 0; return (int)n;
+    pthread_mutex_lock(&io_lock);
+    memcpy(usb_tx,data,n); usb_tx[n] = 0;
+    pthread_cond_broadcast(&io_ready);
+    pthread_mutex_unlock(&io_lock);
+    return (int)n;
+}
+static void setup_command(const char *command) {
+    assert(usb_irq);
+    BaseType_t woken = 0;
+    usb_irq(USJ_SELECT_WRITE_NOTIF, &woken);
+    assert(!woken); /* Console output cannot wake the pairing task. */
+    pthread_mutex_lock(&io_lock);
+    usb_tx[0] = 0;
+    usb_rx = command;
+    pthread_mutex_unlock(&io_lock);
+    usb_irq(USJ_SELECT_READ_NOTIF, &woken);
+    assert(woken);
+    pthread_mutex_lock(&io_lock);
+    while (!usb_tx[0]) pthread_cond_wait(&io_ready, &io_lock);
+    pthread_mutex_unlock(&io_lock);
 }
 
 int main(void) {
@@ -124,7 +177,7 @@ int main(void) {
     assert(baji_connectivity_start() == ESP_OK && baji_connectivity_feed());
     assert(!*wifi_name && pair_len == 44);
     assert(baji_connectivity_start() == ESP_ERR_INVALID_STATE);
-    usb_rx = "BAJI_WIFI 736369656e6365:3132333435363738\n";
+    setup_command("BAJI_WIFI 736369656e6365:3132333435363738\n");
     assert(baji_connectivity_stop() == ESP_FAIL);
     assert(!strcmp(usb_tx,"BAJI_WIFI_SAVED reboot\n") && station_len == 98);
     assert(sync_live && loop_live && wifi_live && !ble_live && !usb_installed && !closed);
@@ -135,7 +188,7 @@ int main(void) {
     external_loop = ble_fail_stop = true;
     assert(baji_connectivity_start() == ESP_OK);
     assert(!strcmp(wifi_name,"science"));
-    usb_rx = "BAJI_PAIR?\n";
+    setup_command("BAJI_PAIR?\n");
     assert(baji_connectivity_stop() == ESP_FAIL && !wifi_live && ble_live && sync_live);
     assert(!strncmp(usb_tx,"BAJI_PAIR1 ",11) && strstr(usb_tx," BAJI-A5A5A5 "));
     assert(baji_connectivity_stop() == ESP_OK && closed == 2);
@@ -150,7 +203,7 @@ int main(void) {
     station_len = sizeof(station_record);
     memset(station_record,'x',station_len);
     assert(baji_connectivity_start() == ESP_OK && !*wifi_name && usb_installed);
-    usb_rx = "BAJI_WIFI :\n";
+    setup_command("BAJI_WIFI :\n");
     assert(baji_connectivity_stop() == ESP_OK && !strcmp(usb_tx,"BAJI_WIFI_SAVED reboot\n"));
     assert(baji_connectivity_stop() == ESP_OK && closed == 4);
     pair_len = 1;

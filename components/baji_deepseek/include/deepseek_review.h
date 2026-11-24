@@ -91,14 +91,19 @@ void dsk_model_smooth_bubble(dsk_model_t *model);
 bool dsk_command(dsk_model_t *model, dsk_command_t command, unsigned value);
 void dsk_advance(dsk_model_t *model, int64_t now_us);
 int64_t dsk_next_update(const dsk_model_t *model, int64_t now_us);
+int64_t dsk_next_bubble_update(const dsk_model_t *model, int64_t now_us);
 
 /* A press counter preserves taps completed between two render callbacks.
  * Coordinates are already rotated into physical (466x466) display space. */
 typedef struct {
     uint32_t presses;
     uint16_t start_x, start_y;
+    uint8_t start_item;
     bool active;
 } dsk_gesture_t;
+
+/* Return true when the release selects a local role pose or animation frame. */
+bool dsk_pixel_release(dsk_model_t *model, const dsk_gesture_t *gesture, int dx, int dy);
 
 void dsk_touch(dsk_gesture_t *gesture, dsk_model_t *model, uint32_t presses,
                uint16_t start_x, uint16_t start_y, bool down, uint16_t x, uint16_t y);

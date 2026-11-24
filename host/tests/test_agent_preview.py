@@ -87,3 +87,40 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(state.view()["family"],"neutral")
         state.close_input()
         self.assertEqual(state.view()["link"],"offline")
+
+    def test_generic_preview_and_device_share_validation_and_metric_age(self):
+        from baji_bridge.device import DeviceState, UNKNOWN
+        clock = [0.0]
+        preview, device = (kind(clock=lambda: clock[0]) for kind in (PreviewState, DeviceState))
+        event = {"type":"agent.state","session":"s","model":"deepseek-local","phase":"tool",
+                 "activity":"reading","context":{"used_pct":0,"ttl_ms":1000,"age_ms":400}}
+        for listener in (preview, device):
+            self.assertTrue(listener.accept(event))
+            self.assertFalse(listener.accept(dict(event, quota={})))
+            self.assertFalse(listener.accept({"type":"turn.started"}))
+            self.assertEqual(listener.revision, 1)
+        self.assertEqual(preview.view()["family"], "deepseek")
+        self.assertEqual(preview.view()["context"]["value"], 0)
+        self.assertEqual(device.sample()[-1], (0, 600, False))
+        # The caller can reuse its event dictionary after publication.
+        event["context"]["used_pct"] = 99
+        self.assertEqual(device.sample()[-1][0], 0)
+        clock[0] = 0.6
+        self.assertIsNone(preview.view()["context"])
+        self.assertEqual(device.sample()[-1], (UNKNOWN, 0, False))
+
+    def test_new_thread_resets_model_and_latest_parallel_tool_owns_pose(self):
+        for fallback in (None, "gpt-default"):
+            state = PreviewState(model=fallback)
+            state.accept({"type":"thread.started","model":"gpt-previous"})
+            state.accept({"type":"turn.started"})
+            self.assertEqual(state.view()["model"], "gpt-previous")
+            state.accept({"type":"thread.started","thread_id":"next"})
+            state.accept({"type":"turn.started"})
+            self.assertEqual(state.view()["model"], fallback)
+            for action, name, tool in (("started", "a", "command_execution"), ("started", "b", "web_search"),
+                                       ("updated", "a", "command_execution")):
+                state.accept({"type":f"item.{action}","item":{"id":name,"type":tool}})
+            self.assertEqual((state.view()["state"], state.view()["tools"]), ("running", 2))
+            state.accept({"type":"item.completed","item":{"id":"a","type":"command_execution"}})
+            self.assertEqual((state.view()["state"], state.view()["tools"]), ("searching", 1))

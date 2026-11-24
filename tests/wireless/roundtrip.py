@@ -36,7 +36,8 @@ class View(ct.Structure):
     _fields_ = [("link", ct.c_int), ("phase", ct.c_int), ("pose", ct.c_char_p),
                 ("animate", ct.c_bool), ("quota_known", ct.c_bool), ("context_known", ct.c_bool),
                 ("quota_estimated", ct.c_bool), ("context_estimated", ct.c_bool),
-                ("quota", ct.c_uint16), ("context", ct.c_uint16), ("outcome", ct.c_int)]
+                ("quota", ct.c_uint16), ("context", ct.c_uint16), ("outcome", ct.c_int),
+                ("next_change_ms", U64)]
 
 
 class Display(ct.Structure):
@@ -180,6 +181,21 @@ class Wireless(unittest.TestCase):
         self.assertFalse(self.read().view.context_estimated)
         self.assertFalse(self.read().view.context_known)
         self.assertEqual(self.read().view.link, ONLINE)
+
+    def test_expired_first_packet_cannot_start_a_session(self):
+        self.event(phase="waiting")
+        delayed = self.packet(1)
+        self.at(8999)
+        self.assertEqual(self.ble.challenge(), self.nonce)
+        self.at(9000)
+        self.assertEqual(self.wifi.send(delayed), BAD_STATE)
+        self.assertFalse(self.changed())
+        self.read(False)
+        fresh = self.ble.challenge()
+        self.assertNotEqual(fresh, self.nonce)
+        self.assertEqual(self.wifi.challenge(), fresh)
+        self.assertEqual(self.ble.send(self.packet(1, nonce=fresh)), OK)
+        self.assertEqual(self.read().view.pose, b"asking")
 
     def test_competing_transports_replay_expiry_and_rebind(self):
         self.event(activity="running")

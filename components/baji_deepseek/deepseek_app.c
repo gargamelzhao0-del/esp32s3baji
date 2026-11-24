@@ -23,9 +23,6 @@ struct deepseek_app {
     baji_damage_t pending;
     baji_board_t *board;
     baji_agent_ui_t *agent;
-    int remote_item; /* Zero selects the local player's item. */
-    int64_t local_until;
-
 };
 
 static void mark(void *context, baji_rect_t area)
@@ -41,7 +38,7 @@ static void full_screen(deepseek_app_t *app)
 static esp_err_t prepare_hd(deepseek_app_t *app)
 {
     dsh_view_t view = app->ui.hd;
-    if (app->remote_item && !view.gallery) view.item = app->remote_item;
+    view.item = view.gallery ? 0 : app->ui.visible_item;
     if (!app->hd_initialized) {
         dsk_canvas_release_motion(&app->canvas);
         if (!dsh_canvas_init(&app->hd_canvas, &app->hd)) return ESP_ERR_NO_MEM;
@@ -84,8 +81,8 @@ static esp_err_t prepare_pixel(deepseek_app_t *app)
     dsk_frame_t frame = app->ui.pixel.shown;
     unsigned mix = app->ui.pixel.bubble_mix;
     unsigned sub = app->ui.pixel.subframe;
-    if (app->remote_item) {
-        frame.item = app->remote_item;
+    if (frame.item != app->ui.visible_item) {
+        frame.item = app->ui.visible_item;
         frame.frame = sub = 0;
     }
     if (!dsk_canvas_damage_motion(&app->canvas, frame, mix, sub, mark, &app->pending) ||
@@ -123,32 +120,12 @@ esp_err_t deepseek_app_tick(void *context, const baji_input_t *input, int64_t no
 {
     if (!context || !input || !next) return ESP_ERR_INVALID_ARG;
     deepseek_app_t *app = context;
-    unsigned previous_item = app->ui.pixel.shown.item;
-    int64_t previous_origin = app->ui.pixel.last_tick;
-    *next = dsk_controls_tick(&app->ui, input->presses, input->press_x, input->press_y,
-                              input->touch.pressed, input->touch.x, input->touch.y, now);
+    bool gallery = app->ui.hd_mode && app->ui.hd.gallery;
+    baji_agent_cue_t cue = baji_agent_ui_update(app->agent, now, gallery ? NULL : &app->pending);
+    *next = dsk_controls_tick(&app->ui, input, projected_item(cue), now);
+    *next = baji_agent_ui_deadline(app->agent, now, *next);
     bool hd = app->ui.hd_mode;
-    bool overlay = false;
-    if (app->agent) {
-        bool gallery = hd && app->ui.hd.gallery;
-        baji_agent_cue_t cue = baji_agent_ui_update(app->agent, now, gallery ? NULL : &app->pending);
-        int item = projected_item(cue);
-        unsigned local = app->ui.pixel.shown.item;
-        if (item && (local != previous_item || previous_origin != app->ui.pixel.last_tick)) {
-            /* Finish the local gesture's selected animation before resuming Agent work. */
-            int64_t duration = local < DSK_CLIPS
-                ? 1000000LL * dsk_clip_frames(local) / dsk_clip_fps(local) : 1600000;
-            app->local_until = now + duration;
-        }
-        if (!item) app->local_until = 0;
-        if (now < app->local_until) {
-            item = 0;
-            if (*next > app->local_until) *next = app->local_until;
-        }
-        app->remote_item = item;
-        overlay = baji_agent_ui_visible(app->agent) && !gallery;
-        *next = baji_agent_ui_deadline(app->agent, now, *next);
-    }
+    bool overlay = baji_agent_ui_visible(app->agent) && !(hd && app->ui.hd.gallery);
     esp_err_t err = hd ? prepare_hd(app) : prepare_pixel(app);
     if (err != ESP_OK || !app->pending.count) return err;
     baji_paint_fn painter = hd ? dsh_paint : dsk_paint;
@@ -260,7 +237,11 @@ esp_err_t deepseek_app_run_connected(baji_board_t *board, const baji_board_info_
     const void *hd = dsh_builtin(&hd_bytes);
     if (!hd || !hd_bytes) return ESP_ERR_INVALID_STATE;
     dsh_motion_t motion = {0};
-    if (!dsh_partition_motion_open(&motion)) return ESP_ERR_INVALID_RESPONSE;
+    if (!dsh_partition_motion_open(&motion)) {
+#ifdef ESP_PLATFORM
+        ESP_LOGW("deepseek", "HD motion pack unavailable; using pose-based breathing");
+#endif
+    }
     deepseek_app_t *app = NULL;
     esp_err_t err = deepseek_app_open(&app, board, info, start, (size_t)(end - start), hd, hd_bytes, -1);
     if (err == ESP_OK && feed) err = deepseek_app_attach_feed(app, feed);

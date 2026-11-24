@@ -38,22 +38,34 @@ async def publish(state, transport, key, eof, *, heartbeat=2., retry_limit=18.):
     closed_at = None
     failures = 0
     while True:
-        if eof.is_set():
+        # EOF is published after the last accepted revision. Read it first so
+        # an initially empty/expired sample cannot race a new final revision.
+        finished = eof.is_set()
+        if not state.revision or state.upstream_expired():
+            if not finished:
+                await asyncio.sleep(0.1)
+                continue
             if not state.revision:
                 raise ValueError("input contained no supported Agent state")
-            if state.sample() is None and sent_revision != state.revision:
+            if sent_revision != state.revision:
                 raise ValueError("last upstream snapshot expired before delivery")
-        if not state.revision:
-            await asyncio.sleep(0.1)
-            continue
+            return sent_revision
         try:
             async with transport() as link:
                 nonce = await link.hello()
                 last_send = None
                 while True:
                     now = time.monotonic()
-                    sample = state.sample()
-                    if sample and (last_send is None or sample[0] != sent_revision or now-last_send >= heartbeat):
+                    if state.upstream_expired():
+                        # Release the BLE connection as well as the expired upstream lease.
+                        break
+                    # BAJI snapshots already carry a producer heartbeat. Repeating
+                    # one here would extend a stalled upstream's 8-second lease.
+                    heartbeat_due = state.source != "snapshot" and last_send is not None and now - last_send >= heartbeat
+                    if last_send is None or state.revision != sent_revision or heartbeat_due:
+                        sample = state.sample()
+                        if sample is None:
+                            break
                         sequence += 1
                         await link.send(signed_snapshot(key,nonce,stream,sequence,sample))
                         last_send, sent_revision, failures = time.monotonic(), sample[0], 0
@@ -66,7 +78,7 @@ async def publish(state, transport, key, eof, *, heartbeat=2., retry_limit=18.):
                             raise ValueError("last upstream snapshot expired before delivery")
                     await asyncio.sleep(0.1)
         except (OSError, asyncio.TimeoutError) as error:
-            if getattr(error,"status",None) == 401:
+            if getattr(error, "pairing_rejected", False):
                 raise ValueError("pairing key was rejected; pair this badge over USB") from error
             if eof.is_set():
                 # The final state may already be acknowledged when closing a

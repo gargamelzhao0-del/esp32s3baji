@@ -15,7 +15,8 @@ def check_lifecycle(build):
     for header in ("esp_err.h", "esp_event.h", "esp_log.h", "esp_netif.h", "nvs_flash.h",
                    "nvs.h", "bootloader_random.h", "esp_random.h", "esp_mac.h",
                    "freertos/FreeRTOS.h", "freertos/semphr.h", "freertos/task.h",
-                   "driver/usb_serial_jtag.h", "driver/usb_serial_jtag_vfs.h"):
+                   "driver/usb_serial_jtag.h", "driver/usb_serial_jtag_vfs.h",
+                   "driver/usb_serial_jtag_select.h"):
         path = headers / header
         path.parent.mkdir(exist_ok=True)
         path.write_text('#include "lifecycle_shim.h"\n', encoding="ascii")
@@ -28,7 +29,7 @@ def check_lifecycle(build):
                coordinator / "connectivity.c", coordinator / "usb_setup.c"]
     subprocess.run([os.environ.get("CC", "gcc"), "-std=c11", "-O2", "-pthread", "-Wall", "-Wextra",
                     "-Werror", *(f"-I{p}" for p in includes), *map(str, sources), "-o", str(exe)], check=True)
-    subprocess.run([str(exe)], check=True)
+    subprocess.run([str(exe)], check=True, timeout=10)
     for header in ("sdkconfig.h", "pet_app.h", "baji_deepseek_app.h"):
         (headers / header).write_text('#include "app_shim.h"\n', encoding="ascii")
     for character in ("deepseek", "gpt"):

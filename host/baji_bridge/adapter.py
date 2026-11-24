@@ -14,6 +14,11 @@ class PercentSample:
     observed_monotonic_ms: int | None
     ttl_ms: int
 
+    def remaining_ms(self, now_ms: int) -> int:
+        if self.observed_monotonic_ms is None or self.used_pct is None or self.quality == "unknown":
+            return 0
+        return max(0, self.ttl_ms - max(0, now_ms - self.observed_monotonic_ms))
+
 @dataclass(frozen=True)
 class QuotaSample:
     id: str

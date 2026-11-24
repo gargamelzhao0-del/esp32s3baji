@@ -1,5 +1,6 @@
 #include "settings.h"
 #include "driver/usb_serial_jtag.h"
+#include "driver/usb_serial_jtag_select.h"
 #include "driver/usb_serial_jtag_vfs.h"
 #include "freertos/task.h"
 #include <stdio.h>
@@ -7,6 +8,13 @@
 
 static TaskHandle_t reader;
 static SemaphoreHandle_t finished;
+enum { USB_RX = 1, USB_STOP = 2 };
+
+/* Setup owns the USB RX stream. Console logging uses only the TX driver. */
+static void usb_event(usj_select_notif_t event, BaseType_t *woken)
+{
+    if (event == USJ_SELECT_READ_NOTIF) xTaskNotifyFromISR(reader, USB_RX, eSetBits, woken);
+}
 
 static int nibble(char c)
 {
@@ -56,8 +64,11 @@ static void read_setup(void *arg)
     char line[216], buf[48];
     size_t length = 0;
     bool dropping = false;
-    while (!ulTaskNotifyTake(pdTRUE,0)) {
-        int n = usb_serial_jtag_read_bytes(buf,sizeof(buf),pdMS_TO_TICKS(100));
+    for (;;) {
+        int n = usb_serial_jtag_read_bytes(buf, sizeof(buf), 0);
+        uint32_t events = 0;
+        xTaskNotifyWait(0, UINT32_MAX, &events, n > 0 ? 0 : portMAX_DELAY);
+        if (events & USB_STOP) break;
         for (int i=0; i<n; i++) {
             if (buf[i]=='\n') {
                 if (!dropping) { line[length]=0; handle(line,arg); }
@@ -69,7 +80,8 @@ static void read_setup(void *arg)
         }
     }
     xSemaphoreGive(finished);
-    vTaskDelete(NULL);
+    /* Keep the notification target valid through ISR removal on any core. */
+    vTaskSuspend(NULL);
 }
 
 esp_err_t badge_setup_start(const badge_settings_t *s)
@@ -92,19 +104,24 @@ esp_err_t badge_setup_start(const badge_settings_t *s)
         usb_serial_jtag_driver_uninstall();
         return ESP_ERR_NO_MEM;
     }
+    usb_serial_jtag_set_select_notif_callback(usb_event);
+    /* A packet can already be buffered from before the ISR hook was installed. */
+    xTaskNotify(reader, USB_RX, eSetBits);
     return ESP_OK;
 }
 
 void badge_setup_stop(void)
 {
     if (!reader) return;
-    xTaskNotifyGive(reader);
+    usb_serial_jtag_set_select_notif_callback(NULL);
+    xTaskNotify(reader, USB_STOP, eSetBits);
     xSemaphoreTake(finished,portMAX_DELAY);
-    reader=NULL;
-    vSemaphoreDelete(finished);
-    finished=NULL;
 #if CONFIG_VFS_SUPPORT_IO && CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG_ENABLED
     usb_serial_jtag_vfs_use_nonblocking();
 #endif
     usb_serial_jtag_driver_uninstall();
+    vTaskDelete(reader);
+    reader = NULL;
+    vSemaphoreDelete(finished);
+    finished = NULL;
 }

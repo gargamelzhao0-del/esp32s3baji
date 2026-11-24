@@ -139,39 +139,56 @@ void dsk_advance(dsk_model_t *m, int64_t now)
     m->bubble_mix = m->smooth_bubble ? offset % 8 : 0;
 }
 
+int64_t dsk_next_bubble_update(const dsk_model_t *m, int64_t now)
+{
+    if (m->bubble_steps <= 1) return INT64_MAX;
+    uint32_t delta;
+    dsk_curve_at(m->float_edges, m->bubble_steps, HALF_FLOAT_US, now - m->float_origin, &delta);
+    return now + delta;
+}
+
 int64_t dsk_next_update(const dsk_model_t *m, int64_t now)
 {
-    int64_t next = INT64_MAX;
+    int64_t next = dsk_next_bubble_update(m, now);
     if (m->shown.item < DSK_CLIPS && m->playing) {
         unsigned rate = rates[m->shown.item] * m->motion_steps;
         int64_t elapsed = now >= m->last_tick ? now - m->last_tick : 0;
         int64_t tick = elapsed * rate / 1000000 + 1;
-        next = m->last_tick + (tick * 1000000 + rate - 1) / rate;
-    }
-    if (m->bubble_steps > 1) {
-        uint32_t delta;
-        dsk_curve_at(m->float_edges, m->bubble_steps, HALF_FLOAT_US, now - m->float_origin, &delta);
-        int64_t bubble_due = now + delta;
-        if (bubble_due < next) next = bubble_due;
+        int64_t frame_due = m->last_tick + (tick * 1000000 + rate - 1) / rate;
+        if (frame_due < next) next = frame_due;
     }
     return next;
 }
 
-static void tap(dsk_model_t *m, unsigned x, unsigned y)
+bool dsk_pixel_release(dsk_model_t *m, const dsk_gesture_t *g, int dx, int dy)
 {
+    unsigned item = g->start_item, x = g->start_x, y = g->start_y;
+    if (abs(dx) >= 38 && abs(dx) >= abs(dy)) {
+        if (item >= DSK_CLIPS && item != m->shown.item)
+            dsk_command(m, DSK_SELECT_STATE, item - DSK_CLIPS);
+        dsk_command(m, dx < 0 ? DSK_STEP_FORWARD : DSK_STEP_BACK, 0);
+        return true;
+    }
+    if (abs(dy) >= 38) {
+        dsk_command(m, DSK_SET_VIEW, dy < 0);
+        return false;
+    }
     /* Buttons sit on the matching on-screen objects; the larger hit areas
      * leave room for a fingertip without changing the source artwork. */
     if (y <= 76 && x >= 119 && x <= 347)
         dsk_command(m, DSK_SET_PHASE, (m->shown.phase + 1) % DSK_PHASES);
-    else if (y >= 369 && x >= 105 && x <= 361)
-        dsk_command(m, DSK_TOGGLE_PLAY, 0);
-    else if (x < 109 && y >= 172 && y <= 271) {
-        unsigned pose = m->last_pose + (m->shown.item >= DSK_CLIPS);
+    else if (y >= 369 && x >= 105 && x <= 361) {
+        if (item == m->shown.item) dsk_command(m, DSK_TOGGLE_PLAY, 0);
+    } else if (x < 109 && y >= 172 && y <= 271) {
+        unsigned pose = item >= DSK_CLIPS ? item - DSK_CLIPS + 1 : m->last_pose;
         dsk_command(m, DSK_SELECT_STATE, pose % (DSK_ITEMS - DSK_CLIPS));
+        return true;
     } else {
-        unsigned clip = m->last_clip + (m->shown.item < DSK_CLIPS);
+        unsigned clip = item < DSK_CLIPS ? item + 1 : m->last_clip;
         dsk_command(m, DSK_SELECT_CLIP, clip % DSK_CLIPS);
+        return true;
     }
+    return false;
 }
 
 void dsk_touch(dsk_gesture_t *g, dsk_model_t *m, uint32_t presses,
@@ -181,15 +198,11 @@ void dsk_touch(dsk_gesture_t *g, dsk_model_t *m, uint32_t presses,
         g->presses = presses;
         g->start_x = px;
         g->start_y = py;
+        g->start_item = m->shown.item;
         g->active = true;
     }
     if (!g->active || down) return;
     g->active = false;
     int dx = (int)x - g->start_x, dy = (int)y - g->start_y;
-    if (abs(dx) >= 38 && abs(dx) >= abs(dy))
-        dsk_command(m, dx < 0 ? DSK_STEP_FORWARD : DSK_STEP_BACK, 0);
-    else if (abs(dy) >= 38)
-        dsk_command(m, DSK_SET_VIEW, dy < 0);
-    else
-        tap(m, g->start_x, g->start_y);
+    dsk_pixel_release(m, g, dx, dy);
 }

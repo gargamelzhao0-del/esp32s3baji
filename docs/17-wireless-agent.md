@@ -62,7 +62,7 @@ codex exec --json "概述当前工程" | python tools/agent_sync.py send --wifi 
 python tools/agent_sync.py send --wifi http://192.168.4.1 --input protocol/fixtures/codex-flow.jsonl --interval 1
 ```
 
-Codex 事件若省略模型名，可在 `send` 增加 `--model` 并填入该次实际运行的模型名。桥在输入打开期间约每 2 秒发送心跳，突发事件按最新状态合并。文件回放用 `--interval` 逐项观察。标准输入结束后，最后状态获确认，桥即退出。设备连续 8 秒未收到有效快照会显示离线。
+Codex 事件若省略模型名，可在 `send` 增加 `--model` 并填入该次实际运行的模型名。Codex 与通用事件流在输入打开期间约每 2 秒发送心跳。转发 BAJI 快照时由上游新序号续期，停更后会释放链路。突发更新按最新状态合并，文件回放可用 `--interval` 逐项观察。标准输入结束后，最后状态获确认，桥即退出。设备连续 8 秒未收到有效快照会显示离线。[设备动作和触摸优先级](18-device-interactions.md)
 
 ## 模块责任
 

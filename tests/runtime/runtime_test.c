@@ -55,8 +55,9 @@ esp_err_t baji_peripherals_next_touch(baji_peripherals_t *io, uint32_t wait, baj
 {
     assert(io && yielding && wait);
     if (++touch_reads == 1) *p = (baji_touch_sample_t){true, 117, 132};
-    else if (touch_reads == 2) *p = (baji_touch_sample_t){true, 196, 136};
-    else if (touch_reads == 3) *p = (baji_touch_sample_t){false, 0, 0};
+    else if (touch_reads == 2) { now += 2000; *p = (baji_touch_sample_t){true, 242, 140}; }
+    else if (touch_reads == 3) { now += 2000; *p = (baji_touch_sample_t){true, 196, 136}; }
+    else if (touch_reads == 4) { now += 3000; *p = (baji_touch_sample_t){false, 0, 0}; }
     else longjmp(blocked_input, 1);
     return ESP_OK;
 }
@@ -164,8 +165,9 @@ static esp_err_t render(void *unused, const baji_input_t *in, int64_t time, int6
         break;
     case TOUCH:
         if (index == 0) { *due = INT64_MAX; event_at = now+45000; }
-        else assert(now == start+45000 && in->presses == 1 && !in->touch.pressed &&
+        else assert(now == start+52000 && in->presses == 1 && !in->touch.pressed &&
                     in->press_x == 117 && in->press_y == 132 &&
+                    in->press_us == start+45000 && in->touch_us == start+52000 && in->travel == 125 &&
                     in->touch.x == 196 && in->touch.y == 136);
         break;
     case DRAW_FAILURE:

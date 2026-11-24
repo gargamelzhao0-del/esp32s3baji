@@ -24,13 +24,24 @@ static uint16_t token;
 static int64_t now;
 static baji_input_t input;
 static deepseek_app_t *app;
+static bool started_without_partition;
 
 int64_t esp_timer_get_time(void) { return now; }
+const void *dsh_builtin(size_t *size) { *size = 1; return "x"; }
+bool dsh_partition_motion_open(dsh_motion_t *out) { assert(!out->count); return false; }
+void dsh_partition_motion_close(dsh_motion_t *out) { assert(!out->count); }
 esp_err_t baji_runtime_run(baji_board_t *board, const baji_board_info_t *info,
                            const baji_runtime_config_t *cfg, baji_frame_fn cb, void *ctx)
 {
-    (void)board; (void)info; (void)cfg; (void)cb; (void)ctx;
-    abort(); /* Test drives the public presenter at deterministic timestamps. */
+    assert(board && info && cfg && cb);
+    baji_input_t sample = {0};
+    int64_t deadline;
+    assert(cb(ctx, &sample, now, &deadline) == ESP_OK && !deepseek_app_is_hd(ctx));
+    sample = (baji_input_t){.presses=1, .press_x=220, .press_y=220, .touch={true,220,220}};
+    assert(cb(ctx, &sample, now, &deadline) == ESP_OK);
+    assert(cb(ctx, &sample, now + 650000, &deadline) == ESP_OK && deepseek_app_is_hd(ctx));
+    started_without_partition = true;
+    return ESP_OK;
 }
 bool dsh_art_open(dsh_art_t *art, const void *bytes, size_t size)
 {
@@ -146,7 +157,7 @@ int main(int argc, char **argv)
     hold();
     assert(hd_item == DSK_CLIPS + 2);
     unsigned prev = transfers;
-    assert(tick(1000) == ESP_OK && transfers == prev && next_update <= now + 250000);
+    assert(tick(1000) == ESP_OK && transfers == prev && next_update == INT64_MAX);
     agent.view.pose = "writing";
     assert(tick(0) == ESP_OK && hd_item == DSK_CLIPS + 3);
     tap(230, 230, true);
@@ -162,8 +173,41 @@ int main(int argc, char **argv)
     assert(tick(0) == ESP_OK && hd_item == DSK_CLIPS + 6);
     agent.has_session = false;
     assert(tick(0) == ESP_OK && hd_item == local_item);
+    /* A gesture that starts between remote jobs still owns its clip. */
+    tap(230, 230, true);
+    assert(hd_item == (local_item + 1) % DSK_CLIPS);
+    local_item = hd_item;
+    agent.has_session = true;
+    agent.view.pose = "reading";
+    assert(tick(80000) == ESP_OK && hd_item == local_item);
+    agent.view.connection = BAJI_OFFLINE;
+    assert(tick(5000) == ESP_OK && hd_item == local_item);
+    agent.view.connection = BAJI_ONLINE;
+    assert(tick(5000) == ESP_OK && hd_item == local_item);
+    assert(tick(2100000) == ESP_OK && hd_item == DSK_CLIPS + 2);
+    /* Start from the reading pose seen at touch down. Even a mid-gesture
+     * Agent update cannot change the base for a left swipe. */
+    input.presses++;
+    input.press_x = input.touch.x = 280;
+    input.press_y = input.touch.y = 220;
+    input.touch.pressed = true;
+    assert(tick(1000) == ESP_OK);
+    agent.view.pose = "searching";
+    input.touch.x = 170;
+    input.touch.pressed = false;
+    assert(tick(10000) == ESP_OK && hd_item == DSK_CLIPS + 3);
+    assert(tick(1600000) == ESP_OK && hd_item == DSK_CLIPS + 5);
+    input.presses++;
+    input.press_x = input.touch.x = 230;
+    input.press_y = 280;
+    input.touch.y = 160;
+    assert(tick(1000) == ESP_OK && last_full); /* enter the overview */
+    prev = transfers;
+    agent.view.pose = "reading";
+    assert(tick(0) == ESP_OK && transfers == prev);
     deepseek_app_close(app);
+    assert(deepseek_app_run((baji_board_t *)&token, &info) == ESP_OK && started_without_partition);
     free(pack);
-    puts("Presenter recovers partial transfer and discarded HD decode and projects Agent poses across local interactions, timeout and reconnect");
+    puts("Presenter recovers partial transfers and HD decode; gestures finish across remote changes and navigate the visible pose");
     return 0;
 }

@@ -13,10 +13,13 @@ int main(void) {
     assert(baji_state_apply(&state, &s, 100) == BAJI_APPLIED);
     assert(baji_state_view(&state, 100).quota_known); /* 0% used is valid */
     assert(baji_state_view(&state, 599).context_known);
+    assert(baji_state_view(&state, 599).next_change_ms == 600);
     assert(!baji_state_view(&state, 600).context_known);
+    assert(baji_state_view(&state, 600).next_change_ms == 8100);
     assert(baji_state_apply(&state, &s, 7000) == BAJI_OLD);
     assert(baji_state_view(&state, 8100).connection == BAJI_OFFLINE);
     assert(!baji_state_view(&state, 8100).animate);
+    assert(baji_state_view(&state, 8100).next_change_ms == 0);
     s.seq=3; s.phase=BAJI_WAITING;
     assert(baji_state_apply(&state, &s, 8200) == BAJI_APPLIED); /* full snapshot skips gap */
     assert(strcmp(baji_state_view(&state, 8200).pose, "asking") == 0);
@@ -37,6 +40,9 @@ int main(void) {
     s.seq=7; s.identity_revision=1; /* Different turn, same terminal phase. */
     assert(baji_state_apply(&state, &s, 10150) == BAJI_APPLIED);
     assert(strcmp(baji_state_view(&state, 10150).pose, "happy") == 0);
+    /* Frame began before this radio update committed. */
+    assert(strcmp(baji_state_view(&state, 10149).pose, "happy") == 0);
+    assert(baji_state_view(&state, 10149).next_change_ms == 10650);
     baji_state_begin_connection(&state);
     s.seq=1;
     assert(baji_state_apply(&state, &s, 10200) == BAJI_APPLIED);

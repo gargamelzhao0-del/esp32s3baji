@@ -5,6 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include <stdlib.h>
 
 enum { SCAN_US = 17000, EDGE_GUARD_US = 1500 };
 
@@ -47,12 +48,21 @@ static void read_input(void *context)
             touch.x = previous.x;
             touch.y = previous.y;
         }
+        int64_t observed_us = esp_timer_get_time();
         portENTER_CRITICAL(&r->lock);
         if (touch.pressed && !previous.pressed) {
             r->latest.presses++;
             r->latest.press_x = touch.x;
             r->latest.press_y = touch.y;
+            r->latest.press_us = observed_us;
+            r->latest.travel = 0;
+        } else {
+            unsigned dx = abs((int)touch.x - r->latest.press_x);
+            unsigned dy = abs((int)touch.y - r->latest.press_y);
+            unsigned distance = dx > dy ? dx : dy;
+            if (distance > r->latest.travel) r->latest.travel = distance;
         }
+        r->latest.touch_us = observed_us;
         r->latest.touch = touch;
         portEXIT_CRITICAL(&r->lock);
         xSemaphoreGive(r->wake);

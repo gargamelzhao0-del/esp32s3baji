@@ -106,6 +106,7 @@ class BleTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.writes = []
         self.fail_seq = None
+        self.write_error = RuntimeError("ATT rejected packet")
         self.disconnected = 0
         case = self
 
@@ -135,7 +136,7 @@ class BleTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.sleep(0)
                 case.writes.append(fragment)
                 if fragment[1] == case.fail_seq:
-                    raise RuntimeError("ATT rejected packet")
+                    raise case.write_error
 
         fake = SimpleNamespace(BleakClient=Peer)
         bleak_module = patch.dict(sys.modules, {"bleak": fake})
@@ -166,6 +167,24 @@ class BleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError):
                 await transport.send(bytes(193))
         self.assertEqual(self.disconnected, 1)
+
+    async def test_only_final_firmware_auth_error_rejects_pairing(self):
+        class BleakGATTProtocolError(Exception):
+            code = 0x80
+
+        async with BleTransport("demo") as transport:
+            for error, seq, rejected in (
+                (RuntimeError("Write failed: Protocol Error 0x80: Unknown"), 1, True),
+                (RuntimeError("ATT error: 0x80 (unknown)"), 1, True),
+                (BleakGATTProtocolError(), 1, True),
+                (RuntimeError("Protocol Error 0x80: Unknown"), 0, False),
+                (RuntimeError("Protocol Error 0x81: Unknown"), 1, False),
+                (OSError("Windows system error 0x80"), 1, False),
+            ):
+                self.fail_seq, self.write_error = seq, error
+                with self.assertRaises(OSError) as raised:
+                    await transport.send(bytes(22))
+                self.assertEqual(getattr(raised.exception, "pairing_rejected", False), rejected)
 
 
 if __name__ == "__main__":

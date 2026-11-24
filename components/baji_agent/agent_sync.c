@@ -11,27 +11,25 @@ struct baji_agent_sync {
     SemaphoreHandle_t lock, changed;
     baji_state_t state;
     uint8_t key[32], nonce[16], stream[8];
+    uint64_t lease_until_ms;
     bool bound, selected;
     char model[BAJI_MODEL_MAX + 1];
 };
 
 static uint64_t now_ms(void) { return (uint64_t)esp_timer_get_time()/1000; }
 
-static void expire(baji_agent_sync_t *s, uint64_t now)
-{
-    if (s->bound && now - s->state.received_ms >= BAJI_LINK_TIMEOUT_MS) {
-        // Keep the last UI state for its offline indication. Old signed packets
-        // must never bind a new lease, even if they arrive via the other radio.
-        esp_fill_random(s->nonce, sizeof(s->nonce));
-        s->bound = false;
-    }
-}
-
 static void hello(void *context, uint8_t out[16])
 {
     baji_agent_sync_t *s = context;
     xSemaphoreTake(s->lock, portMAX_DELAY);
-    expire(s, now_ms());
+    uint64_t now = now_ms();
+    if (now >= s->lease_until_ms) {
+        /* Start the first-packet window when a radio client asks for it.
+         * Reading the same challenge again cannot prolong that window. */
+        esp_fill_random(s->nonce, sizeof(s->nonce));
+        s->lease_until_ms = now + BAJI_LINK_TIMEOUT_MS;
+        s->bound = false;
+    }
     memcpy(out, s->nonce, 16);
     xSemaphoreGive(s->lock);
 }
@@ -50,15 +48,16 @@ static esp_err_t receive(void *context, const uint8_t *packet, size_t length)
     if (!agent_wire_decode(packet, body, &msg)) return ESP_ERR_INVALID_ARG;
     xSemaphoreTake(s->lock, portMAX_DELAY);
     uint64_t now = now_ms();
-    expire(s, now);
     esp_err_t err = ESP_ERR_INVALID_STATE;
-    if (!memcmp(packet+4,s->nonce,16) && (!s->bound || !memcmp(packet+20,s->stream,8))) {
+    if (now < s->lease_until_ms && !memcmp(packet+4,s->nonce,16) &&
+        (!s->bound || !memcmp(packet+20,s->stream,8))) {
         if (!s->bound) baji_state_begin_connection(&s->state);
         if (baji_state_apply(&s->state,&msg.snapshot,now) == BAJI_APPLIED) {
             memcpy(s->stream,packet+20,8);
             memcpy(s->model,msg.model,sizeof(s->model));
             s->bound = true;
             s->selected = msg.selected;
+            s->lease_until_ms = now + BAJI_LINK_TIMEOUT_MS;
             err = ESP_OK;
         }
     }
@@ -89,7 +88,6 @@ esp_err_t baji_agent_sync_open(baji_agent_sync_t **out, const uint8_t key[32])
     s->changed = xSemaphoreCreateBinary();
     if (!s->lock || !s->changed) { baji_agent_sync_close(s); return ESP_ERR_NO_MEM; }
     memcpy(s->key,key,32);
-    esp_fill_random(s->nonce,sizeof(s->nonce));
     baji_state_init(&s->state);
     *out = s;
     return ESP_OK;

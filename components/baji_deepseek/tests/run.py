@@ -1,6 +1,7 @@
 """Exercise the production animation, touch recognizer, dirty redraws and RGB565 painter."""
 import argparse
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 
@@ -23,19 +24,14 @@ def main():
     parser.add_argument("--goldens", type=Path, default=COMPONENT / "authoring/web.crc")
     options = parser.parse_args()
     with tempfile.TemporaryDirectory() as tmp:
-        flags = ["gcc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
-                 "-I" + str(GRAPHICS), "-I" + str(COMPONENT / "include"),
-                 str(COMPONENT / "deepseek_review.c"), str(COMPONENT / "deepseek_canvas.c")]
+        compiler = ["gcc", "-std=gnu11", "-O2", "-Wall", "-Wextra", "-Werror",
+                    "-I" + str(GRAPHICS), "-I" + str(COMPONENT / "include")]
+        flags = compiler + [str(COMPONENT / "deepseek_review.c"), str(COMPONENT / "deepseek_canvas.c")]
         checker = Path(tmp) / "check.exe"
         renderer = Path(tmp) / "render.exe"
         controls = Path(tmp) / "controls.exe"
         subprocess.run(flags + [str(HERE / "review_test.c"), "-o", str(checker)], check=True)
         subprocess.run([str(checker), str(options.pack)], check=True)
-        subprocess.run(flags + ["-I" + str(COMPONENT),
-                       "-I" + str(COMPONENT.parent / "baji_deepseek_hd" / "include"),
-                       str(COMPONENT / "deepseek_controls.c"), str(HERE / "controls_test.c"),
-                       "-o", str(controls)], check=True)
-        subprocess.run([str(controls)], check=True)
         # Borrow the board/runtime header stubs already exercised by their
         # host suites. HD allocation and DMA failures are injected by the test.
         headers = Path(tmp) / "headers"
@@ -43,15 +39,27 @@ def main():
             dest = headers / relative
             dest.parent.mkdir(exist_ok=True, parents=True)
             dest.write_text('#include "sim.h"\n', encoding="ascii")
+        (headers / "esp_log.h").write_text('#include "sim.h"\n#define ESP_LOGI ESP_LOGW\n', encoding="ascii")
         repo_tests = COMPONENT.parents[1] / "tests"
         presenter = Path(tmp) / "presenter.exe"
         includes = [headers, repo_tests / "runtime", repo_tests / "display", COMPONENT,
                     *(COMPONENT.parent / c / "include" for c in
                       ("baji_board", "baji_peripherals", "baji_runtime", "baji_scene_damage", "baji_deepseek_hd",
                        "baji_agent_port", "baji_core", "baji_agent_ui"))]
-        subprocess.run(flags + ["-DBAJI_DEEPSEEK_EXTERNAL_ASSET", "-DESP_ERR_NOT_SUPPORTED=0x106",
-                       *["-I" + str(path) for path in includes],
-                       str(COMPONENT / "deepseek_app.c"), str(COMPONENT / "deepseek_controls.c"),
+        include_flags = ["-I" + str(path) for path in includes]
+        subprocess.run(flags + include_flags + [
+                       str(COMPONENT / "deepseek_controls.c"), str(HERE / "controls_test.c"),
+                       "-o", str(controls)], check=True)
+        subprocess.run([str(controls)], check=True)
+        # Link the same embedded symbol pair as IDF so this test reaches the
+        # production boot path, including a missing optional motion partition.
+        shutil.copyfile(options.pack, Path(tmp) / "scene.dsk")
+        subprocess.run(["ld", "-r", "-b", "binary", "scene.dsk", "-o", "scene.o"], cwd=tmp, check=True)
+        app_object = Path(tmp) / "app.o"
+        subprocess.run(compiler + include_flags + ["-DESP_PLATFORM", "-DESP_ERR_NOT_SUPPORTED=0x106",
+                       "-c", str(COMPONENT / "deepseek_app.c"), "-o", str(app_object)], check=True)
+        subprocess.run(flags + include_flags + [str(app_object), str(Path(tmp) / "scene.o"),
+                       str(COMPONENT / "deepseek_controls.c"),
                        str(COMPONENT.parent / "baji_scene_damage/baji_scene_damage.c"),
                        str(COMPONENT.parent / "baji_agent_ui/agent_ui.c"),
                        str(HERE / "presenter_test.c"), "-o", str(presenter)], check=True)
