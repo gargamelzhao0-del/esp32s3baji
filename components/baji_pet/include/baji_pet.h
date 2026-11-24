@@ -23,7 +23,8 @@ typedef struct {
  * open_data owns a decoded copy and releases all references to packed on return. */
 esp_err_t baji_pet_open(baji_pet_t **out);
 esp_err_t baji_pet_open_data(baji_pet_t **out, const void *packed, size_t size);
-/* Attach a 4-byte aligned BPR1 companion to BPH5. Retain its bytes until close. */
+/* BPH6/BPR2 share the panel projection. BPH5/BPR1 share the legacy crop.
+ * Retain the 4-byte aligned companion data until close. */
 esp_err_t baji_pet_attach_reactions(baji_pet_t *pet, const void *data, size_t size);
 /* Physical display coordinates. Returns -1 for the left cheek, +1 for right. */
 int baji_pet_cheek(const baji_pet_t *pet, baji_pet_state_t state, uint16_t x, uint16_t y);
@@ -32,6 +33,7 @@ unsigned baji_pet_frame_count(baji_pet_clip_t clip);
 unsigned baji_pet_fps(baji_pet_clip_t clip);
 /* Actual sample rate is authored fps times the substeps in this artwork. */
 unsigned baji_pet_substeps(const baji_pet_t *pet, baji_pet_clip_t clip);
+bool baji_pet_full_body_panel(const baji_pet_t *pet);
 
 /* Frames wrap in their clip. Gaze saturates at +/-2 horizontal, +/-1 vertical. */
 void baji_pet_select(baji_pet_t *pet, baji_pet_state_t state);

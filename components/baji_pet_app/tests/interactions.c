@@ -192,6 +192,13 @@ static void fireflies(void)
     assert(r.v.star_phase==PET_TOY_INVITE);
     point_t star={r.v.star_x,r.v.star_y};press(&r,star);
     assert(r.v.star_phase==PET_TOY_HELD);
+    finger(&r,(point_t){233,12},100,true);assert(r.v.star_y<30);
+    finger(&r,(point_t){455,233},100,true);assert(r.v.star_x>430);
+    finger(&r,(point_t){233,455},100,true);assert(r.v.star_y>430);
+    finger(&r,(point_t){12,233},100,true);assert(r.v.star_x<30);
+    finger(&r,(point_t){400,400},100,true);
+    int dx=r.v.star_x-233,dy=r.v.star_y-233;
+    assert(dx==dy && dx*dx+dy*dy<=213*213);
     finger(&r,(point_t){233,115},120,true);finger(&r,(point_t){233,115},200,false);
     assert(r.v.star_phase==PET_TOY_RETURN);tick(&r,650);assert(r.v.star_phase==PET_TOY_INVITE);
     int palms[4];assert(pet_clip_palms(r.v.clip,r.v.frame,palms));point_t left={palms[0],palms[1]};

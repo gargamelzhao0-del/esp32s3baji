@@ -5,38 +5,23 @@ import json
 import os
 import shutil
 import struct
-import subprocess
-import tempfile
 import threading
-import zipfile
 import zlib
 from pathlib import Path
 
 import numpy as np
 from playwright.sync_api import sync_playwright
 
-from bake import COMPONENT, REFERENCE, pixels
+from bake import COMPONENT, pixels
+from panel_source import panel_source
 from bake_motion import Dictionary, write_atlases, physical_index
 from motion_pack import split_plan
 
-ART_REV = "00d3931037c9cf88642134c3271c8b9aa9c540dd"
 REACTIONS = ("cheekLeft", "cheekRight", "tickle")
 
 
-def tracked(name):
-    return subprocess.check_output(["git", "show", f"{ART_REV}:design/pixel-badge/{name}"], cwd=COMPONENT)
-
-
 def bake(web):
-    original = tracked("gesture-clips.js").decode()
-    actions = json.JSONDecoder().raw_decode(original[original.index("{"):])[0]
-    path = web/"clips.js"
-    clips = json.loads(path.read_text().split("=", 1)[1].rstrip(";"))
-    for name in REACTIONS:
-        clips[name] = actions[name]
-        (web/"assets"/(name+".png")).write_bytes(tracked("assets/"+name+".png"))
-    path.write_text("window.PIXEL_CLIPS="+json.dumps(clips)+";")
-    write_atlases(web, [(name,3) for name in REACTIONS])
+    clips = write_atlases(web, [(name,3) for name in REACTIONS])
     landmarks, crcs = [], []
     quads = Dictionary()
     plans, deltas, keys, rectangles = [], [], [], []
@@ -56,7 +41,7 @@ def bake(web):
                 origin = f"http://127.0.0.1:{server.server_port}"
                 page.route(origin+"/capture", lambda r:r.fulfill(content_type="text/html",body="<meta charset=utf-8>"))
                 page.goto(origin+"/capture")
-                for script in ["clips.js","nap-prop.js","face-fx.js","display.js"]:
+                for script in ["clips.js","gesture-clips.js","nap-prop.js","face-fx.js","display.js"]:
                     page.add_script_tag(url=origin+"/"+script)
                 page.add_script_tag(path=Path(__file__).with_name("capture.js"))
                 page.evaluate("setupPetCapture(true,"+json.dumps(REACTIONS)+")")
@@ -95,7 +80,7 @@ def bake(web):
         finally:
             server.shutdown()
     assert len(quads.index) <= 65536
-    parts = [struct.pack("<4sIII",b"BPR1",len(quads.index),change_count,len(rectangles)),
+    parts = [struct.pack("<4sIII",b"BPR2",len(quads.index),change_count,len(rectangles)),
              np.array(landmarks,dtype="<i2").tobytes(),b"".join(plans),b"".join(quads.index),
              np.array(keys,dtype="<u2").tobytes(),b"".join(deltas),
              np.asarray(rectangles,dtype="<u2").tobytes()]
@@ -106,7 +91,5 @@ def bake(web):
 
 
 if __name__ == "__main__":
-    with tempfile.TemporaryDirectory() as tmp:
-        with zipfile.ZipFile(REFERENCE) as z:
-            z.extractall(tmp)
-        bake(Path(tmp))
+    with panel_source() as web:
+        bake(web)

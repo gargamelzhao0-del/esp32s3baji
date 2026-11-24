@@ -13,10 +13,10 @@
 #include <zlib.h>
 #endif
 
-enum { GRID = 184, SIDE = 466, CELLS = GRID * GRID };
+enum { GRID = 184, SIDE = 466, CELLS = GRID * GRID, FULL_BODY_PANEL = 1 };
 typedef struct {
     char magic[4];
-    uint32_t size, crc, clips, frames, colors, body, reserved;
+    uint32_t size, crc, clips, frames, colors, body, layout;
 } header_t;
 typedef struct {
     char name[24], scene[16];
@@ -159,12 +159,13 @@ esp_err_t pet_clips_open(pet_clips_t **out)
     header_t h;
     esp_err_t err=esp_partition_read(p,0,&h,sizeof(h));
     if (err!=ESP_OK) return err;
-    if (!valid_header(&h,p->size)) return ESP_ERR_INVALID_RESPONSE;
+    /* The embedded high-rate poses and this partition must share a projection. */
+    if (!valid_header(&h,p->size) || h.layout!=FULL_BODY_PANEL) return ESP_ERR_INVALID_RESPONSE;
     pet_clips_t *b=allocate(sizeof(*b));
     if (!b) return ESP_ERR_NO_MEM;
     b->h=h;
     b->partition=p;
-    /* The 16 MiB pack need not occupy a contiguous DROM/MMU mapping. Keep
+    /* The pack need not occupy a contiguous DROM/MMU mapping. Keep
      * only the directory, hit maps and one drawing's compressed stream in RAM. */
     b->tables=allocate(h.body-sizeof(h));
     uint8_t *chunk=allocate(16384);
@@ -361,6 +362,8 @@ pet_hit_t pet_clip_hit(const pet_clips_t *b,const pet_clip_t *c,unsigned n,int x
     const frame_t *f=get_frame(c,n);
     if (side) *side=0;
     if (!f || b!=c->bank || (unsigned)x>=SIDE || (unsigned)y>=SIDE) return PET_HIT_NONE;
+    int px=2*x+1-SIDE, py=2*y+1-SIDE;
+    if (px*px+py*py>SIDE*SIDE) return PET_HIT_NONE;
     const int16_t *a=f->anchor;
     int s=x<a[2] ? -1 : 1;
     if (side) *side=s;

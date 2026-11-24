@@ -66,6 +66,9 @@ def exercise(lib):
     damaged=data[:-1]+bytes([data[-1]^1])
     lib.mount_bank(damaged,len(data),host.inflate,host.crc)
     assert lib.pet_clips_open(c.byref(out))!=0 and not out.value
+    old_projection=data[:28]+bytes(4)+data[32:]
+    lib.mount_bank(old_projection,len(data),host.inflate,host.crc)
+    assert lib.pet_clips_open(c.byref(out))!=0 and not out.value
     lib.mount_bank(data,len(data),host.inflate,host.crc)
     assert lib.pet_clips_open(c.byref(out))==0 and out.value
     entries=[]

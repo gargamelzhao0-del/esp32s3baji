@@ -19,6 +19,7 @@ static bool read_feed(void *ctx, uint64_t now, baji_agent_display_t *out)
 int64_t esp_timer_get_time(void) { return 0; }
 esp_err_t baji_pet_open(baji_pet_t **p) { *p = &art; return ESP_OK; }
 void baji_pet_close(baji_pet_t *p) { assert(p == &art); }
+bool baji_pet_full_body_panel(const baji_pet_t *p) { return p == &art; }
 unsigned baji_pet_substeps(const baji_pet_t *p, baji_pet_clip_t clip) { (void)p; return clip==BAJI_PET_IDLE ? 4 : 3; }
 unsigned baji_pet_fps(baji_pet_clip_t clip) { return clip==BAJI_PET_IDLE ? 12 : 16; }
 unsigned baji_pet_frame_count(baji_pet_clip_t clip) { return clip==BAJI_PET_TICKLE ? 30 : clip>=BAJI_PET_CHEEK_LEFT ? 22 : 8; }
@@ -53,7 +54,9 @@ esp_err_t baji_board_paint_round_regions(baji_board_t *board, const baji_rect_t 
     assert(count && regions);
     uint8_t pixels[2];
     paint(&(baji_rect_t){140,385,1,1}, pixels, ctx);
-    assert((pixels[0] == 0x17) == offline);
+    assert(pixels[0] == 0x17); /* skirt and tail stay clear in both modes */
+    paint(&(baji_rect_t){140,405,1,1}, pixels, ctx);
+    assert(pixels[0] != 0x17); /* compact gauges also exist during local play */
     paint(&(baji_rect_t){232,8,1,1}, pixels, ctx);
     assert(pixels[0] != 0x17); /* power always remains visible */
     ++board->batches;

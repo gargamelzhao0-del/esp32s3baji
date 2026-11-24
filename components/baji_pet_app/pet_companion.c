@@ -179,7 +179,8 @@ esp_err_t pet_companion_run(baji_board_t *board, const baji_board_info_t *info, 
     if (!p) return ESP_ERR_NO_MEM;
     p->board = board;
     p->album = album;
-    if (feed && !(p->agent = baji_agent_ui_open(feed))) { free(p); return ESP_ERR_NO_MEM; }
+    p->agent = baji_agent_ui_open_panel(feed);
+    if (!p->agent) { free(p); return ESP_ERR_NO_MEM; }
     unsigned bond = 0;
     p->menu.sound = true;
     p->feedback = pet_feedback_open(board, &bond, &p->menu.sound);

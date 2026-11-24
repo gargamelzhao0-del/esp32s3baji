@@ -23,12 +23,15 @@ window.NapProp = (() => {
     const h=Math.max(2,Math.round(scale*(6+16*open)*a));
     const between=(right.sx-left.sx)*.54;
     const x=Math.round(left.sx+(between+2*scale*open)*a-w/2);
-    const hem=Math.min(148,Math.round(left.sy+(right.sy-left.sy)*.45+
-      scale*(3+8*open)*a));
+    const sewnHem=Math.round(left.sy+(right.sy-left.sy)*.45+scale*(3+8*open)*a);
+    const hem=display.panel ? sewnHem : Math.min(148,sewnHem);
     const y=hem-h+1;
     const hands=[Math.round(left.sx-x),Math.round(left.sy-y),
       Math.round(right.sx-x),Math.round(right.sy-y)];
-    return {x,y,w,h,open,weight:weight/100,close,hands,
+    const [ox,oy]=close ? clip.closeOrigin || [113,34.5] : clip.fullOrigin || [28,12];
+    const origin=display.facePoint(view,clip,frame,ox,oy);
+    if (close) origin.sx += clip.closePan?.[frame] || 0;
+    return {x,y,w,h,open,weight:weight/100,close,hands,origin,
       grip:clip.gripMasks[close?1:0][frame]};
   }
   function contains(p,x,y,contact,motion) {
@@ -36,7 +39,7 @@ window.NapProp = (() => {
     if (!p || p.open<.9 || x<p.x || x>=p.x+p.w || y<p.y || y>=p.y+p.h) return false;
     if (!gripRuns.has(p.grip)) gripRuns.set(p.grip,atob(p.grip));
     const mask=gripRuns.get(p.grip);
-    const row=y-(p.close?22:18), col=x-23;
+    const row=y-p.origin.sy, col=x-p.origin.sx;
     for (let i=0;i<mask.length;i+=3) {
       if (mask.charCodeAt(i)>row) break;
       if (mask.charCodeAt(i)===row && col>=mask.charCodeAt(i+1) && col<mask.charCodeAt(i+2)) return false;

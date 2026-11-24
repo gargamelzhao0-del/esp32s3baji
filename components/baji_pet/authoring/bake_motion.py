@@ -1,14 +1,11 @@
-"""Bake 48 Hz pixel-art poses from the original close-view atlas and browser renderer."""
+"""Bake 48 Hz pixel-art poses from the full-body panel atlas and browser renderer."""
 import argparse
 import functools
 import http.server
-import json
 import os
 import shutil
 from pathlib import Path
-import tempfile
 import threading
-import zipfile
 import zlib
 
 import cv2
@@ -16,7 +13,8 @@ import numpy as np
 from PIL import Image
 from playwright.sync_api import sync_playwright
 
-from bake import COMPONENT, REFERENCE, pixels
+from bake import COMPONENT, pixels
+from panel_source import metadata, panel_source
 
 
 class Dictionary:
@@ -37,20 +35,18 @@ class Dictionary:
 def write_atlases(web, clips_and_steps=(("idle", 4), ("pat", 3))):
     # Bidirectional flow registers the two silhouettes before reconstructing
     # contour coverage. The face, hair, hands, and horns can move separately.
-    clips = json.loads((web/"clips.js").read_text().split("=", 1)[1].rstrip(";"))
+    clips = metadata(web)
     x, y = np.meshgrid(np.arange(138, dtype="f"), np.arange(132, dtype="f"))
-    idle_rows = (clips["idle"]["frames"] + 7) // 8
     with Image.open(web/"assets/idle.png") as idle:
-        idle_first = np.array(idle.convert("RGBA").crop((0,idle_rows*132,138,(idle_rows+1)*132)))
+        idle_first = np.array(idle.convert("RGBA").crop((0,0,138,132)))
     for name, steps in clips_and_steps:
         meta = clips[name]
         count = meta["frames"]
-        rows = (count + 7) // 8
         path = web/"assets"/(name+".png")
         atlas = np.asarray(Image.open(path).convert("RGBA"))
-        poses = [atlas[(rows+i//8)*132:(rows+i//8+1)*132, i%8*138:(i%8+1)*138] for i in range(count)]
+        poses = [atlas[(i//8)*132:(i//8+1)*132, i%8*138:(i%8+1)*138] for i in range(count)]
         next_poses = poses[1:] + [idle_first]
-        sheet = np.zeros(((rows+(count*steps+7)//8)*132, 8*138, 4), dtype=np.uint8)
+        sheet = np.zeros((((count*steps+7)//8)*132, 8*138, 4), dtype=np.uint8)
         for i, (a,b) in enumerate(zip(poses,next_poses)):
             # Composite transparent cells over neutral grey when estimating
             # flow, so the silhouette participates along with the facial ink.
@@ -80,7 +76,7 @@ def write_atlases(web, clips_and_steps=(("idle", 4), ("pat", 3))):
                     # contours travel by a small fraction of a source pixel.
                     img = np.where(np.any(a!=b,axis=2)[:,:,None],interp,a)
                 k = i*steps+phase
-                sheet[(rows+k//8)*132:(rows+k//8+1)*132,k%8*138:(k%8+1)*138] = img
+                sheet[(k//8)*132:(k//8+1)*132,k%8*138:(k%8+1)*138] = img
         Image.fromarray(sheet).save(path)
     return clips
 
@@ -111,7 +107,6 @@ def generate(web, browser, output, golden_path):
     clips = write_atlases(web)
     palette = Dictionary()
     neutral_frames, eye_variants, heads, sums = [], [], [], []
-    canonical = np.frombuffer((COMPONENT/"tests/web.crc").read_bytes(), dtype="<u4")
     axis = physical_index()
     with http.server.ThreadingHTTPServer(("127.0.0.1",0), functools.partial(Quiet,directory=str(web))) as server:
         threading.Thread(target=server.serve_forever,daemon=True).start()
@@ -122,7 +117,7 @@ def generate(web, browser, output, golden_path):
                 origin = f"http://127.0.0.1:{server.server_port}"
                 page.route(origin+"/capture",lambda r:r.fulfill(content_type="text/html; charset=utf-8",body="<meta charset=utf-8>"))
                 page.goto(origin+"/capture")
-                for name in ["clips.js","nap-prop.js","face-fx.js","display.js"]:
+                for name in ["clips.js","gesture-clips.js","nap-prop.js","face-fx.js","display.js"]:
                     if (web/name).exists():
                         page.add_script_tag(url=origin+"/"+name)
                 page.add_script_tag(path=Path(__file__).with_name("capture.js"))
@@ -137,17 +132,15 @@ def generate(web, browser, output, golden_path):
                             eyes = []
                             eye_variants.append(eyes)
                             heads.append(shot["head"])
+                            x,y,w,h = shot["eyeRegion"]
                             for g in range(15):
-                                gx,gy = g%3*112, 368+g//3*48
-                                crop = stack[gy:gy+48,gx:gx+112]
+                                gx,gy = g%3*w, 368+g//3*h
+                                crop = stack[gy:gy+h,gx:gx+w]
                                 eyes.append(native_ids(crop,palette))
                                 image = base.copy()
-                                image[176:224,128:240] = crop
+                                image[y:y+h,x:x+w] = crop
                                 crc = zlib.crc32(image[axis[:,None],axis].tobytes())
                                 assert crc == shot["variants"][g], (clip,frame,phase,g,"canvas CRC")
-                                if not phase:
-                                    k = (frame+(43 if clip=="pat" else 0))*15+g
-                                    assert crc == canonical[k], (clip, frame, g, hex(crc), hex(canonical[k]))
                                 sums.append(shot["variants"][g])
                         if frame%10==0: print(clip,frame,len(palette.index),"LCD colours",flush=True)
                 browser.close()
@@ -158,7 +151,7 @@ def generate(web, browser, output, golden_path):
         if gaze == 7:
             return neutral
         result = neutral.copy()
-        result[88:112,64:120] = eye_variants[pose][gaze]
+        result[y//2:(y+h)//2,x//2:(x+w)//2] = eye_variants[pose][gaze]
         return result
     from motion_pack import encode
     output.write_bytes(encode(grid,b"".join(palette.index),heads))
@@ -169,7 +162,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--browser", default=shutil.which("chromium") or shutil.which("google-chrome") or os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"))
     options = parser.parse_args()
-    with tempfile.TemporaryDirectory() as tmp:
-        with zipfile.ZipFile(REFERENCE) as z:
-            z.extractall(tmp)
-        generate(Path(tmp),options.browser,COMPONENT/"assets/motion.bpz",COMPONENT/"tests/motion.crc")
+    with panel_source() as web:
+        generate(web,options.browser,COMPONENT/"assets/motion.bpz",COMPONENT/"tests/motion.crc")

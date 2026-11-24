@@ -1,13 +1,12 @@
-/* Capture the renderer's own 184-cell close view, including its 2x LCD mesh.
+/* Capture the renderer's own 184-cell physical-panel view, including its 2x LCD mesh.
  * Encode each native cell as a shared pair of RGB565 colours. */
 async function prepare() {
-  const lcd = new PixelBadge(document.createElement("canvas"));
+  const lcd = new PixelBadge(document.createElement("canvas"), {panel:true});
   lcd.resize(400);
   const images = new Map(), palette = new Map(), usedImages=new Set();
   const expressions = ["idleSulky","idleSulkPeek","idleReunion","idleBond"];
   const agent = new Set(["working","reading","readingMoon","running","writing","searching",
                          "waiting","compact","error","limited","ended","cancelled","succeeded"]);
-  const codes = Object.fromEntries(Object.entries({...states,...actions}).map(([key,value])=>[key,value[1]]));
   const phys = 466/184;
   // This second canvas is the physical reference. Its browser resampler and
   // independent RGB565 wire checksum also cover partial-update correctness.
@@ -58,8 +57,8 @@ async function prepare() {
     const metadata = [];
     const activity = scene || (agent.has(action) ? action : "idle");
     for (let f=0;f<clip.frames;f++) {
-      lcd.draw({sheet:img, hands, clip, frame:f, view:"close", grid:true, skyMode:"dusk",
-        code:codes[activity==="idle"?action:activity] || "IDLE", agentState:activity,
+      lcd.draw({sheet:img, hands, clip, frame:f, view:"full", grid:true, skyMode:"dusk",
+        agentState:activity,
         action, tick:Math.floor(1000*f/clip.fps), motion:true, sparks:[],
         sulkPhase:name==="idleSulkPeek"?"peek":name==="idleSulky"?"away":null,
         reunion:name==="idleReunion", bondLevel:name==="idleBond"?3:0,
@@ -79,18 +78,18 @@ async function prepare() {
         frames[frameOffset+y*184+x]=id;
       }
       const map=(x,y)=> {
-        const p=lcd.facePoint("close",clip,f,x,y);
+        const p=lcd.facePoint("full",clip,f,x,y);
         return [Math.round(p.sx*phys),Math.round(p.sy*phys)];
       };
       const a=clip.anchors[f], axes=[];
       for(let i=0;i<10;i+=2) axes.push(...map(a[i],a[i+1]));
-      const px=phys/(clip.closeStep||2.75);
+      const px=phys/(clip.fullStep||4);
       const palms=[];
       if (clip.palms) for(let i=0;i<4;i+=2) {
         const [x,y]=map(...clip.palms[f].slice(i,i+2));
         palms.push(x,Math.round(y-4*phys));
       }
-      const p=NapProp.position(lcd,clip,f,"close");
+      const p=NapProp.position(lcd,clip,f,"full");
       let cushion=null;
       if (p && p.open>=.9) {
         const bits=new Uint8Array(Math.ceil(p.w*p.h/8));

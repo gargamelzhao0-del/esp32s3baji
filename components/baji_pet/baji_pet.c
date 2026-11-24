@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+bool baji_pet_full_body_panel(const baji_pet_t *p) { return p && p->full_body_panel; }
+
 unsigned baji_pet_frame_count(baji_pet_clip_t clip)
 {
     if (clip == BAJI_PET_CHEEK_LEFT || clip == BAJI_PET_CHEEK_RIGHT) return 22;

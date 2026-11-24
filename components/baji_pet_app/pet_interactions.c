@@ -307,9 +307,13 @@ static void toy_touch(pet_interactions_t *s,int x,int y,bool down,int64_t now)
     if(s->star_phase==PET_TOY_HAND) {
         s->glow=inside_palm(p,x,y,30)==s->hand ? s->hand : 0;
     } else {
-        s->star_y=clamp(y+s->star_dy,79,365);
-        int dy=s->star_y-233, half=(int)sqrtf(185*185-dy*dy);
-        s->star_x=clamp(x+s->star_dx,233-half,233+half);
+        /* Keep the winged star on the glass, including at diagonal edges. */
+        int dx=x+s->star_dx-233, dy=y+s->star_dy-233;
+        const int limit=233-21;
+        float distance=sqrtf((float)dx*dx+(float)dy*dy);
+        float k=distance>limit ? limit/distance : 1.f;
+        s->star_x=233+(int)lroundf(dx*k);
+        s->star_y=233+(int)lroundf(dy*k);
         s->glow=inside_palm(p,s->star_x,s->star_y,30);
         if(!s->trail_count || abs(s->star_x-s->trail[s->trail_count-1].x)+abs(s->star_y-s->trail[s->trail_count-1].y)>=8) {
             if(s->trail_count==4) {

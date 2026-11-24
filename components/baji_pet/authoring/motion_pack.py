@@ -121,4 +121,4 @@ def encode(grid, quads, heads):
     raw += transition_masks(base)
     packed=zlib.compress(raw,9)
     print(f"{len(raw)} decoded bytes, {len(packed)} compressed, {len(quads)//8} LCD quads",flush=True)
-    return struct.pack("<4sIII",b"BPH5",len(raw),len(packed),zlib.crc32(raw))+packed
+    return struct.pack("<4sIII",b"BPH6",len(raw),len(packed),zlib.crc32(raw))+packed

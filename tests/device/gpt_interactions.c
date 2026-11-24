@@ -37,8 +37,10 @@ void __wrap_pet_interactions_tick(pet_interactions_t *s,const baji_input_t *i,ba
 }
 
 enum target { MENU, NAP, CLOTH, FACE, FEED, BUBBLE, STAR, HAND, WORK, READ, BOOK,
-              IDLE_JOB, PARTS, TAIL, NOSE, OBSERVE };
+              IDLE_JOB, PARTS, TAIL, NOSE, DIRECT_LEFT, DIRECT_RIGHT, DIRECT_TAIL, OBSERVE };
 static const struct {enum target target; const char *action; unsigned frame;} steps[]={
+    {DIRECT_LEFT,"idle",0},{OBSERVE,"wingLeft",1},{DIRECT_RIGHT,"idle",0},{OBSERVE,"wing",1},
+    {DIRECT_TAIL,"idle",0},{OBSERVE,"tail",1},
     {MENU,NULL,0},{NAP,NULL,0},{CLOTH,"doze",16},{FACE,"doze",16},{FACE,"peek",1},
     {OBSERVE,"wake",6},{MENU,"idle",0},{FEED,NULL,0},{BUBBLE,"feed",33},{OBSERVE,"bubblePop",2},
     {MENU,NULL,0},{STAR,NULL,0},{HAND,"starWatch",0},{OBSERVE,"starCatch",2},
@@ -60,6 +62,14 @@ static bool target_point(enum target target,int *x,int *y)
     case PARTS: *x=306;*y=320;return true;
     case TAIL: *x=160;*y=380;return true;
     case NOSE: *x=306;*y=380;return true;
+    case DIRECT_LEFT: case DIRECT_RIGHT: case DIRECT_TAIL: {
+        int axes[10], side;
+        int i=target==DIRECT_LEFT ? 4 : target==DIRECT_RIGHT ? 6 : 8;
+        pet_hit_t part=target==DIRECT_LEFT ? PET_HIT_WING_LEFT : target==DIRECT_RIGHT ? PET_HIT_WING_RIGHT : PET_HIT_TAIL;
+        pet_clip_anchors(visible.clip,visible.frame,axes);
+        *x=axes[i];*y=axes[i+1];
+        return pet_clip_hit(art,visible.clip,visible.frame,*x,*y,&side)==part;
+    }
     case FACE: {
         int axes[10];
         pet_clip_anchors(visible.clip,visible.frame,axes);

@@ -1,11 +1,12 @@
 /* Runs inside the existing web renderer. The host calls capturePose once per
  * pose, keeping each transaction and the browser canvas memory bounded. */
 async function setupPetCapture(motion = false, actions = ["idle", "pat"]) {
-  const lcd = new PixelBadge(document.createElement("canvas"));
+  const lcd = new PixelBadge(document.createElement("canvas"), {panel:motion});
+  const view = motion ? "full" : "close";
   lcd.resize(400);
   const output = document.createElement("canvas");
   output.width = output.height = 466;
-  const ctx = output.getContext("2d");
+  const ctx = output.getContext("2d", motion ? {willReadFrequently:true} : undefined);
   ctx.imageSmoothingEnabled = false;
   const images = {};
   for (const clip of actions) {
@@ -46,8 +47,10 @@ async function setupPetCapture(motion = false, actions = ["idle", "pat"]) {
   const scale = 466 / 184;
   const strip = document.createElement("canvas");
   strip.width = 368;
-  strip.height = 368 + 5 * 48;
-  const atlas = strip.getContext("2d");
+  const eyeRegion = [128, 136, 112, 76];
+  const [eyeX, eyeY, eyeW, eyeH] = eyeRegion;
+  strip.height = 368 + 5 * eyeH;
+  const atlas = strip.getContext("2d", {willReadFrequently:true});
   const crc = new Uint32Array(256);
   for (let i=0; i<256; ++i) {
     let value = i;
@@ -68,6 +71,8 @@ async function setupPetCapture(motion = false, actions = ["idle", "pat"]) {
   window.capturePose = ([action, frame, phase = 0, steps = 1, reaction = false]) => {
     const original = PIXEL_CLIPS[action];
     let clip = original;
+    const step = motion ? original.fullStep || 4 : 2.75;
+    const tick = motion ? Math.floor(1000*frame/original.fps) : 0;
     if (motion) {
       const next = frame+1 < original.frames ? original.anchors[frame+1] : PIXEL_CLIPS.idle.anchors[0];
       const anchors = original.anchors.slice();
@@ -77,18 +82,18 @@ async function setupPetCapture(motion = false, actions = ["idle", "pat"]) {
     const [fx, fy, nx, ny] = clip.anchors[frame];
     const size = Math.hypot(nx-fx, ny-fy) / 132;
     if (reaction) {
-      lcd.shift = lcd.computeShift("close",action,0,false);
+      lcd.shift = lcd.computeShift(view,action,0,false);
       const landmarks = [];
       for (const [x, y] of [[fx,fy], [nx,ny], [nx-(ny-fy)*.52,ny+(nx-fx)*.52],
                               [nx+(ny-fy)*.52,ny-(nx-fx)*.52]]) {
-        const point = lcd.facePoint("close",clip,frame,x,y);
+        const point = lcd.facePoint(view,clip,frame,x,y);
         landmarks.push(Math.round(point.sx*scale), Math.round(point.sy*scale));
       }
-      landmarks.push(...[91/0.75,75/0.75,39,32].map(r=>Math.round(r*size*scale/2.75)));
+      landmarks.push(...[91/0.75,75/0.75,39,32].map(r=>Math.round(r*size*scale/step)));
       if (reaction === "landmarks") return landmarks;
-      current = {sheet:images[action],hands:null,clip,frame,view:"close",grid:true,
+      current = {sheet:images[action],hands:null,clip,frame,view,grid:true,
         agentState:"idle",action,code:action==="tickle"?"GIGGLE":"BLUSH",
-        telemetry:{mode:"OFF",quota:missing,context:missing},tick:0,motion:true,skyMode:"dusk",
+        telemetry:{mode:"OFF",quota:missing,context:missing},tick,motion:true,skyMode:"dusk",
         helpers:0,gazeX:0,gazeY:0,sparks:[],contact:null,starToy:null};
       lcd.draw(current);
       ctx.fillStyle="black";
@@ -99,9 +104,9 @@ async function setupPetCapture(motion = false, actions = ["idle", "pat"]) {
     const variants = [];
     for (let gy=-1; gy<=1; gy++) {
       for (let gx=-2; gx<=2; gx++) {
-        current = {sheet:images[action], hands:null, clip, frame, view:"close", grid:true,
+        current = {sheet:images[action], hands:null, clip, frame, view, grid:true,
           agentState:"idle", action, code:"IDLE", telemetry:{mode:"OFF", quota:missing, context:missing},
-          tick:0, motion:true, skyMode:"dusk", helpers:0, gazeX:gx/2, gazeY:gy,
+          tick, motion:true, skyMode:"dusk", helpers:0, gazeX:gx/2, gazeY:gy,
           sparks:[], contact:null, starToy:null};
         lcd.draw(current);
         if (motion) {
@@ -116,9 +121,9 @@ async function setupPetCapture(motion = false, actions = ["idle", "pat"]) {
           }
           const g = (gy+1)*5+gx+2;
           atlas.fillStyle = "black";
-          const x = (g%3)*112, y = 368+Math.floor(g/3)*48;
-          atlas.fillRect(x, y, 112, 48);
-          atlas.drawImage(lcd.canvas,128,176,112,48,x,y,112,48);
+          const x = (g%3)*eyeW, y = 368+Math.floor(g/3)*eyeH;
+          atlas.fillRect(x, y, eyeW, eyeH);
+          atlas.drawImage(lcd.canvas,eyeX,eyeY,eyeW,eyeH,x,y,eyeW,eyeH);
           continue;
         }
         ctx.fillStyle = "black";
@@ -127,9 +132,9 @@ async function setupPetCapture(motion = false, actions = ["idle", "pat"]) {
         variants.push(output.toDataURL().split(",")[1]);
       }
     }
-    const head = lcd.facePoint("close", clip, frame, fx, fy);
-    return {variants, packed:motion && strip.toDataURL().split(",")[1], head:[head.sx*scale, head.sy*scale, 91*size/0.75/2.75*scale,
-      75*size/0.75/2.75*scale].map(Math.round)};
+    const head = lcd.facePoint(view, clip, frame, fx, fy);
+    return {variants, eyeRegion, packed:motion && strip.toDataURL().split(",")[1], head:[head.sx*scale, head.sy*scale, 91*size/0.75/step*scale,
+      75*size/0.75/step*scale].map(Math.round)};
   };
   return [PIXEL_CLIPS.idle.frames,PIXEL_CLIPS.pat.frames,PIXEL_CLIPS.idle.fps,PIXEL_CLIPS.pat.fps];
 }

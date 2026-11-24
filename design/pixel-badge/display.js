@@ -5,7 +5,7 @@ window.PixelBadge = (() => {
     faceCenter = 92,
     faceRadius = 82,
     originX = 23,
-    originY = (view) => (view === "close" ? 22 : 18),
+    originY = (view, panel) => (panel ? 24 : view === "close" ? 22 : 18),
     W = 138,
     H = 132;
   const blank = (w, h) => {
@@ -296,6 +296,18 @@ window.PixelBadge = (() => {
       if (Math.hypot(x + 0.5 - faceCenter, y + 0.5 - faceCenter) < faceRadius)
         mask.fillRect(x, y, 1, 1);
     }
+
+  // Keep every logical cell touching the glass. The physical aperture trims
+  // the last fraction of a cell after nearest-neighbour scan-out.
+  const panelDisc = blank(faceSide, faceSide);
+  const panelMask = panelDisc.getContext("2d");
+  for (let y = 0; y < faceSide; y++) {
+    for (let x = 0; x < faceSide; x++) {
+      const dx = Math.max(0, Math.abs(x + 0.5 - faceCenter) - 0.5);
+      const dy = Math.max(0, Math.abs(y + 0.5 - faceCenter) - 0.5);
+      if (dx * dx + dy * dy <= faceCenter * faceCenter) panelMask.fillRect(x, y, 1, 1);
+    }
+  }
 
   const letters = {
     ">": "100010001010100",
@@ -697,11 +709,14 @@ window.PixelBadge = (() => {
       if (canvas.dataset.icon !== name) paintIcon(canvas, name);
     }
 
-    constructor(canvas) {
+    constructor(canvas, { panel = false } = {}) {
+      this.panel = panel;
       this.canvas = canvas;
-      this.ctx = canvas.getContext("2d");
+      // Explicit readback mode keeps RGB565 rounding stable across long capture sessions.
+      const contextOptions = panel ? {willReadFrequently: true} : undefined;
+      this.ctx = canvas.getContext("2d", contextOptions);
       this.buffer = blank(faceSide, faceSide);
-      this.paint = this.buffer.getContext("2d");
+      this.paint = this.buffer.getContext("2d", contextOptions);
       this.zoom = 0;
       this.overlay = null;
     }
@@ -727,9 +742,11 @@ window.PixelBadge = (() => {
       g.fill();
       g.globalCompositeOperation = "destination-in";
       g.imageSmoothingEnabled = false;
-      g.drawImage(disc, 0, 0, layer.width, layer.height);
-      g.clearRect(0, 149 * zoom, layer.width, layer.height);
-      g.clearRect(0, 0, layer.width, 22 * zoom);
+      g.drawImage(this.panel ? panelDisc : disc, 0, 0, layer.width, layer.height);
+      if (!this.panel) {
+        g.clearRect(0, 149 * zoom, layer.width, layer.height);
+        g.clearRect(0, 0, layer.width, 22 * zoom);
+      }
       this.overlay = layer;
     }
     draw({
@@ -756,6 +773,7 @@ window.PixelBadge = (() => {
       if (!this.zoom) return;
       const ctx = this.paint;
       ctx.clearRect(0, 0, faceSide, faceSide);
+      if (this.panel) rect(ctx, 0, 0, faceSide, faceSide, "#393246");
       ctx.drawImage(facePlate, 0, 0);
       if (motion) {
         const phase = Math.floor(tick / 420) % 8;
@@ -779,7 +797,7 @@ window.PixelBadge = (() => {
           W,
           H,
           originX,
-          originY(view),
+          originY(view, this.panel),
           W,
           H,
         );
@@ -794,7 +812,7 @@ window.PixelBadge = (() => {
             W,
             H,
             originX,
-            originY(view),
+            originY(view, this.panel),
             W,
             H,
           );
@@ -803,7 +821,7 @@ window.PixelBadge = (() => {
         if (cushion) {
           NapProp.pillow(ctx, cushion, contact, motion);
           // Keep the resting hands and lower cheek in front of the cushion.
-          ctx.drawImage(sheet,(column+8)*W,r*H,W,H,originX,originY(view),W,H);
+          ctx.drawImage(sheet,(column+8)*W,r*H,W,H,originX,originY(view, this.panel),W,H);
         }
         NapProp.sleepMarks(ctx, action, frame, view, motion);
         if (burstOrigin) this.sugarBurst(ctx, clip, frame, view, burstOrigin);
@@ -814,18 +832,20 @@ window.PixelBadge = (() => {
       }
       if (starToy || contact) {
         ctx.save();
-        ctx.beginPath();
-        ctx.rect(0, 23, faceSide, 126);
-        ctx.clip();
+        if (!this.panel) {
+          ctx.beginPath();
+          ctx.rect(0, 23, faceSide, 126);
+          ctx.clip();
+        }
         starToy?.draw(ctx);
         if (contact) this.contactMark(ctx, contact, motion);
         ctx.restore();
       }
-      instrument(ctx, telemetry, code);
+      if (!this.panel) instrument(ctx, telemetry, code);
       ctx.globalCompositeOperation = "destination-in";
-      ctx.drawImage(disc, 0, 0);
+      ctx.drawImage(this.panel ? panelDisc : disc, 0, 0);
       ctx.globalCompositeOperation = "source-over";
-      ctx.drawImage(faceShell, 0, 0);
+      if (!this.panel) ctx.drawImage(faceShell, 0, 0);
       this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
       this.ctx.imageSmoothingEnabled = false;
       this.ctx.drawImage(
@@ -850,7 +870,7 @@ window.PixelBadge = (() => {
           originX +
           (x - ox) / step -
           (view === "close" ? clip.closePan?.[frame] || 0 : 0),
-        sy: originY(view) + (y - oy) / step,
+        sy: originY(view, this.panel) + (y - oy) / step,
       };
     }
     contactMark(ctx, { sx, sy, part, age, phase }, motion) {
@@ -1144,9 +1164,10 @@ window.PixelBadge = (() => {
       const screenX = ((event.clientX - box.left) / box.width) * faceSide,
         screenY = ((event.clientY - box.top) / box.height) * faceSide;
       const x = screenX - originX,
-        y = screenY - originY(view);
-      const inside =
-        Math.hypot(screenX - faceCenter, screenY - faceCenter) < faceRadius &&
+        y = screenY - originY(view, this.panel);
+      const inside = this.panel
+        ? Math.hypot(screenX - faceCenter, screenY - faceCenter) < faceCenter
+        : Math.hypot(screenX - faceCenter, screenY - faceCenter) < faceRadius &&
         x >= 0 &&
         x < W &&
         y >= 0 &&

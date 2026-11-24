@@ -71,7 +71,7 @@ def run(build):
     symbols=[".balign 4",".globl _binary_motion_bpz_start","_binary_motion_bpz_start:",
              f".space {motion_bytes}",".globl _binary_motion_bpz_end","_binary_motion_bpz_end:"]
     # Compile the actual assembly template with a writable section and a
-    # deliberately odd prefix: opening BPR1 must still permit aligned reads.
+    # deliberately odd prefix: opening the reaction pack must still permit aligned reads.
     local_blob=build/"reactions.bpr"
     local_blob.write_bytes((ROOT/"assets/reactions.bpr").read_bytes())
     reactions=(ROOT/"baji_pet_reactions.S.in").read_text()
@@ -108,6 +108,7 @@ def run(build):
     for payload in (asset, legacy):
         check_pixels(lib, payload)
     motion=(ROOT/"assets/motion.bpz").read_bytes()
+    check_projection(lib,motion)
     check_pixels(lib,motion,True)
     check_reactions(lib,motion)
     check_product_boot(lib,motion)
@@ -120,12 +121,29 @@ def run(build):
     assert count>=4
     masks=transitions+262*2*8
     struct.pack_into("<H",raw,masks+first+2,65535)
-    bad=pack(b"BPH5",raw)
+    bad=pack(motion[:4],raw)
     assert lib.baji_pet_open_data(c.byref(empty),bad,len(bad)) and not empty.value
     # Explicit unload lets Windows remove the temporary DLL.
     if os.name=="nt":
         import _ctypes
         _ctypes.FreeLibrary(lib._handle)
+
+
+def check_projection(lib,motion):
+    reactions=(ROOT/"assets/reactions.bpr").read_bytes()
+    legacy_raw=b"BPR1"+reactions[4:-4]
+    legacy=legacy_raw+struct.pack("<I",zlib.crc32(legacy_raw))
+    assert motion[:4]==b"BPH6" and reactions[:4]==b"BPR2"
+    lib.baji_pet_full_body_panel.argtypes=[ptr]
+    lib.baji_pet_full_body_panel.restype=c.c_bool
+    lib.baji_pet_attach_reactions.argtypes=[ptr,ptr,c.c_size_t]
+    for base,right,wrong,panel in [(motion,reactions,legacy,True),(b"BPH5"+motion[4:],legacy,reactions,False)]:
+        art=ptr()
+        assert lib.baji_pet_open_data(c.byref(art),base,len(base))==0
+        assert lib.baji_pet_full_body_panel(art)==panel
+        assert lib.baji_pet_attach_reactions(art,wrong,len(wrong))!=0
+        assert lib.baji_pet_attach_reactions(art,right,len(right))==0
+        lib.baji_pet_close(art)
 
 
 def check_product_boot(lib,motion):
@@ -207,7 +225,7 @@ def check_reactions(lib,motion):
         assert zlib.crc32(band)==target,(i,"full")
         prev=state
     lib.baji_pet_close(art)
-    print("BPR1 222 browser RGB565 samples, 484 pose hit maps and 180 random clip interruptions passed.")
+    print("BPR2 222 browser RGB565 samples, 484 pose hit maps and 180 random clip interruptions passed.")
 
 
 def check_pixels(lib, asset, motion=False):

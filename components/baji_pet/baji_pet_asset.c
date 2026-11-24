@@ -85,12 +85,14 @@ esp_err_t baji_pet_open_data(baji_pet_t **out, const void *packed, size_t size)
     uint32_t meta[3];
     memcpy(meta,bytes+4,sizeof(meta));
     bool compact = memcmp(bytes,"BPT2",4) == 0;
-    bool motion = memcmp(bytes,"BPH5",4) == 0;
+    bool panel = memcmp(bytes,"BPH6",4) == 0;
+    bool motion = panel || memcmp(bytes,"BPH5",4) == 0;
     if ((!compact && !motion && memcmp(bytes,"BPT1",4)) || meta[0]<sizeof(header_t) || meta[0]>MAX_RAW ||
         meta[1] != size-16) return ESP_ERR_INVALID_RESPONSE;
 
     baji_pet_t *p = heap_caps_calloc(1,sizeof(*p),MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);
     if (!p) return ESP_ERR_NO_MEM;
+    p->full_body_panel = panel;
     p->decoded = heap_caps_malloc(meta[0],MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
     tinfl_decompressor *decoder = heap_caps_malloc(sizeof(*decoder),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
     esp_err_t err = ESP_ERR_NO_MEM;

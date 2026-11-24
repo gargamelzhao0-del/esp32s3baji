@@ -13,6 +13,7 @@
 enum { TOP_W = 224, TOP_H = 30, BOTTOM_W = 228, BOTTOM_H = 56 };
 static const baji_rect_t header = {121, 32, TOP_W, TOP_H};
 static const baji_rect_t footer = {119, 374, BOTTOM_W, BOTTOM_H};
+static const baji_rect_t panel_footer = {119, 392, BOTTOM_W, 38};
 
 /* RGB565 cache in panel wire order. All writes happen on the display owner. */
 #define RGB(r,g,b) ((((r) & 248) << 8) | (((g) & 252) << 3) | ((b) >> 3))
@@ -27,6 +28,7 @@ struct baji_agent_ui {
     uint32_t generation;
     int64_t next_change_us;
     int quota, context; /* permille, or -1 for unavailable */
+    bool full_body;
     bool quota_estimated, context_estimated;
     uint16_t top[TOP_W * TOP_H], bottom[BOTTOM_W * BOTTOM_H];
 };
@@ -151,7 +153,7 @@ static void header_draw(baji_agent_ui_t *ui)
 {
     surface_t s = {ui->top, TOP_W, TOP_H};
     panel(s);
-    const char *name = ui->model[0] ? ui->model : "AGENT";
+    const char *name = ui->model[0] ? ui->model : ui->full_body ? "CODEX" : "AGENT";
     int width = text_run((surface_t){0}, 0, 0, name, 1, PAPER);
     int scale = 2 * width <= TOP_W - 16 ? 2 : 1;
     text_run(s, (s.w - width * scale) / 2, (s.h - 12 * scale) / 2, name, scale, PAPER);
@@ -186,25 +188,30 @@ static void meter(surface_t s, int x, const char *label, int value, bool estimat
     if (value < 0) memcpy(number, "--", 3);
     else if (value % 10) snprintf(number, sizeof(number), "%s%d.%d%%", prefix, value / 10, value % 10);
     else snprintf(number, sizeof(number), "%s%d%%", prefix, value / 10);
-    text_run(s, x, 19, label, 1, MUTED);
-    text_run(s, x, 27, number, 2, PAPER);
-    box(s, x, 50, 88, 3, EDGE);
-    if (value > 0) box(s, x, 50, (88 * value + 999) / 1000, 3, color);
+    bool compact = s.h == panel_footer.height;
+    int label_x = compact && x > s.w/2 ? s.w-16-text_run((surface_t){0}, 0, 0, label, 1, MUTED) : x;
+    int bar_y = compact ? 33 : 50;
+    text_run(s, label_x, compact ? 1 : 19, label, 1, MUTED);
+    text_run(s, x, compact ? 10 : 27, number, 2, PAPER);
+    box(s, x, bar_y, 88, 3, EDGE);
+    if (value > 0) box(s, x, bar_y, (88 * value + 999) / 1000, 3, color);
 }
 
 static void footer_draw(baji_agent_ui_t *ui)
 {
-    surface_t s = {ui->bottom, BOTTOM_W, BOTTOM_H};
+    surface_t s = {ui->bottom, BOTTOM_W, ui->full_body ? panel_footer.height : BOTTOM_H};
     panel(s);
     unsigned cue = ui->cue;
     uint16_t color = badges[cue].color;
-    int text_width = text_run((surface_t){0}, 0, 0, badges[cue].label, 2, color);
-    int x = (s.w - text_width - 20) / 2;
+    int scale = ui->full_body ? 1 : 2;
+    int icon_width = 10 * scale;
+    int text_width = text_run((surface_t){0}, 0, 0, badges[cue].label, scale, color);
+    int x = (s.w - text_width - icon_width) / 2;
     for (int y = 0; y < 7; ++y)
         for (int col = 0; col < 7; ++col)
             if (badges[cue].icon[y] & (1u << (6 - col)))
-                box(s, x + col * 2, 5 + y * 2, 2, 2, color);
-    text_run(s, x + 20, -1, badges[cue].label, 2, color);
+                box(s, x + col * scale, (ui->full_body ? 3 : 5) + y * scale, scale, scale, color);
+    text_run(s, x + icon_width, ui->full_body ? 1 : -1, badges[cue].label, scale, color);
     meter(s, 16, "QUOTA LEFT", ui->quota, ui->quota_estimated, AQUA);
     meter(s, 124, "CTX USED", ui->context, ui->context_estimated, LILAC);
 }
@@ -227,39 +234,55 @@ static baji_agent_cue_t state_cue(const baji_agent_display_t *state)
     return BAJI_CUE_DONE;
 }
 
-baji_agent_ui_t *baji_agent_ui_open(const baji_agent_feed_t *feed)
+static baji_agent_ui_t *open_ui(const baji_agent_feed_t *feed, bool full_body)
 {
-    if (!feed || !feed->read) return NULL;
+    if (feed && !feed->read) return NULL;
 #ifdef ESP_PLATFORM
     baji_agent_ui_t *ui = heap_caps_calloc(1, sizeof(*ui), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 #else
     baji_agent_ui_t *ui = calloc(1, sizeof(*ui));
 #endif
     if (ui) {
-        ui->feed = *feed;
+        if (feed) ui->feed = *feed;
+        ui->full_body = full_body;
         ui->next_change_us = INT64_MAX;
+        ui->quota = ui->context = -1;
+        if (full_body) {
+            header_draw(ui);
+            footer_draw(ui);
+        }
     }
     return ui;
 }
 
+baji_agent_ui_t *baji_agent_ui_open(const baji_agent_feed_t *feed)
+{
+    return feed ? open_ui(feed, false) : NULL;
+}
+
+baji_agent_ui_t *baji_agent_ui_open_panel(const baji_agent_feed_t *feed)
+{
+    return open_ui(feed, true);
+}
+
 void baji_agent_ui_close(baji_agent_ui_t *ui) { free(ui); }
 
-bool baji_agent_ui_visible(const baji_agent_ui_t *ui) { return ui && ui->cue != BAJI_CUE_LOCAL; }
+bool baji_agent_ui_visible(const baji_agent_ui_t *ui) { return ui && (ui->full_body || ui->cue != BAJI_CUE_LOCAL); }
 uint32_t baji_agent_ui_generation(const baji_agent_ui_t *ui) { return ui ? ui->generation : 0; }
 
 baji_agent_cue_t baji_agent_ui_update(baji_agent_ui_t *ui, int64_t now_us, baji_damage_t *damage)
 {
     if (!ui) return BAJI_CUE_LOCAL;
     baji_agent_display_t state = {0};
-    bool visible = ui->feed.read(ui->feed.context, (uint64_t)now_us / 1000, &state);
+    bool visible = ui->feed.read && ui->feed.read(ui->feed.context, (uint64_t)now_us / 1000, &state);
     if (visible) ui->generation = state.generation;
     uint64_t at = state.view.next_change_ms;
     ui->next_change_us = visible && at && at <= INT64_MAX / 1000 ? (int64_t)at * 1000 : INT64_MAX;
     state.model[sizeof(state.model) - 1] = 0;
-    bool transition = visible != baji_agent_ui_visible(ui);
+    bool transition = visible != (ui->cue != BAJI_CUE_LOCAL);
     if (transition || (visible && strcmp(state.model, ui->model))) {
         memcpy(ui->model, state.model, sizeof(ui->model));
-        if (visible) header_draw(ui);
+        if (visible || ui->full_body) header_draw(ui);
         if (damage) baji_damage_add(damage, header);
     }
     baji_agent_cue_t cue = visible ? state_cue(&state) : BAJI_CUE_LOCAL;
@@ -273,8 +296,8 @@ baji_agent_cue_t baji_agent_ui_update(baji_agent_ui_t *ui, int64_t now_us, baji_
         ui->context_estimated = state.view.context_estimated;
         ui->quota = q;
         ui->context = c;
-        if (visible) footer_draw(ui);
-        if (damage) baji_damage_add(damage, footer);
+        if (visible || ui->full_body) footer_draw(ui);
+        if (damage) baji_damage_add(damage, ui->full_body ? panel_footer : footer);
     }
     return cue;
 }
@@ -284,7 +307,7 @@ int64_t baji_agent_ui_deadline(const baji_agent_ui_t *ui, int64_t now_us, int64_
     if (!ui) return scene_due;
     if (ui->next_change_us < scene_due) scene_due = ui->next_change_us;
     /* Providers without a change notification must still be polled. */
-    if (!ui->feed.changed && scene_due > now_us && scene_due - now_us > 250000)
+    if (ui->feed.read && !ui->feed.changed && scene_due > now_us && scene_due - now_us > 250000)
         return now_us + 250000;
     return scene_due;
 }
@@ -310,7 +333,7 @@ void baji_agent_ui_paint(const baji_agent_ui_t *ui, const baji_rect_t *band, uin
 {
     if (!baji_agent_ui_visible(ui)) return;
     copy_panel(band, pixels, &header, ui->top);
-    copy_panel(band, pixels, &footer, ui->bottom);
+    copy_panel(band, pixels, ui->full_body ? &panel_footer : &footer, ui->bottom);
 }
 
 /* Centred in the round screen's top margin, above the agent/model header. */

@@ -22,6 +22,7 @@ _Static_assert(sizeof(header_t)==24 && sizeof(pose_t)==48 && sizeof(range_t)==8 
 typedef struct motion_art motion_art_t;
 struct baji_pet {
     motion_art_t *motion;
+    bool full_body_panel;
     uint8_t *decoded;
     const pose_t *poses;
     const uint16_t *maps;

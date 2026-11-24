@@ -23,7 +23,7 @@ typedef struct {
     const cell_patch_t *changes;
     const baji_rect_t *windows;
 } reactions_t;
-_Static_assert(sizeof(reaction_pose_t)==12, "BPR1 pose layout");
+_Static_assert(sizeof(reaction_pose_t)==12, "Reaction pose layout");
 
 struct motion_art {
     const int16_t (*heads)[4];
@@ -152,7 +152,7 @@ esp_err_t baji_pet_attach_reactions(baji_pet_t *p,const void *data,size_t size)
     unsigned quads=n[0],changes=n[1],windows=n[2];
     uint64_t expected=20u+(SAMPLES+REACTIONS)*24u+REACTIONS*12u+(uint64_t)quads*8+
                       REACTION_KEYS*CELL_COUNT*2u+(uint64_t)changes*4+(uint64_t)windows*8;
-    if (memcmp(bytes,"BPR1",4) || !quads || quads>65536 || expected!=size ||
+    if (memcmp(bytes,p->full_body_panel ? "BPR2" : "BPR1",4) || !quads || quads>65536 || expected!=size ||
         esp_rom_crc32_le(0,bytes,size-4)!=crc) return ESP_ERR_INVALID_RESPONSE;
     reactions_t r={.faces=(const int16_t (*)[12])(bytes+16)};
     r.poses=(const reaction_pose_t *)(r.faces+SAMPLES+REACTIONS);

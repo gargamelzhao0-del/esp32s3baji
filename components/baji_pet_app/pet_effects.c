@@ -164,8 +164,8 @@ static void burst_layer(const pet_effects_t *fx, ink_t *ink)
         static const int8_t dir[6][2]={{-80,-60},{30,-95},{96,-28},{72,69},{-20,98},{-96,28}};
         static const unsigned colors[]={RGB(255,230,180),RGB(188,233,224),RGB(255,209,223)};
         /* The hit radius includes 12 source pixels of finger tolerance,
-         * corresponding to 11 physical pixels in the baked close view. */
-        int reach=unit(max_i(0,fx->bubble_radius-11))+(5*f+2)/4;
+         * corresponding to 8 panel pixels at the full-body scale. */
+        int reach=unit(max_i(0,fx->bubble_radius-8))+(5*f+2)/4;
         for (int i=0;i<6;i++) if (f<=4+i%3) {
             int x=cx+dir[i][0]*reach/100, y=cy+dir[i][1]*reach/100+f*f/12;
             int w=abs(dir[i][0])<80 && f<4 ? 3 : 1, h=w==1 && f<4 ? 2 : 1;

@@ -69,7 +69,9 @@ esp_err_t pet_app_run_loaded_connected(baji_board_t *board, const baji_board_inf
 {
     if (!board || !info || !art || (feed && !feed->read)) return ESP_ERR_INVALID_ARG;
     pet_app_t app = {.board = board};
-    if (feed && !(app.agent = baji_agent_ui_open(feed))) return ESP_ERR_NO_MEM;
+    bool full_body = baji_pet_full_body_panel(art);
+    app.agent = full_body ? baji_agent_ui_open_panel(feed) : baji_agent_ui_open(feed);
+    if ((full_body || feed) && !app.agent) return ESP_ERR_NO_MEM;
     pet_player_init(&app.player, art, info, esp_timer_get_time());
     app.player.cheek_at = baji_pet_cheek;
     const baji_runtime_config_t config = {

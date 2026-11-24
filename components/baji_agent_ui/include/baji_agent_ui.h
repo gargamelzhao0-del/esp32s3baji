@@ -15,6 +15,8 @@ typedef enum {
 
 typedef struct baji_agent_ui baji_agent_ui_t;
 baji_agent_ui_t *baji_agent_ui_open(const baji_agent_feed_t *feed);
+/* Native model and gauges outside the GPT silhouette, including local play. */
+baji_agent_ui_t *baji_agent_ui_open_panel(const baji_agent_feed_t *feed);
 void baji_agent_ui_close(baji_agent_ui_t *ui);
 /* Display owner only. Invalidates only panels whose displayed contents change.
  * The caller keeps damage until its normal display submission succeeds. */
