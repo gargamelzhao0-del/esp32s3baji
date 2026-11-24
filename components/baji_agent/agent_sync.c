@@ -13,6 +13,7 @@ struct baji_agent_sync {
     uint8_t key[32], nonce[16], stream[8];
     uint64_t lease_until_ms;
     bool bound, selected;
+    uint32_t generation;
     char model[BAJI_MODEL_MAX + 1];
 };
 
@@ -51,8 +52,14 @@ static esp_err_t receive(void *context, const uint8_t *packet, size_t length)
     esp_err_t err = ESP_ERR_INVALID_STATE;
     if (now < s->lease_until_ms && !memcmp(packet+4,s->nonce,16) &&
         (!s->bound || !memcmp(packet+20,s->stream,8))) {
+        /* The wire identity revision is local to the publishing stream. A
+         * changed lease nonce alone does not establish a different identity. */
+        bool handoff = s->selected && msg.selected &&
+            (s->state.snapshot.identity_revision != msg.snapshot.identity_revision ||
+             memcmp(s->stream, packet+20, sizeof(s->stream)) != 0);
         if (!s->bound) baji_state_begin_connection(&s->state);
         if (baji_state_apply(&s->state,&msg.snapshot,now) == BAJI_APPLIED) {
+            if (handoff) s->generation++;
             memcpy(s->stream,packet+20,8);
             memcpy(s->model,msg.model,sizeof(s->model));
             s->bound = true;
@@ -72,6 +79,7 @@ static bool read_view(void *context, uint64_t now, baji_agent_display_t *out)
     xSemaphoreTake(s->lock,portMAX_DELAY);
     bool available = s->state.has_snapshot;
     out->has_session = s->selected;
+    out->generation = s->generation;
     out->view = baji_state_view(&s->state,now);
     memcpy(out->model,s->model,sizeof(s->model));
     xSemaphoreGive(s->lock);

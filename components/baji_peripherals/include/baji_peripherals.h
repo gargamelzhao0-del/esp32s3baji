@@ -47,6 +47,9 @@ esp_err_t baji_peripherals_read_touch(baji_peripherals_t *p, baji_touch_sample_t
  * untouched. After a signalled IRQ, use read_touch for strict validation. */
 esp_err_t baji_peripherals_poll_touch(baji_peripherals_t *p, baji_touch_sample_t *out);
 esp_err_t baji_peripherals_read_power(baji_peripherals_t *p, baji_power_status_t *out);
+/* Configure the playback DAC for I2S 16 kHz / stereo S16 with a 256× MCLK.
+ * The caller supplies the clock before configuring the DAC. */
+esp_err_t baji_peripherals_speaker_init(baji_peripherals_t *p);
 /* Stop/join all callers first. ESP_OK consumes the handle. On failure the
  * partially closed handle accepts only another close attempt. */
 esp_err_t baji_peripherals_close(baji_peripherals_t *p);

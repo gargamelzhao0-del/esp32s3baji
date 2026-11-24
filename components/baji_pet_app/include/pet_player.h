@@ -24,6 +24,7 @@ typedef struct {
 
 void pet_player_init(pet_player_t *player, baji_pet_t *art,
                      const baji_board_info_t *info, int64_t now_us);
+void pet_player_update_gaze(const pet_player_t *player, baji_pet_state_t *next, const baji_input_t *input);
 /* submitted is true only after all changed pixels have reached the panel bus. */
 esp_err_t pet_player_tick(pet_player_t *player, baji_board_t *board,
                           const baji_input_t *input, int64_t now_us, bool *submitted);

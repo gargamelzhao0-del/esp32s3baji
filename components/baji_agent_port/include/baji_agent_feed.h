@@ -11,6 +11,9 @@ typedef struct {
     baji_view_t view;
     char model[33];
     bool has_session;
+    /* Changes across a handoff between two selected Agent identities. Heartbeats,
+     * metrics and the first selection do not advance this local counter. */
+    uint32_t generation;
 } baji_agent_display_t;
 
 /* The application borrows this port until its synchronous run returns.

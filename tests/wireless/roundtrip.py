@@ -41,7 +41,8 @@ class View(ct.Structure):
 
 
 class Display(ct.Structure):
-    _fields_ = [("view", View), ("model", ct.c_char * 33), ("selected", ct.c_bool)]
+    _fields_ = [("view", View), ("model", ct.c_char * 33), ("selected", ct.c_bool),
+                ("generation", ct.c_uint32)]
 
 
 READ = ct.CFUNCTYPE(ct.c_bool, PTR, U64, ct.POINTER(Display))
@@ -228,6 +229,35 @@ class Wireless(unittest.TestCase):
         loser_stream = (b"stream-B", b"stream-W")[winner]
         self.assertEqual(self.wifi.send(self.packet(2, nonce=fresh, stream=loser_stream)), BAD_STATE)
         self.assertEqual(self.wifi.send(self.packet(100)), BAD_STATE)
+
+    def test_same_pose_session_handoff(self):
+        self.event(session="one", activity="reading")
+        self.assertEqual(self.wifi.send(self.packet(1)), OK)
+        self.assertEqual(self.read().generation, 0)
+        self.assertEqual(self.ble.send(self.packet(2)), OK)
+        self.assertEqual(self.read().generation, 0)
+        self.event(session="two", activity="reading")
+        self.assertEqual(self.wifi.send(self.packet(1)), BAD_STATE)
+        self.assertEqual(self.read().generation, 0)
+        self.assertEqual(self.wifi.send(self.packet(3)), OK)
+        state = self.read()
+        self.assertEqual((state.view.pose, state.generation), (b"reading", 1))
+        self.event(session="two", activity="writing")
+        self.assertEqual(self.ble.send(self.packet(4)), OK)
+        self.assertEqual(self.read().generation, 1)
+        self.event(session=None)
+        self.assertEqual(self.wifi.send(self.packet(5)), OK)
+        self.event(session="three", activity="reading")
+        self.assertEqual(self.ble.send(self.packet(6)), OK)
+        self.assertEqual(self.read().generation, 1)
+        self.at(self.now + 8000)
+        renewed = self.ble.challenge()
+        self.assertEqual(self.ble.send(self.packet(1, nonce=renewed)), OK)
+        self.assertEqual(self.read().generation, 1)
+        self.at(self.now + 8000)
+        renewed = self.wifi.challenge()
+        self.assertEqual(self.wifi.send(self.packet(1, nonce=renewed, stream=b"stream-2")), OK)
+        self.assertEqual(self.read().generation, 2)
 
     def test_new_session_and_no_selection(self):
         self.event(phase="ended", outcome="succeeded")

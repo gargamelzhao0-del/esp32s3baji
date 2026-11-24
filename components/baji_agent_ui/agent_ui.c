@@ -1,4 +1,5 @@
 #include "baji_agent_ui.h"
+#include "baji_ui_button.h"
 #include "baji_power_indicator.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +24,7 @@ struct baji_agent_ui {
     baji_agent_feed_t feed;
     char model[33];
     baji_agent_cue_t cue;
+    uint32_t generation;
     int64_t next_change_us;
     int quota, context; /* permille, or -1 for unavailable */
     bool quota_estimated, context_estimated;
@@ -123,6 +125,28 @@ static int text_run(surface_t s, int x, int y, const char *str, int scale, uint1
     return x - start;
 }
 
+void baji_ui_button_paint(const baji_rect_t *band, uint8_t *pixels, baji_rect_t r,
+                          const char *label, unsigned scale, bool accent)
+{
+    int x0 = r.x - (int)band->x, y0 = r.y - (int)band->y;
+    if (x0 >= band->width || y0 >= band->height || x0 + r.width <= 0 || y0 + r.height <= 0) return;
+    surface_t dst = {(uint16_t *)pixels, band->width, band->height};
+    int start = y0 < 0 ? -y0 : 0;
+    int end = r.height < band->height-y0 ? r.height : band->height-y0;
+    for (int row = start; row < end; row++) {
+        int pad = inset(row, r.height);
+        int left = x0 + pad, right = x0 + r.width - pad;
+        for (int x = left < 0 ? 0 : left; x < right && x < band->width; x++) {
+            bool border = row < 2 || row >= r.height-2 || x < left+2 || x >= right-2;
+            dst.p[(y0+row)*dst.w+x] = wire(border ? (accent ? AQUA : EDGE) : INK);
+        }
+    }
+    int y = y0 + (r.height - (int)scale*12)/2;
+    if (y >= band->height || y + (int)scale*12 <= 0) return;
+    int width = text_run((surface_t){0}, 0, 0, label, scale, PAPER);
+    text_run(dst, x0 + (r.width-width)/2, y, label, scale, accent ? AQUA : PAPER);
+}
+
 static void header_draw(baji_agent_ui_t *ui)
 {
     surface_t s = {ui->top, TOP_W, TOP_H};
@@ -221,12 +245,14 @@ baji_agent_ui_t *baji_agent_ui_open(const baji_agent_feed_t *feed)
 void baji_agent_ui_close(baji_agent_ui_t *ui) { free(ui); }
 
 bool baji_agent_ui_visible(const baji_agent_ui_t *ui) { return ui && ui->cue != BAJI_CUE_LOCAL; }
+uint32_t baji_agent_ui_generation(const baji_agent_ui_t *ui) { return ui ? ui->generation : 0; }
 
 baji_agent_cue_t baji_agent_ui_update(baji_agent_ui_t *ui, int64_t now_us, baji_damage_t *damage)
 {
     if (!ui) return BAJI_CUE_LOCAL;
     baji_agent_display_t state = {0};
     bool visible = ui->feed.read(ui->feed.context, (uint64_t)now_us / 1000, &state);
+    if (visible) ui->generation = state.generation;
     uint64_t at = state.view.next_change_ms;
     ui->next_change_us = visible && at && at <= INT64_MAX / 1000 ? (int64_t)at * 1000 : INT64_MAX;
     state.model[sizeof(state.model) - 1] = 0;

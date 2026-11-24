@@ -4,6 +4,10 @@
 #include "baji_power_indicator.h"
 #include "baji_runtime.h"
 #include "esp_timer.h"
+#ifdef BAJI_PET_COMPANION
+#include "pet_companion.h"
+#include "esp_log.h"
+#endif
 
 typedef struct {
     pet_player_t player;
@@ -86,6 +90,19 @@ esp_err_t pet_app_run_connected(baji_board_t *board, const baji_board_info_t *in
 {
     baji_pet_t *art = NULL;
     esp_err_t err = baji_pet_open(&art);
+#ifdef BAJI_PET_COMPANION
+    if (err == ESP_OK) {
+        pet_clips_t *album = NULL;
+        esp_err_t opened = pet_clips_open(&album);
+        if (opened == ESP_OK) {
+            err = pet_companion_run(board, info, art, album, feed);
+            pet_clips_close(album);
+            baji_pet_close(art);
+            return err;
+        }
+        ESP_LOGW("gpt_pet", "interaction pack unavailable (%s), using embedded artwork", esp_err_to_name(opened));
+    }
+#endif
     if (err == ESP_OK) err = pet_app_run_loaded_connected(board, info, art, feed);
     baji_pet_close(art);
     return err;

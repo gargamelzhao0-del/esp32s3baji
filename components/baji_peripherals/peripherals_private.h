@@ -9,17 +9,20 @@
 #include <stdatomic.h>
 
 #define BAJI_I2C_TIMEOUT_MS 40
+#define BAJI_ES8311_ADDRESS 0x18
 
 struct baji_peripherals {
     i2c_master_bus_handle_t bus;
     i2c_master_dev_handle_t touch;
     i2c_master_dev_handle_t power;
+    i2c_master_dev_handle_t speaker;
     StaticSemaphore_t mutex_storage, irq_storage;
     SemaphoreHandle_t mutex;
     SemaphoreHandle_t irq;
     bool closing;
     atomic_bool touch_ready;
     bool power_ready;
+    bool speaker_ready;
     bool reset_owned;
     bool irq_pin_owned;
     bool irq_handler_added;

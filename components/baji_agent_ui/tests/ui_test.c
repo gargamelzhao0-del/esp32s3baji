@@ -8,12 +8,14 @@
 enum { SIDE = 466 };
 static baji_state_t state;
 static const char *model = "DeepSeek";
+static uint32_t generation;
 static bool read_feed(void *ctx, uint64_t now, baji_agent_display_t *out)
 {
     baji_state_t *s = ctx;
     if (!s->has_snapshot) return false;
     out->view = baji_state_view(s, now);
     out->has_session = true;
+    out->generation = generation;
     snprintf(out->model, sizeof(out->model), "%s", model);
     return true;
 }
@@ -130,6 +132,7 @@ int main(int argc, char **argv)
     baji_agent_ui_close(polling);
     baji_agent_ui_t *ui = baji_agent_ui_open(&feed);
     assert(ui && baji_agent_ui_update(ui, 0, &damage) == BAJI_CUE_LOCAL && !damage.count);
+    assert(!baji_agent_ui_generation(ui) && !baji_agent_ui_generation(NULL));
     assert(baji_agent_ui_deadline(ui, 0, INT64_MAX) == INT64_MAX);
     baji_snapshot_t snapshot = {
         .seq = 1, .phase = BAJI_TOOL, .activity = BAJI_READING,
@@ -146,6 +149,9 @@ int main(int argc, char **argv)
     memset(numbers, 0, sizeof(numbers));
     baji_agent_ui_paint(ui, &footer, (uint8_t *)numbers);
     baji_damage_clear(&damage);
+    generation++;
+    assert(baji_agent_ui_update(ui, 1000000, &damage) == BAJI_CUE_READ);
+    assert(baji_agent_ui_generation(ui) == generation && !damage.count);
     ++snapshot.seq;
     assert(baji_state_apply(&state, &snapshot, 1100) == BAJI_APPLIED);
     assert(baji_agent_ui_update(ui, 1100000, &damage) == BAJI_CUE_READ && damage.count == 0);

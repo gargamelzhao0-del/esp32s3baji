@@ -21,6 +21,8 @@ void baji_agent_ui_close(baji_agent_ui_t *ui);
 baji_agent_cue_t baji_agent_ui_update(baji_agent_ui_t *ui, int64_t now_us, baji_damage_t *damage);
 int64_t baji_agent_ui_deadline(const baji_agent_ui_t *ui, int64_t now_us, int64_t scene_due);
 bool baji_agent_ui_visible(const baji_agent_ui_t *ui);
+/* Read on the display owner after update(), including when the pose is unchanged. */
+uint32_t baji_agent_ui_generation(const baji_agent_ui_t *ui);
 void baji_agent_ui_paint(const baji_agent_ui_t *ui, const baji_rect_t *band, uint8_t *pixels);
 
 #ifdef __cplusplus

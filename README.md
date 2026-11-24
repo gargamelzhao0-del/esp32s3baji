@@ -4,7 +4,7 @@
 
 本项目让圆屏角色跟随电脑上的 AI Agent 工作：**客户端决定主题，实际模型决定角色，生命周期事件决定姿态；额度、上下文与电量独立显示。**
 
-工程默认构建 DeepSeek 鲸鱼娘，在晴海背景中循环喂饭。圆屏可切换六套动画、十二种 Agent 姿态、四个时段和两种视距，打盹时可以轻按胸前的枕头。GPT 白龙娘单独构建，支持摸头、跟眼、左右戳脸和挠痒，动作素材以 48 Hz 采样。两份产品固件都能通过 USB、BLE 或 Wi-Fi 接收模型状态和额度，独立显示实际供电状态。离线构建和 G1 板级自检另有入口。[配对与 Agent 接入](docs/17-wireless-agent.md) · [圆屏互动手册](docs/18-device-interactions.md) · [板级接口与上板检查](docs/06-hardware-and-environment.md)
+工程默认构建 DeepSeek 鲸鱼娘。在晴海圆屏上可切换六套动画、十二种 Agent 姿态、四个时段和两种视距。GPT 白龙娘单独构建，在圆屏底部点「陪玩」可以喂星糖、接星萤或抱枕打盹。两位角色的枕布均可按压。白龙娘还有贴额头、揉脸、哄好、翻书、敲键、查镜片和击掌等分支。两份产品固件通过 USB、BLE 或 Wi-Fi 接收模型状态和额度，独立显示实际供电状态。[白龙娘操作清单](docs/19-gpt-interaction-inventory.md) · [两位角色的手势](docs/18-device-interactions.md) · [配对与 Agent 接入](docs/17-wireless-agent.md)
 
 ## 先看这三个入口
 
@@ -30,6 +30,7 @@
 | [09 决策记录](docs/09-decisions.md) | 为什么采用这些技术选择 |
 | [17 无线与 Agent 接入](docs/17-wireless-agent.md) | USB 配对、BLE、Wi-Fi、通用事件示例及显示链路 |
 | [18 圆屏互动触发手册](docs/18-device-interactions.md) | GPT、鲸鱼娘像素及高清模式的手势、动作优先级与远端状态 |
+| [19 白龙娘互动清单](docs/19-gpt-interaction-inventory.md) | 每个可操作部位、道具、条件分支、自动动作以及网页和设备的差异 |
 
 ## 当前工程
 

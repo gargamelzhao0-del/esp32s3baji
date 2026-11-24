@@ -6,10 +6,12 @@ param(
     [switch]$BoardCheck,
     [switch]$Offline,
     [switch]$FrameProbe,
+    [switch]$InteractionProbe,
     [ValidateSet('DeepSeek', 'GPT')][string]$Character = 'DeepSeek',
     [ValidateRange(1, 64)][int]$Jobs = 4
 )
 $ErrorActionPreference = 'Stop'
+if ($InteractionProbe -and ($Character -ne 'GPT' -or $BoardCheck)) { throw 'InteractionProbe requires the GPT character product.' }
 if (-not $IdfPath) { $IdfPath = Join-Path $ToolsRoot 'frameworks/esp-idf-v5.5.4' }
 if (-not $PythonEnvironment) { $PythonEnvironment = Join-Path $ToolsRoot 'python_env/idf5.5_py3.11_env' }
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
@@ -74,7 +76,7 @@ try {
     if ($BoardCheck) { $defaults += ";$($root.TrimEnd('/','\'))/config/sdkconfig.board-check.defaults" }
     & $cmake -G Ninja -S $root -B $buildDir "-DPYTHON=$python" "-DCMAKE_MAKE_PROGRAM=$ninja" `
         -DPYTHON_DEPS_CHECKED=1 -DESP_PLATFORM=1 -DCCACHE_ENABLE=OFF -DIDF_TARGET=esp32s3 `
-        "-DSDKCONFIG=$buildDir/sdkconfig" "-DSDKCONFIG_DEFAULTS=$defaults" "-DBAJI_G1_ONLY=$([int]$BoardCheck.IsPresent)" "-DBAJI_CHARACTER=$characterName" "-DBAJI_WIRELESS=$([int]$wireless)" "-DBAJI_FRAME_PROBE=$([int]$FrameProbe.IsPresent)"
+        "-DSDKCONFIG=$buildDir/sdkconfig" "-DSDKCONFIG_DEFAULTS=$defaults" "-DBAJI_G1_ONLY=$([int]$BoardCheck.IsPresent)" "-DBAJI_CHARACTER=$characterName" "-DBAJI_WIRELESS=$([int]$wireless)" "-DBAJI_FRAME_PROBE=$([int]$FrameProbe.IsPresent)" "-DBAJI_INTERACTION_PROBE=$([int]$InteractionProbe.IsPresent)"
     if ($LASTEXITCODE -ne 0) { throw 'Firmware CMake configuration failed.' }
     & $cmake --build $buildDir --parallel $Jobs
     if ($LASTEXITCODE -ne 0) { throw 'Firmware compilation failed.' }

@@ -7,7 +7,7 @@ esp_err_t baji_attach_i2c(baji_peripherals_t *p, uint8_t address, i2c_master_dev
     const i2c_device_config_t cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = address,
-        .scl_speed_hz = 400000,
+        .scl_speed_hz = address == BAJI_ES8311_ADDRESS ? 100000 : 400000,
     };
     return i2c_master_bus_add_device(p->bus, &cfg, dev);
 }
@@ -67,6 +67,7 @@ esp_err_t baji_peripherals_close(baji_peripherals_t *p)
     esp_err_t err = baji_touch_release_pins(p);
     if (err == ESP_OK) err = detach(&p->touch);
     if (err == ESP_OK) err = detach(&p->power);
+    if (err == ESP_OK) err = detach(&p->speaker);
     if (err == ESP_OK) err = i2c_del_master_bus(p->bus);
     if (err != ESP_OK) return err; /* The owner can retry close. */
     vSemaphoreDelete(p->irq);

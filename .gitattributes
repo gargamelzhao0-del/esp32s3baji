@@ -6,6 +6,9 @@
 *.dsk -text
 *.hds -text
 *.hda -text
+*.bpc -text
+*.pcm -text
+components/baji_pet_clips/tests/chrome.crc -text
 
 # This upstream source record is verified against its original byte hash.
 assets/ai-girls/sources/crosspet/LICENSE.md -text

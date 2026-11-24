@@ -53,6 +53,7 @@ with tempfile.TemporaryDirectory(prefix="baji-display-test-") as directory:
                             HERE / "pet_player_test.c"],
         "board_check_paint_test": [COMPONENTS.parent / "main/board_check.c", HERE / "board_check_paint_test.c"],
         "peripheral_decode_test": [peripherals / "test/test_peripheral_decode.c"],
+        "speaker_codec_test": [peripherals / "es8311.c", peripherals / "test/test_es8311.c"],
         "peripheral_lifecycle_test": [peripherals / "baji_peripherals.c", peripherals / "axp2101.c",
                                       HERE / "peripheral_lifecycle_test.c"],
     }.items():

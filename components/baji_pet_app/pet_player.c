@@ -30,7 +30,7 @@ static int toward(int gaze, int target)
     return gaze - (gaze > target) + (gaze < target);
 }
 
-static void update_gaze(const pet_player_t *p, baji_pet_state_t *next, const baji_input_t *input)
+void pet_player_update_gaze(const pet_player_t *p, baji_pet_state_t *next, const baji_input_t *input)
 {
     if (next->clip>=BAJI_PET_CHEEK_LEFT) {
         next->gaze_x=0;
@@ -49,7 +49,7 @@ static void update_gaze(const pet_player_t *p, baji_pet_state_t *next, const baj
 int64_t pet_player_next_update(const pet_player_t *p, const baji_input_t *input, int64_t now)
 {
     baji_pet_state_t gaze = p->shown;
-    update_gaze(p, &gaze, input);
+    pet_player_update_gaze(p, &gaze, input);
     if (gaze.gaze_x != p->shown.gaze_x || gaze.gaze_y != p->shown.gaze_y)
         return now;
     if (p->cheek_held && now-p->action_since>=CHEEK_HOLD_US) return INT64_MAX;
@@ -151,7 +151,7 @@ esp_err_t pet_player_tick(pet_player_t *p, baji_board_t *board,
     }
     next.gaze_x = p->shown.gaze_x;
     next.gaze_y = p->shown.gaze_y;
-    update_gaze(p, &next, input);
+    pet_player_update_gaze(p, &next, input);
 
     /* The display retains its last frame. Keep even failed/partial submissions
      * dirty until a later complete redraw from the latest scene succeeds. */
