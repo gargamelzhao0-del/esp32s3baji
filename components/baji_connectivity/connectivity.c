@@ -32,7 +32,7 @@ esp_err_t baji_connectivity_start(void)
     if (err != ESP_OK) return err;
     baji_link_endpoint_t endpoint = baji_agent_endpoint(service.sync);
     service.feed = baji_agent_feed(service.sync);
-    err = badge_setup_start(&service.settings);
+    err = badge_setup_start(&service.settings, &endpoint);
     service.setup = err == ESP_OK;
     if (!service.setup) ESP_LOGW("baji_radio","USB pairing unavailable: %s",esp_err_to_name(err));
     /* A failed start can own callbacks while its own rollback is incomplete.
@@ -55,11 +55,11 @@ esp_err_t baji_connectivity_start(void)
         service.wifi = err == ESP_OK;
     }
     if (!service.wifi) ESP_LOGW("baji_radio","Wi-Fi unavailable: %s",esp_err_to_name(err));
-    return service.wifi || service.ble ? ESP_OK : err;
+    return service.wifi || service.ble || service.setup ? ESP_OK : err;
 }
 
 const baji_agent_feed_t *baji_connectivity_feed(void)
-{ return service.ble || service.wifi ? &service.feed : NULL; }
+{ return service.ble || service.wifi || service.setup ? &service.feed : NULL; }
 
 esp_err_t baji_connectivity_stop(void)
 {

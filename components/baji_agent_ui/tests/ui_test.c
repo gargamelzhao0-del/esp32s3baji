@@ -1,4 +1,5 @@
 #include "baji_agent_ui.h"
+#include "baji_power_indicator.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,6 +20,65 @@ static bool read_feed(void *ctx, uint64_t now, baji_agent_display_t *out)
 
 static uint16_t screen[SIDE * SIDE];
 static const baji_rect_t full = {0, 0, SIDE, SIDE};
+
+static void check_power(void)
+{
+    const baji_power_reading_t states[] = {
+        {BAJI_POWER_UNKNOWN,-1}, {BAJI_POWER_NO_BATTERY,-1}, {BAJI_POWER_USB_ONLY,-1},
+        {BAJI_POWER_BATTERY,-1}, {BAJI_POWER_BATTERY,0}, {BAJI_POWER_BATTERY,1},
+        {BAJI_POWER_BATTERY,99}, {BAJI_POWER_BATTERY,100},
+        {BAJI_POWER_USB_BATTERY,100}, {BAJI_POWER_CHARGING,100},
+    };
+    enum { COUNT = sizeof(states) / sizeof(*states) };
+    uint32_t fingerprints[COUNT];
+    baji_power_indicator_t icon = {0};
+    baji_damage_t damage;
+    baji_damage_init(&damage, SIDE, SIDE);
+    for (unsigned i = 0; i < COUNT; ++i) {
+        baji_power_indicator_update(&icon, states[i], &damage);
+        assert(damage.count == 1);
+        baji_rect_t rect = damage.regions[0];
+        assert(rect.width == 84 && rect.height == 24 && rect.y + rect.height <= 32);
+        baji_damage_clear(&damage);
+        baji_power_indicator_update(&icon, states[i], &damage);
+        assert(!damage.count);
+        memset(screen, 0x17, sizeof(screen));
+        baji_power_indicator_paint(&icon, &full, (uint8_t *)screen);
+        uint32_t hash = 2166136261u;
+        for (int y = 0; y < SIDE; ++y) {
+            for (int x = 0; x < SIDE; ++x) {
+                uint16_t color = screen[y * SIDE + x];
+                if (color == 0x1717) continue;
+                assert(x >= rect.x && x < rect.x + rect.width && y >= rect.y && y < rect.y + rect.height);
+                int dx = x - SIDE / 2, dy = y - SIDE / 2;
+                assert(dx * dx + dy * dy < SIDE * SIDE / 4);
+                hash = (hash ^ color) * 16777619u;
+            }
+        }
+        for (unsigned j = 0; j < i; ++j) assert(hash != fingerprints[j]);
+        fingerprints[i] = hash;
+        /* Odd-width rectangles start on both halves of a scaled source pixel. */
+        for (int x = rect.x - 3; x < rect.x + rect.width; x += 9) {
+            uint16_t strip[9 * 27];
+            baji_rect_t band = {x, rect.y - 1, 9, 27};
+            memset(strip, 0x17, sizeof(strip));
+            baji_power_indicator_paint(&icon, &band, (uint8_t *)strip);
+            for (int row = 0; row < band.height; ++row)
+                assert(!memcmp(strip + row * 9, screen + (band.y + row) * SIDE + x, 18));
+        }
+        if (states[i].source == BAJI_POWER_BATTERY && states[i].percent >= 0) {
+            unsigned columns = 0;
+            for (unsigned x = 3; x < 11; ++x) columns += (icon.rows[5] >> x) & 1u;
+            int percent = states[i].percent;
+            assert(columns == (percent == 100 ? 8u : percent == 99 ? 7u : percent == 1 ? 1u : 0u));
+        }
+    }
+    baji_power_indicator_update(&icon, (baji_power_reading_t){0}, &damage);
+    assert(damage.count == 1);
+    memset(screen, 0x17, sizeof(screen));
+    baji_power_indicator_paint(&icon, &full, (uint8_t *)screen);
+    for (unsigned i = 0; i < SIDE * SIDE; ++i) assert(screen[i] == 0x1717);
+}
 
 static void check_crops(baji_agent_ui_t *ui)
 {
@@ -60,6 +120,7 @@ static void preview(baji_agent_ui_t *ui, const char *input, const char *output)
 
 int main(int argc, char **argv)
 {
+    check_power();
     baji_damage_t damage;
     baji_damage_init(&damage, SIDE, SIDE);
     baji_agent_feed_t feed = {.read = read_feed, .context = &state, .changed = &state};

@@ -34,20 +34,21 @@ class Dictionary:
         return np.asarray(ids, dtype="<u4")[inverse]
 
 
-def write_atlases(web):
+def write_atlases(web, clips_and_steps=(("idle", 4), ("pat", 3))):
     # Bidirectional flow registers the two silhouettes before reconstructing
     # contour coverage. The face, hair, hands, and horns can move separately.
     clips = json.loads((web/"clips.js").read_text().split("=", 1)[1].rstrip(";"))
     x, y = np.meshgrid(np.arange(138, dtype="f"), np.arange(132, dtype="f"))
-    for name, steps in (("idle", 4), ("pat", 3)):
+    idle_rows = (clips["idle"]["frames"] + 7) // 8
+    with Image.open(web/"assets/idle.png") as idle:
+        idle_first = np.array(idle.convert("RGBA").crop((0,idle_rows*132,138,(idle_rows+1)*132)))
+    for name, steps in clips_and_steps:
         meta = clips[name]
         count = meta["frames"]
         rows = (count + 7) // 8
         path = web/"assets"/(name+".png")
         atlas = np.asarray(Image.open(path).convert("RGBA"))
         poses = [atlas[(rows+i//8)*132:(rows+i//8+1)*132, i%8*138:(i%8+1)*138] for i in range(count)]
-        if name == "idle":
-            idle_first = poses[0].copy()
         next_poses = poses[1:] + [idle_first]
         sheet = np.zeros(((rows+(count*steps+7)//8)*132, 8*138, 4), dtype=np.uint8)
         for i, (a,b) in enumerate(zip(poses,next_poses)):

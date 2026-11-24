@@ -19,7 +19,9 @@ with tempfile.TemporaryDirectory(prefix="baji-display-test-") as directory:
     for header in ("driver/i2c_master.h", "esp_attr.h", "freertos/semphr.h"):
         (build / header).write_text('#include "touch_recorder.h"\n', encoding="ascii")
     (build / "esp_log.h").write_text(
-        '#include <stdio.h>\n#define ESP_LOGI(tag, ...) ((void)(tag), (void)sizeof(printf(__VA_ARGS__)))\n'
+        '#include <stdio.h>\n#ifdef BAJI_HOST_FRAME_PROBE\n'
+        'void frame_log(const char *, const char *, unsigned, unsigned, unsigned, unsigned, unsigned);\n'
+        '#define ESP_LOGI frame_log\n#else\n#define ESP_LOGI(tag, ...) ((void)(tag), (void)sizeof(printf(__VA_ARGS__)))\n#endif\n'
         '#define ESP_LOGW ESP_LOGI\n#define esp_err_to_name(e) "host error"\n', encoding="ascii")
     (build / "esp_timer.h").write_text(
         '#include <stdint.h>\n#ifdef BAJI_HOST_VSYNC\nint64_t esp_timer_get_time(void);\n#else\n'
@@ -38,6 +40,8 @@ with tempfile.TemporaryDirectory(prefix="baji-display-test-") as directory:
     ]
     peripherals = COMPONENTS / "baji_peripherals"
     for name, sources in {
+        "product_frames_test": [HERE.parent / "device/product_frames.c",
+                                HERE.parent / "device/deepseek_review/main/body_probe.c", HERE / "product_frames_test.c"],
         "scene_damage_test": [COMPONENTS / "baji_scene_damage/baji_scene_damage.c", HERE / "scene_damage_test.c"],
         "display_test": [
             COMPONENTS / "baji_display/baji_display.c", COMPONENTS / "baji_board/baji_board.c",
@@ -54,5 +58,7 @@ with tempfile.TemporaryDirectory(prefix="baji-display-test-") as directory:
     }.items():
         executable = build / (name + (".exe" if os.name == "nt" else ""))
         options = ["-DBAJI_HOST_VSYNC", "-I", str(COMPONENTS / "baji_vsync/include")] if name == "vsync_test" else []
+        if name == "product_frames_test":
+            options = ["-DBAJI_HOST_VSYNC", "-DBAJI_HOST_FRAME_PROBE"]
         subprocess.run([*compiler, *options, "-I", str(peripherals), *map(str, sources), "-o", str(executable)], check=True)
         subprocess.run([str(executable)], check=True)

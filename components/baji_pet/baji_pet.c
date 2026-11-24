@@ -5,17 +5,18 @@
 
 unsigned baji_pet_frame_count(baji_pet_clip_t clip)
 {
-    return clip == BAJI_PET_PAT ? PAT_FRAMES : IDLE_FRAMES;
+    if (clip == BAJI_PET_CHEEK_LEFT || clip == BAJI_PET_CHEEK_RIGHT) return 22;
+    return clip == BAJI_PET_PAT || clip == BAJI_PET_TICKLE ? PAT_FRAMES : IDLE_FRAMES;
 }
 
 unsigned baji_pet_fps(baji_pet_clip_t clip)
 {
-    return clip == BAJI_PET_PAT ? 16 : 12;
+    return clip == BAJI_PET_IDLE ? 12 : 16;
 }
 
 unsigned baji_pet_substeps(const baji_pet_t *p, baji_pet_clip_t clip)
 {
-    return p && p->motion ? (clip == BAJI_PET_PAT ? 3 : 4) : 1;
+    return p && p->motion ? (clip == BAJI_PET_IDLE ? 4 : 3) : 1;
 }
 
 static unsigned pose_id(baji_pet_state_t state)
@@ -66,14 +67,31 @@ void baji_pet_select(baji_pet_t *p, baji_pet_state_t state)
     p->gaze = gaze;
 }
 
-bool baji_pet_forehead(const baji_pet_t *p,baji_pet_state_t state,uint16_t x,uint16_t y)
+static bool in_ellipse(int x,int y,int cx,int cy,int rx,int ry)
 {
-    if (!p || x >= SIDE || y >= SIDE) return false;
-    const int16_t *h = p->motion ? pet_motion_head(p->motion,state) : p->poses[pose_id(state)].forehead;
-    int dx=x-h[0],dy=y-h[1],rx=h[2],ry=h[3];
+    int dx=x-cx,dy=y-cy;
     if (abs(dx)>rx || abs(dy)>ry) return false;
     int64_t a=(int64_t)dx*ry,b=(int64_t)dy*rx,r=(int64_t)rx*ry;
     return a*a+b*b <= r*r;
+}
+
+bool baji_pet_forehead(const baji_pet_t *p,baji_pet_state_t state,uint16_t x,uint16_t y)
+{
+    if (!p || x >= SIDE || y >= SIDE) return false;
+    const int16_t *face=p->motion ? pet_motion_landmarks(p->motion,state) : NULL;
+    if (face) return in_ellipse(x,y,face[0],face[1],face[8],face[9]);
+    const int16_t *h = p->motion ? pet_motion_head(p->motion,state) : p->poses[pose_id(state)].forehead;
+    return in_ellipse(x,y,h[0],h[1],h[2],h[3]);
+}
+
+int baji_pet_cheek(const baji_pet_t *p,baji_pet_state_t state,uint16_t x,uint16_t y)
+{
+    if (!p || !p->motion || x>=SIDE || y>=SIDE) return 0;
+    const int16_t *face=pet_motion_landmarks(p->motion,state);
+    if (!face || in_ellipse(x,y,face[2],face[3],17,16)) return 0;
+    int side=x<face[2] ? -1 : 1;
+    const int16_t *center=face+(side<0 ? 4 : 6);
+    return in_ellipse(x,y,center[0],center[1],face[10],face[11]) ? side : 0;
 }
 
 static baji_rect_t joined(baji_rect_t a,baji_rect_t b)

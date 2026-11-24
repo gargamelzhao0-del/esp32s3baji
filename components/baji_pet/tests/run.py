@@ -64,14 +64,32 @@ def row_formats(asset):
 def run(build):
     for header in ["esp_err.h","esp_heap_caps.h","esp_rom_crc.h","miniz.h"]:
         (build/header).write_text('#include "host.h"\n')
+    # Exercise the production linker's start/end symbols. Writable host-only
+    # fixtures let us inject either a valid image or a flash CRC fault.
+    embedded=build/"bundle.S"
+    motion_bytes=(ROOT/"assets/motion.bpz").stat().st_size
+    symbols=[".balign 4",".globl _binary_motion_bpz_start","_binary_motion_bpz_start:",
+             f".space {motion_bytes}",".globl _binary_motion_bpz_end","_binary_motion_bpz_end:"]
+    # Compile the actual assembly template with a writable section and a
+    # deliberately odd prefix: opening BPR1 must still permit aligned reads.
+    local_blob=build/"reactions.bpr"
+    local_blob.write_bytes((ROOT/"assets/reactions.bpr").read_bytes())
+    reactions=(ROOT/"baji_pet_reactions.S.in").read_text()
+    reactions=reactions.replace('.section .rodata.baji_pet_reactions,"a"',".data\n.byte 0")
+    symbols.append(reactions.replace("@reactions_asset@",local_blob.as_posix()))
+    embedded.write_text("\n".join([".bss",*symbols,
+        "#if defined(__ELF__)",'.section .note.GNU-stack,"",@progbits',"#endif",""]))
+    (build/"esp_log.h").write_text('extern unsigned warnings_host, info_host;\n'
+                                    '#define ESP_LOGI(tag,...) ((void)++info_host)\n'
+                                    '#define ESP_LOGW(tag,...) ((void)++warnings_host)\n')
     source=build/"callbacks.c"
-    source.write_text('#include "host.h"\ninflate_fn inflate_host; checksum_fn checksum_host;\n'
+    source.write_text('#include "host.h"\ninflate_fn inflate_host; checksum_fn checksum_host; unsigned warnings_host, info_host;\n'
                       'void set_callbacks(inflate_fn d,checksum_fn c){inflate_host=d;checksum_host=c;}\n')
     binary=build/("pet.dll" if os.name=="nt" else "pet.so")
-    subprocess.run([os.environ.get("CC","gcc"),"-std=c11","-Wall","-Wextra","-Werror","-O2",
-                    "-fPIC","-shared","-DBAJI_PET_EXTERNAL_ASSET","-I",str(build),"-I",str(HERE),
+    subprocess.run([os.environ.get("CC","gcc"),"-std=gnu11","-Wall","-Wextra","-Werror","-O2",
+                    "-fPIC","-shared","-I",str(build),"-I",str(HERE),
                     "-I",str(ROOT/"include"),"-I",str(ROOT.parent/"baji_graphics/include"),
-                    str(ROOT/"baji_pet.c"),str(ROOT/"baji_pet_asset.c"),str(ROOT/"baji_pet_motion.c"),str(source),"-o",str(binary)],check=True)
+                    str(ROOT/"baji_pet.c"),str(ROOT/"baji_pet_asset.c"),str(ROOT/"baji_pet_motion.c"),str(embedded),str(source),"-o",str(binary)],check=True)
     lib=c.CDLL(str(binary))
     lib.set_callbacks.argtypes=[inflate_fn,checksum_fn]
     lib.set_callbacks(inflate,crc)
@@ -91,6 +109,8 @@ def run(build):
         check_pixels(lib, payload)
     motion=(ROOT/"assets/motion.bpz").read_bytes()
     check_pixels(lib,motion,True)
+    check_reactions(lib,motion)
+    check_product_boot(lib,motion)
     # Truncated mask runs must be rejected before a touch can read them.
     raw=bytearray(zlib.decompress(motion[16:]))
     quads,changes,eyes,rects,keys=struct.unpack_from("<5I",raw)
@@ -106,6 +126,88 @@ def run(build):
     if os.name=="nt":
         import _ctypes
         _ctypes.FreeLibrary(lib._handle)
+
+
+def check_product_boot(lib,motion):
+    blob=(ROOT/"assets/reactions.bpr").read_bytes()
+    core=(c.c_ubyte*len(motion)).in_dll(lib,"_binary_motion_bpz_start")
+    extra=(c.c_ubyte*len(blob)).in_dll(lib,"_binary_reactions_bpr_start")
+    warnings=c.c_uint.in_dll(lib,"warnings_host")
+    info=c.c_uint.in_dll(lib,"info_host")
+    assert c.addressof(extra)%4==0
+    c.memmove(core,motion,len(motion))
+    c.memmove(extra,blob,len(blob))
+    lib.baji_pet_open.argtypes=[c.POINTER(ptr)]
+    art=ptr()
+    cheek=struct.unpack_from("<2h",blob,16+8)
+    assert lib.baji_pet_open(c.byref(art))==0 and warnings.value==0 and info.value==1
+    assert lib.baji_pet_cheek(art,State(0,0),*cheek)==-1
+    lib.baji_pet_close(art)
+    extra[-1]^=1
+    assert lib.baji_pet_open(c.byref(art))==0 and art.value and warnings.value==1
+    screen=c.create_string_buffer(SIDE*SIDE*2)
+    golden=struct.unpack("<3930I",(HERE/"motion.crc").read_bytes())
+    assert not lib.baji_pet_cheek(art,State(0,0),*cheek)
+    assert lib.baji_pet_forehead(art,State(0,0),220,185)
+    for state,sample in [(State(0,0),0),(State(1,8),172+8*3)]:
+        lib.baji_pet_select(art,state)
+        lib.baji_pet_paint(c.byref(Rect(0,0,SIDE,SIDE)),screen,art)
+        assert zlib.crc32(screen)==golden[sample*15+7]
+    lib.baji_pet_close(art)
+    assert warnings.value==1 and info.value==1
+    core[12]^=1
+    assert lib.baji_pet_open(c.byref(art))!=0 and not art.value and warnings.value==1
+    print("Product boot: full art, optional CRC fault with idle/pat pixels, and mandatory CRC fault passed.")
+
+
+def check_reactions(lib,motion):
+    art=ptr()
+    assert lib.baji_pet_open_data(c.byref(art),motion,len(motion))==0
+    lib.baji_pet_attach_reactions.argtypes=[ptr,ptr,c.c_size_t]
+    lib.baji_pet_cheek.argtypes=[ptr,State,c.c_uint16,c.c_uint16]
+    assert lib.baji_pet_cheek(art,State(0,0),190,255)==0
+    blob=(ROOT/"assets/reactions.bpr").read_bytes()
+    for bad in [blob[:-4], blob[:-1]+bytes([blob[-1]^1])]:
+        assert lib.baji_pet_attach_reactions(art,bad,len(bad))!=0
+    assert lib.baji_pet_attach_reactions(art,blob,len(blob))==0
+    golden=struct.unpack("<222I",(HERE/"reactions.crc").read_bytes())
+    base=struct.unpack("<3930I",(HERE/"motion.crc").read_bytes())
+    cases=[(0,43,4),(1,30,3),(2,22,3),(3,22,3),(4,30,3)]
+    seq=[]
+    for clip,count,steps in cases:
+        for k in range(count*steps):
+            seq.append((State(clip,k//steps,0,0,k%steps),len(seq)))
+    screen=c.create_string_buffer(SIDE*SIDE*2)
+    band=c.create_string_buffer(SIDE*SIDE*2)
+    rects=(Rect*16)()
+    full=Rect(0,0,SIDE,SIDE)
+    prev=None
+    rng=random.Random(842)
+    # Verify physical hit regions for every interpolated pose, including
+    # the nose exclusion and forehead while either cheek deforms.
+    for state,i in seq:
+        face=struct.unpack_from("<12h",blob,16+i*24)
+        for side,x,y in [(-1,*face[4:6]), (1,*face[6:8]),(0,*face[2:4]),(0,0,0)]:
+            assert lib.baji_pet_cheek(art,state,x,y)==side,(state.clip,i,x,y,side)
+        assert lib.baji_pet_forehead(art,state,*face[:2])
+    for state,i in [seq[0],*seq[262:],seq[170],*rng.choices(seq,k=180),seq[262],seq[481],seq[172]]:
+        target=base[i*15+7] if i<262 else golden[i-262]
+        cap=rng.choice([1,4,16])
+        n=lib.baji_pet_damage(art,c.byref(prev) if prev is not None else None,c.byref(state),rects,cap)
+        assert n<=cap
+        lib.baji_pet_select(art,state)
+        for r in rects[:n]:
+            assert not (r.x|r.y|r.width|r.height)&1 and r.x+r.width<=SIDE and r.y+r.height<=SIDE
+            lib.baji_pet_paint(c.byref(r),band,art)
+            for row in range(r.height):
+                c.memmove(c.addressof(screen)+2*((r.y+row)*SIDE+r.x),
+                          c.addressof(band)+row*r.width*2,r.width*2)
+        assert zlib.crc32(screen)==target,(i,"damage")
+        lib.baji_pet_paint(c.byref(full),band,art)
+        assert zlib.crc32(band)==target,(i,"full")
+        prev=state
+    lib.baji_pet_close(art)
+    print("BPR1 222 browser RGB565 samples, 484 pose hit maps and 180 random clip interruptions passed.")
 
 
 def check_pixels(lib, asset, motion=False):

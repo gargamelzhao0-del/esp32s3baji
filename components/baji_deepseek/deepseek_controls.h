@@ -2,6 +2,7 @@
 #include "deepseek_review.h"
 #include "baji_deepseek_hd.h"
 #include "baji_input.h"
+#include "deepseek_pillow.h"
 
 typedef struct {
     dsk_model_t pixel;
@@ -11,6 +12,10 @@ typedef struct {
     int8_t start_pan_x, start_pan_y;
     int64_t press_time, breath_origin, freeze_time, local_until;
     uint8_t breath_mix, visible_item;
+    bool pillow_held, agent_footer;
+    int8_t pillow_dx, pillow_dy, release_depth;
+    int64_t pillow_release;
+    dsk_pillow_t pillow;
     uint32_t breath_edges[129];
 } dsk_controls_t;
 

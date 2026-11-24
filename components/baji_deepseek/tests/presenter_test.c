@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static bool fail_dma, fail_decode, last_full;
 static unsigned transfers, opened_hd, closed_hd, hd_item;
@@ -25,6 +26,7 @@ static int64_t now;
 static baji_input_t input;
 static deepseek_app_t *app;
 static bool started_without_partition;
+static uint8_t *capture;
 
 int64_t esp_timer_get_time(void) { return now; }
 const void *dsh_builtin(size_t *size) { *size = 1; return "x"; }
@@ -33,13 +35,23 @@ void dsh_partition_motion_close(dsh_motion_t *out) { assert(!out->count); }
 esp_err_t baji_runtime_run(baji_board_t *board, const baji_board_info_t *info,
                            const baji_runtime_config_t *cfg, baji_frame_fn cb, void *ctx)
 {
-    assert(board && info && cfg && cb);
-    baji_input_t sample = {0};
+    assert(board && info && cfg && cfg->watch_power && cb);
+    baji_input_t sample = {.power = {BAJI_POWER_UNKNOWN,-1}};
     int64_t deadline;
     assert(cb(ctx, &sample, now, &deadline) == ESP_OK && !deepseek_app_is_hd(ctx));
-    sample = (baji_input_t){.presses=1, .press_x=220, .press_y=220, .touch={true,220,220}};
+    unsigned previous = transfers;
+    sample.power = (baji_power_reading_t){BAJI_POWER_USB_ONLY,-1};
+    assert(cb(ctx, &sample, now, &deadline) == ESP_OK && transfers == previous + 1 && !last_full);
+    assert(cb(ctx, &sample, now, &deadline) == ESP_OK && transfers == previous + 1);
+    sample.presses = 1;
+    sample.press_x = sample.press_y = 220;
+    sample.touch = (baji_touch_sample_t){true,220,220};
     assert(cb(ctx, &sample, now, &deadline) == ESP_OK);
     assert(cb(ctx, &sample, now + 650000, &deadline) == ESP_OK && deepseek_app_is_hd(ctx));
+    previous = transfers;
+    sample.power = (baji_power_reading_t){BAJI_POWER_CHARGING,42};
+    assert(cb(ctx, &sample, now + 650000, &deadline) == ESP_OK && transfers == previous + 1 && !last_full);
+    assert(cb(ctx, &sample, now + 650000, &deadline) == ESP_OK && transfers == previous + 1);
     started_without_partition = true;
     return ESP_OK;
 }
@@ -96,6 +108,20 @@ esp_err_t baji_board_paint_round_regions(baji_board_t *board, const baji_rect_t 
     assert(board && count && ctx);
     last_full = count == 1 && regions[0].width == DSK_SIDE && regions[0].height == DSK_SIDE;
     transfers++;
+    if (capture) {
+        static uint8_t contiguous[DSK_SIDE*DSK_SIDE*2];
+        uint8_t line[DSK_SIDE*2];
+        for (size_t i = 0; i < count; i++) {
+            baji_rect_t row = regions[i];
+            paint(&row, contiguous, ctx);
+            row.height = 1;
+            for (unsigned j = 0; j < regions[i].height; j++, row.y++) {
+                paint(&row, line, ctx);
+                assert(!memcmp(contiguous+2*j*row.width, line, 2*row.width));
+                memcpy(capture + 2*(DSK_SIDE*row.y + row.x), line, 2*row.width);
+            }
+        }
+    }
     uint8_t pixel[2];
     baji_rect_t dot = {regions[0].x, regions[0].y, 1, 1};
     paint(&dot, pixel, ctx); /* Hardware may already have consumed part of a failed batch. */
@@ -125,6 +151,62 @@ static void tap(unsigned x, unsigned y, bool ok)
     assert((tick(1000) == ESP_OK) == ok);
 }
 
+static void nap_pixels(const baji_board_info_t *info, const void *pack, size_t length, bool close)
+{
+    static uint8_t screens[2][DSK_SIDE*DSK_SIDE*2];
+    deepseek_app_t *pair[2];
+    baji_input_t events[2] = {0};
+    int64_t t = 0, due;
+    memset(screens, 0, sizeof(screens));
+    unsigned steps = 0;
+    for (int i = 0; i < 2; i++) {
+        capture = screens[i];
+        assert(deepseek_app_open(&pair[i], (baji_board_t *)&token, info, pack, length, NULL, 0, 0) == ESP_OK);
+        assert(deepseek_app_tick(pair[i], &events[i], 0, &due) == ESP_OK);
+        /* Normal tap navigation from feed to nap, plus the user-facing close-up swipe. */
+        events[i] = (baji_input_t){.press_x=230,.press_y=220,.touch={false,230,220}};
+        for (int j = 0; j < 4; j++) {
+            events[i].presses++;
+            assert(deepseek_app_tick(pair[i], &events[i], 0, &due) == ESP_OK);
+        }
+        if (close) {
+            events[i].presses++;
+            events[i].touch.y = 129;
+            assert(deepseek_app_tick(pair[i], &events[i], 0, &due) == ESP_OK);
+        }
+    }
+    assert(!memcmp(screens[0], screens[1], sizeof(screens[0])));
+    events[1].presses++;
+    events[1].press_x = events[1].touch.x = close ? 156 : 176;
+    events[1].press_y = events[1].touch.y = close ? 367 : 299;
+    events[1].touch.pressed = true;
+    /* One native nap cycle at all eight in-between samples per key, then the rebound. */
+    for (int frame = 0; frame <= 71; frame++) {
+        if (frame == 65) events[1].touch.pressed = false;
+        for (int i = 0; i < 2; i++) {
+            capture = screens[i];
+            assert(deepseek_app_tick(pair[i], &events[i], t, &due) == ESP_OK);
+        }
+        unsigned changed = 0;
+        for (int y = 0; y < DSK_SIDE; y++) {
+            for (int x = 0; x < DSK_SIDE; x++) {
+                int p = 2*(y*DSK_SIDE+x);
+                if (screens[0][p] == screens[1][p] && screens[0][p+1] == screens[1][p+1]) continue;
+                assert(close ? (x >= 135 && x <= 177 && y >= 350 && y < 385)
+                             : (x >= 155 && x <= 197 && y >= 284 && y <= 314));
+                changed++;
+            }
+        }
+        if (frame < 65) { assert(changed > 10); steps++; }
+        if (frame == 71) assert(changed == 0);
+        t += 31250;
+    }
+    assert(steps == 65);
+    for (int i = 0; i < 2; i++) deepseek_app_close(pair[i]);
+    capture = NULL;
+    transfers = 0;
+}
+
 int main(int argc, char **argv)
 {
     assert(argc == 2);
@@ -136,6 +218,8 @@ int main(int argc, char **argv)
     assert(pack && fread(pack, 1, length, in) == (size_t)length);
     fclose(in);
     baji_board_info_t info = {.width = DSK_SIDE, .height = DSK_SIDE};
+    nap_pixels(&info, pack, length, false);
+    nap_pixels(&info, pack, length, true);
     assert(deepseek_app_open(&app, (baji_board_t *)&token, &info, pack, length, "x", 1, 0) == ESP_OK);
     assert(tick(0) == ESP_OK && transfers == 1 && last_full);
     fail_dma = true;

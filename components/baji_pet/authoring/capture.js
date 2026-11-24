@@ -1,6 +1,6 @@
 /* Runs inside the existing web renderer. The host calls capturePose once per
  * pose, keeping each transaction and the browser canvas memory bounded. */
-async function setupPetCapture(motion = false) {
+async function setupPetCapture(motion = false, actions = ["idle", "pat"]) {
   const lcd = new PixelBadge(document.createElement("canvas"));
   lcd.resize(400);
   const output = document.createElement("canvas");
@@ -8,7 +8,7 @@ async function setupPetCapture(motion = false) {
   const ctx = output.getContext("2d");
   ctx.imageSmoothingEnabled = false;
   const images = {};
-  for (const clip of ["idle", "pat"]) {
+  for (const clip of actions) {
     const image = new Image();
     image.src = "/assets/" + clip + ".png";
     await image.decode();
@@ -65,7 +65,7 @@ async function setupPetCapture(motion = false) {
     }
     return (~value)>>>0;
   }
-  window.capturePose = ([action, frame, phase = 0, steps = 1]) => {
+  window.capturePose = ([action, frame, phase = 0, steps = 1, reaction = false]) => {
     const original = PIXEL_CLIPS[action];
     let clip = original;
     if (motion) {
@@ -76,6 +76,26 @@ async function setupPetCapture(motion = false) {
     }
     const [fx, fy, nx, ny] = clip.anchors[frame];
     const size = Math.hypot(nx-fx, ny-fy) / 132;
+    if (reaction) {
+      lcd.shift = lcd.computeShift("close",action,0,false);
+      const landmarks = [];
+      for (const [x, y] of [[fx,fy], [nx,ny], [nx-(ny-fy)*.52,ny+(nx-fx)*.52],
+                              [nx+(ny-fy)*.52,ny-(nx-fx)*.52]]) {
+        const point = lcd.facePoint("close",clip,frame,x,y);
+        landmarks.push(Math.round(point.sx*scale), Math.round(point.sy*scale));
+      }
+      landmarks.push(...[91/0.75,75/0.75,39,32].map(r=>Math.round(r*size*scale/2.75)));
+      if (reaction === "landmarks") return landmarks;
+      current = {sheet:images[action],hands:null,clip,frame,view:"close",grid:true,
+        agentState:"idle",action,code:action==="tickle"?"GIGGLE":"BLUSH",
+        telemetry:{mode:"OFF",quota:missing,context:missing},tick:0,motion:true,skyMode:"dusk",
+        helpers:0,gazeX:0,gazeY:0,sparks:[],contact:null,starToy:null};
+      lcd.draw(current);
+      ctx.fillStyle="black";
+      ctx.fillRect(0,0,466,466);
+      ctx.drawImage(lcd.canvas,0,0,466,466);
+      return {landmarks, image:output.toDataURL().split(",")[1], crc:wireChecksum()};
+    }
     const variants = [];
     for (let gy=-1; gy<=1; gy++) {
       for (let gx=-2; gx<=2; gx++) {

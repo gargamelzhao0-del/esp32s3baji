@@ -4,7 +4,7 @@
 
 本项目让圆屏角色跟随电脑上的 AI Agent 工作：**客户端决定主题，实际模型决定角色，生命周期事件决定姿态；额度、上下文与电量独立显示。**
 
-ESP32-S3 固件默认启动 DeepSeek 鲸鱼娘，首屏与检视台相同，在晴海背景中循环播放喂饭动作。可以在圆屏上切换六套动画、十二种 Agent 姿态、四个时段和两种视距。GPT 白龙娘单独构建，待机、摸头以 48 Hz 采样，并随触摸改变视线。两个角色都按圆屏实际扫描时刻选择姿势。无线固件通过 BLE 或 Wi-Fi 接收电脑发送的模型状态和额度，离线构建和 G1 板级自检另有入口。[无线配对与 Agent 接入](docs/17-wireless-agent.md) · [鲸鱼娘圆屏与操作](docs/16-deepseek-device.md) · [板级接口与上板检查](docs/06-hardware-and-environment.md)
+工程默认构建 DeepSeek 鲸鱼娘，在晴海背景中循环喂饭。圆屏可切换六套动画、十二种 Agent 姿态、四个时段和两种视距，打盹时可以轻按胸前的枕头。GPT 白龙娘单独构建，支持摸头、跟眼、左右戳脸和挠痒，动作素材以 48 Hz 采样。两份产品固件都能通过 USB、BLE 或 Wi-Fi 接收模型状态和额度，独立显示实际供电状态。离线构建和 G1 板级自检另有入口。[配对与 Agent 接入](docs/17-wireless-agent.md) · [圆屏互动手册](docs/18-device-interactions.md) · [板级接口与上板检查](docs/06-hardware-and-environment.md)
 
 ## 先看这三个入口
 

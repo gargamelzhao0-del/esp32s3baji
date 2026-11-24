@@ -7,7 +7,7 @@
 #include "freertos/task.h"
 #include <stdlib.h>
 
-enum { SCAN_US = 17000, EDGE_GUARD_US = 1500 };
+enum { SCAN_US = 17000, EDGE_GUARD_US = 1500, POWER_PERIOD_MS = 5000 };
 
 typedef struct {
     portMUX_TYPE lock;
@@ -15,19 +15,54 @@ typedef struct {
     baji_peripherals_t *io;
     StaticSemaphore_t wake_storage, done_storage;
     SemaphoreHandle_t wake, done;
-    bool stopping;
+    bool touch_enabled, watch_power, power_ready, sampled_power;
+    TaskHandle_t task;
 } input_reader_t;
+
+static void sample_power(input_reader_t *r)
+{
+    static const char *const sources[] = {
+        [BAJI_POWER_UNKNOWN] = "unknown", [BAJI_POWER_NO_BATTERY] = "no-battery",
+        [BAJI_POWER_USB_ONLY] = "usb-only", [BAJI_POWER_BATTERY] = "battery",
+        [BAJI_POWER_USB_BATTERY] = "usb-battery", [BAJI_POWER_CHARGING] = "charging",
+    };
+    baji_power_status_t status;
+    baji_power_reading_t next = {.source = BAJI_POWER_UNKNOWN, .percent = -1};
+    if (!r->power_ready) r->power_ready = baji_peripherals_power_init(r->io) == ESP_OK;
+    if (r->power_ready && baji_peripherals_read_power(r->io, &status) == ESP_OK) {
+        if (!status.battery_present) next.source = status.usb_present ? BAJI_POWER_USB_ONLY : BAJI_POWER_NO_BATTERY;
+        else {
+            next.source = status.charging ? BAJI_POWER_CHARGING :
+                          status.usb_present ? BAJI_POWER_USB_BATTERY : BAJI_POWER_BATTERY;
+            if (status.percent_valid && status.percent <= 100) next.percent = (int8_t)status.percent;
+        }
+    }
+    portENTER_CRITICAL(&r->lock);
+    bool source_changed = r->latest.power.source != next.source;
+    bool changed = source_changed || r->latest.power.percent != next.percent;
+    r->latest.power = next;
+    portEXIT_CRITICAL(&r->lock);
+    if (changed) xSemaphoreGive(r->wake);
+    if (!r->sampled_power || source_changed) {
+        ESP_LOGI("baji_runtime", "power source=%s percent=%d", sources[next.source], (int)next.percent);
+        r->sampled_power = true;
+    }
+}
 
 static void read_input(void *context)
 {
     input_reader_t *r = context;
     baji_touch_sample_t previous = {0};
-    int64_t next_log = 0;
-    for (;;) {
-        portENTER_CRITICAL(&r->lock);
-        bool stop = r->stopping;
-        portEXIT_CRITICAL(&r->lock);
-        if (stop) break;
+    int64_t next_log = 0, next_power = 0;
+    while (!ulTaskNotifyTake(pdTRUE, 0)) {
+        if (r->watch_power && esp_timer_get_time() >= next_power) {
+            sample_power(r);
+            next_power = esp_timer_get_time() + POWER_PERIOD_MS * INT64_C(1000);
+        }
+        if (!r->touch_enabled) {
+            if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(POWER_PERIOD_MS))) break;
+            continue;
+        }
         baji_touch_sample_t touch;
         esp_err_t err = baji_peripherals_next_touch(r->io, previous.pressed ? 24 : 120, &touch);
         if (err == ESP_ERR_NOT_FINISHED) continue;
@@ -56,11 +91,13 @@ static void read_input(void *context)
             r->latest.press_y = touch.y;
             r->latest.press_us = observed_us;
             r->latest.travel = 0;
+            r->latest.travel_y = 0;
         } else {
             unsigned dx = abs((int)touch.x - r->latest.press_x);
             unsigned dy = abs((int)touch.y - r->latest.press_y);
             unsigned distance = dx > dy ? dx : dy;
             if (distance > r->latest.travel) r->latest.travel = distance;
+            if (dy > r->latest.travel_y) r->latest.travel_y = dy;
         }
         r->latest.touch_us = observed_us;
         r->latest.touch = touch;
@@ -132,7 +169,11 @@ esp_err_t baji_runtime_run(baji_board_t *board, const baji_board_info_t *info,
 {
     if (!board || !info || !config || !render || config->brightness > 100) return ESP_ERR_INVALID_ARG;
     input_reader_t reader = {.lock = portMUX_INITIALIZER_UNLOCKED, .io = baji_board_peripherals(board)};
-    baji_input_t input = {0};
+    reader.touch_enabled = info->touch_status == ESP_OK;
+    reader.watch_power = config->watch_power;
+    reader.power_ready = info->power_status == ESP_OK;
+    if (reader.watch_power) reader.latest.power = (baji_power_reading_t){BAJI_POWER_UNKNOWN, -1};
+    baji_input_t input = reader.latest;
     int64_t now = esp_timer_get_time(), due = now;
     esp_err_t err = render(context, &input, now, &due);
     if (err == ESP_OK) err = baji_board_set_brightness(board, config->brightness);
@@ -140,9 +181,9 @@ esp_err_t baji_runtime_run(baji_board_t *board, const baji_board_info_t *info,
 
     reader.wake = config->changed ? config->changed : xSemaphoreCreateBinaryStatic(&reader.wake_storage);
     reader.done = xSemaphoreCreateBinaryStatic(&reader.done_storage);
-    bool reading = info->touch_status == ESP_OK &&
-                   xTaskCreate(read_input, "baji_touch", 3072, &reader, 4, NULL) == pdPASS;
-    if (info->touch_status == ESP_OK && !reading) ESP_LOGW("baji_runtime", "touch worker unavailable");
+    bool needs_reader = reader.io && (reader.touch_enabled || reader.watch_power);
+    bool reading = needs_reader && xTaskCreate(read_input, "baji_input", 3072, &reader, 4, &reader.task) == pdPASS;
+    if (needs_reader && !reading) ESP_LOGW("baji_runtime", "input worker unavailable");
     frame_clock_t clock = {.open = baji_vsync_open() == ESP_OK};
     if (!clock.open) ESP_LOGW("baji_runtime", "TE unavailable, using software pacing");
     unsigned failures = 0;
@@ -173,9 +214,7 @@ esp_err_t baji_runtime_run(baji_board_t *board, const baji_board_info_t *info,
         }
     }
     if (reading) {
-        portENTER_CRITICAL(&reader.lock);
-        reader.stopping = true;
-        portEXIT_CRITICAL(&reader.lock);
+        xTaskNotifyGive(reader.task);
         xSemaphoreTake(reader.done, portMAX_DELAY);
     }
     vSemaphoreDelete(reader.done);

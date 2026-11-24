@@ -5,6 +5,9 @@
 #include "esp_heap_caps.h"
 #include "esp_rom_crc.h"
 #include "miniz.h"
+#ifndef BAJI_PET_EXTERNAL_ASSET
+#include "esp_log.h"
+#endif
 
 static bool within(range_t range, unsigned count)
 {
@@ -128,7 +131,16 @@ esp_err_t baji_pet_open(baji_pet_t **out)
 #else
     extern const uint8_t start[] asm("_binary_motion_bpz_start");
     extern const uint8_t end[] asm("_binary_motion_bpz_end");
-    return baji_pet_open_data(out,start,(size_t)(end-start));
+    extern const uint8_t reactions[] asm("_binary_reactions_bpr_start");
+    extern const uint8_t reactions_end[] asm("_binary_reactions_bpr_end");
+    esp_err_t err=baji_pet_open_data(out,start,(size_t)(end-start));
+    if (err!=ESP_OK) return err;
+    err=baji_pet_attach_reactions(*out,reactions,(size_t)(reactions_end-reactions));
+    if (err==ESP_OK)
+        ESP_LOGI("baji_pet","reactions.bpr active: left cheek, right cheek and tickle");
+    else
+        ESP_LOGW("baji_pet","reactions.bpr rejected (%d), using idle and pat only",(int)err);
+    return ESP_OK;
 #endif
 }
 

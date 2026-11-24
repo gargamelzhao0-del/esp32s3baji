@@ -37,6 +37,7 @@ struct baji_pet {
 
 esp_err_t pet_motion_open(baji_pet_t *p,size_t length);
 void pet_motion_close(motion_art_t *m);
+const int16_t *pet_motion_landmarks(const motion_art_t *m,baji_pet_state_t s);
 const int16_t *pet_motion_head(const motion_art_t *m,baji_pet_state_t s);
 void pet_motion_select(motion_art_t *m,baji_pet_state_t s,unsigned gaze);
 size_t pet_motion_damage(const motion_art_t *m,baji_pet_state_t before,unsigned g0,

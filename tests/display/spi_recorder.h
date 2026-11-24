@@ -43,6 +43,7 @@ void vTaskDelay(int ticks);
 enum { MALLOC_CAP_INTERNAL=1, MALLOC_CAP_DMA=2, MALLOC_CAP_8BIT=4 };
 void *heap_caps_malloc(size_t bytes, unsigned caps);
 void heap_caps_free(void *address);
+size_t heap_caps_get_free_size(unsigned caps);
 esp_err_t gpio_set_level(int pin, int level);
 esp_err_t gpio_config(const gpio_config_t *config);
 esp_err_t gpio_reset_pin(int pin);

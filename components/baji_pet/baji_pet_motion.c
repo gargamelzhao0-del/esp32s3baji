@@ -1,5 +1,6 @@
 #include "baji_pet_private.h"
 #include "esp_heap_caps.h"
+#include "esp_rom_crc.h"
 #include <limits.h>
 #include <string.h>
 
@@ -10,6 +11,20 @@ typedef struct { uint16_t cell, quad; } cell_patch_t;
 typedef struct { uint16_t start; uint8_t length, first; } axis_t;
 typedef struct { uint16_t pixel[2][2]; } quad_t;
 
+enum { CHEEK_SAMPLES=22*3, TICKLE_SAMPLES=30*3, REACTIONS=2*CHEEK_SAMPLES+TICKLE_SAMPLES,
+       KEY_INTERVAL=12, CHEEK_KEYS=(CHEEK_SAMPLES+KEY_INTERVAL-1)/KEY_INTERVAL,
+       REACTION_KEYS=2*CHEEK_KEYS+(TICKLE_SAMPLES+KEY_INTERVAL-1)/KEY_INTERVAL };
+typedef struct { uint32_t first; uint16_t count, windows; uint32_t window; } reaction_pose_t;
+typedef struct {
+    const int16_t (*faces)[12];
+    const reaction_pose_t *poses;
+    const quad_t *palette;
+    const uint16_t *keys;
+    const cell_patch_t *changes;
+    const baji_rect_t *windows;
+} reactions_t;
+_Static_assert(sizeof(reaction_pose_t)==12, "BPR1 pose layout");
+
 struct motion_art {
     const int16_t (*heads)[4];
     const uint16_t *key_ids, *keys;
@@ -19,6 +34,9 @@ struct motion_art {
     const cell_patch_t *body, *eye;
     const range_t (*transitions)[2];
     const uint8_t *masks;
+    reactions_t reactions;
+    unsigned shown_reaction;
+    const quad_t *active_palette;
     quad_t *palette;
     uint16_t *neutral, *scratch, *screen, *visible;
     uint16_t physical_row[SIDE];
@@ -118,6 +136,42 @@ esp_err_t pet_motion_open(baji_pet_t *p,size_t length)
         if (!(src&1)) a->first++;
     }
     m->shown=UINT_MAX;
+    m->shown_reaction=UINT_MAX;
+    m->active_palette=m->palette;
+    return ESP_OK;
+}
+
+esp_err_t baji_pet_attach_reactions(baji_pet_t *p,const void *data,size_t size)
+{
+    if (!p || !p->motion || !data || ((uintptr_t)data&3) || size<20) return ESP_ERR_INVALID_ARG;
+    if (p->motion->reactions.faces) return ESP_ERR_INVALID_STATE;
+    const uint8_t *bytes=data;
+    uint32_t n[3], crc;
+    memcpy(n,bytes+4,sizeof(n));
+    memcpy(&crc,bytes+size-4,4);
+    unsigned quads=n[0],changes=n[1],windows=n[2];
+    uint64_t expected=20u+(SAMPLES+REACTIONS)*24u+REACTIONS*12u+(uint64_t)quads*8+
+                      REACTION_KEYS*CELL_COUNT*2u+(uint64_t)changes*4+(uint64_t)windows*8;
+    if (memcmp(bytes,"BPR1",4) || !quads || quads>65536 || expected!=size ||
+        esp_rom_crc32_le(0,bytes,size-4)!=crc) return ESP_ERR_INVALID_RESPONSE;
+    reactions_t r={.faces=(const int16_t (*)[12])(bytes+16)};
+    r.poses=(const reaction_pose_t *)(r.faces+SAMPLES+REACTIONS);
+    r.palette=(const quad_t *)(r.poses+REACTIONS);
+    r.keys=(const uint16_t *)(r.palette+quads);
+    r.changes=(const cell_patch_t *)(r.keys+REACTION_KEYS*CELL_COUNT);
+    r.windows=(const baji_rect_t *)(r.changes+changes);
+    for (unsigned i=0;i<SAMPLES+REACTIONS;i++)
+        for (unsigned j=8;j<12;j++) if (r.faces[i][j]<=0 || r.faces[i][j]>SIDE) return ESP_ERR_INVALID_RESPONSE;
+    for (unsigned i=0;i<REACTIONS;i++) {
+        reaction_pose_t pose=r.poses[i];
+        if (pose.first>changes || pose.count>changes-pose.first ||
+            pose.window>windows || pose.windows>windows-pose.window) return ESP_ERR_INVALID_RESPONSE;
+    }
+    for (unsigned i=0;i<REACTION_KEYS*CELL_COUNT;i++) if (r.keys[i]>=quads) return ESP_ERR_INVALID_RESPONSE;
+    for (unsigned i=0;i<changes;i++)
+        if (r.changes[i].cell>=CELL_COUNT || r.changes[i].quad>=quads) return ESP_ERR_INVALID_RESPONSE;
+    for (unsigned i=0;i<windows;i++) if (!checked_rect(r.windows[i])) return ESP_ERR_INVALID_RESPONSE;
+    p->motion->reactions=r;
     return ESP_OK;
 }
 
@@ -136,6 +190,20 @@ static unsigned sample(baji_pet_state_t s)
 {
     return s.clip==BAJI_PET_PAT ? IDLE_SAMPLES+s.frame%PAT_FRAMES*3+s.phase%3 :
                                   s.frame%IDLE_FRAMES*4+s.phase%4;
+}
+
+static unsigned reaction_sample(const motion_art_t *m,baji_pet_state_t s)
+{
+    if (!m->reactions.faces || s.clip<BAJI_PET_CHEEK_LEFT || s.clip>BAJI_PET_TICKLE) return UINT_MAX;
+    return (s.clip-BAJI_PET_CHEEK_LEFT)*CHEEK_SAMPLES+
+           s.frame%baji_pet_frame_count(s.clip)*3+s.phase%3;
+}
+
+const int16_t *pet_motion_landmarks(const motion_art_t *m,baji_pet_state_t s)
+{
+    if (!m->reactions.faces) return NULL;
+    unsigned id=reaction_sample(m,s);
+    return m->reactions.faces[id==UINT_MAX ? sample(s) : SAMPLES+id];
 }
 
 const int16_t *pet_motion_head(const motion_art_t *m,baji_pet_state_t s)
@@ -164,7 +232,7 @@ static void expand_row(motion_art_t *m,unsigned y)
             unsigned col=group*32+(unsigned)__builtin_ctz(bits);
             bits&=bits-1;
             axis_t x=m->axis[col];
-            const quad_t *q=m->palette+visible[col];
+            const quad_t *q=m->active_palette+visible[col];
             uint16_t *line=base+x.start;
             for (unsigned dy=0;dy<dest_y.length;dy++,line+=SIDE) {
                 const uint16_t *v=q->pixel[dy>=dest_y.first];
@@ -209,8 +277,46 @@ static void enter_clip(motion_art_t *m,unsigned next)
     }
 }
 
+static unsigned reaction_start(unsigned id)
+{
+    return id>=2*CHEEK_SAMPLES ? 2*CHEEK_SAMPLES : id>=CHEEK_SAMPLES ? CHEEK_SAMPLES : 0;
+}
+
+static void select_reaction(motion_art_t *m,unsigned id)
+{
+    if (id==m->shown_reaction) return;
+    const reactions_t *r=&m->reactions;
+    unsigned start=reaction_start(id), from=m->shown_reaction;
+    bool same_clip=from!=UINT_MAX && reaction_start(from)==start;
+    if (!same_clip || id<from || id-from>KEY_INTERVAL) {
+        unsigned distance=id-start;
+        unsigned key=(start/CHEEK_SAMPLES)*CHEEK_KEYS+distance/KEY_INTERVAL;
+        from=id-distance%KEY_INTERVAL;
+        memcpy(m->scratch,r->keys+key*CELL_COUNT,CELL_COUNT*2);
+        for (unsigned i=from+1;i<=id;i++) {
+            reaction_pose_t pose=r->poses[i];
+            apply(m,r->changes,(range_t){pose.first,pose.count,0},m->scratch,false);
+        }
+        for (unsigned i=0;i<CELL_COUNT;i++)
+            if (m->shown_reaction==UINT_MAX || m->visible[i]!=m->scratch[i])
+                stage_cell(m,i,m->scratch[i]);
+    } else {
+        for (unsigned i=from+1;i<=id;i++) {
+            reaction_pose_t pose=r->poses[i];
+            apply(m,r->changes,(range_t){pose.first,pose.count,0},NULL,true);
+        }
+    }
+    m->shown=UINT_MAX;
+    m->shown_reaction=id;
+    m->active_palette=r->palette;
+}
+
 void pet_motion_select(motion_art_t *m,baji_pet_state_t s,unsigned gaze)
 {
+    unsigned reaction=reaction_sample(m,s);
+    if (reaction!=UINT_MAX) { select_reaction(m,reaction); return; }
+    m->shown_reaction=UINT_MAX;
+    m->active_palette=m->palette;
     unsigned next=sample(s);
     if (next==m->shown && gaze==m->gaze) return;
     if (m->shown!=UINT_MAX) {
@@ -252,6 +358,21 @@ void pet_motion_select(motion_art_t *m,baji_pet_state_t s,unsigned gaze)
 size_t pet_motion_damage(const motion_art_t *m,baji_pet_state_t before,unsigned g0,
                          baji_pet_state_t after,unsigned g1,baji_rect_t *areas,size_t capacity)
 {
+    unsigned a=reaction_sample(m,before), b=reaction_sample(m,after);
+    if (a!=UINT_MAX || b!=UINT_MAX) {
+        if (a==b) return 0;
+        if (a!=UINT_MAX && b!=UINT_MAX && b>a && b-a<=4 && reaction_start(a)==reaction_start(b)) {
+            size_t count=0;
+            for (unsigned i=a+1;i<=b;i++) {
+                reaction_pose_t pose=m->reactions.poses[i];
+                for (unsigned j=0;j<pose.windows;j++)
+                    pet_add_rect(areas,&count,capacity,m->reactions.windows[pose.window+j]);
+            }
+            return count;
+        }
+        areas[0]=(baji_rect_t){0,0,SIDE,SIDE};
+        return 1;
+    }
     unsigned old=sample(before),next=sample(after);
     size_t count=0;
     if (old==next && g0==g1) return 0;

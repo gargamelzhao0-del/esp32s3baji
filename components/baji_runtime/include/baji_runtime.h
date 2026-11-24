@@ -23,6 +23,7 @@ typedef struct {
      * A producer publishes its latest state under its own lock, then gives
      * the semaphore. Keep it alive until run returns. Repeated wakes coalesce. */
     SemaphoreHandle_t changed;
+    bool watch_power; /* Publish PMIC changes through the same input snapshot. */
 } baji_runtime_config_t;
 
 /* The first frame completes before the panel lights. Later failed frames are

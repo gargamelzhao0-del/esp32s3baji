@@ -1,4 +1,5 @@
 #include "baji_agent_ui.h"
+#include "baji_power_indicator.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -284,4 +285,82 @@ void baji_agent_ui_paint(const baji_agent_ui_t *ui, const baji_rect_t *band, uin
     if (!baji_agent_ui_visible(ui)) return;
     copy_panel(band, pixels, &header, ui->top);
     copy_panel(band, pixels, &footer, ui->bottom);
+}
+
+/* Centred in the round screen's top margin, above the agent/model header. */
+static const baji_rect_t power_rect = {192, 8, 84, 24};
+
+void baji_power_indicator_update(baji_power_indicator_t *p, baji_power_reading_t reading, baji_damage_t *damage)
+{
+    if (reading.source == p->reading.source && reading.percent == p->reading.percent) return;
+    p->reading = reading;
+    if (damage) baji_damage_add(damage, power_rect);
+    if (reading.source == BAJI_POWER_HIDDEN) return;
+    memset(p->rows, 0, sizeof(p->rows));
+    char percent[8];
+    const char *label = "--";
+    static const uint8_t plug[] = {20,20,62,62,28,8,8};
+    static const uint8_t bolt[] = {48,24,12,62,24,12,6};
+    const uint8_t *symbol = NULL;
+    p->accent = AQUA;
+    switch (reading.source) {
+    case BAJI_POWER_UNKNOWN: label = "?"; p->accent = MUTED; break;
+    case BAJI_POWER_NO_BATTERY: label = "NONE"; p->accent = MUTED; break;
+    case BAJI_POWER_USB_ONLY: label = "USB"; symbol = plug; break;
+    case BAJI_POWER_USB_BATTERY: symbol = plug; break;
+    case BAJI_POWER_CHARGING: symbol = bolt; p->accent = GOLD; break;
+    default: break;
+    }
+    bool battery = reading.source == BAJI_POWER_BATTERY || reading.source == BAJI_POWER_USB_BATTERY ||
+                   reading.source == BAJI_POWER_CHARGING;
+    if (battery && reading.percent >= 0 && reading.percent <= 100) {
+        snprintf(percent, sizeof(percent), "%d%%", (int)reading.percent);
+        label = percent;
+        if (reading.source == BAJI_POWER_BATTERY && reading.percent <= 15) p->accent = ROSE;
+    }
+    if (symbol) {
+        for (unsigned y = 0; y < 7; ++y) p->rows[y + 2] = (uint64_t)symbol[y] << 4;
+    } else {
+        /* Ten outline columns, with eight interior columns of charge. */
+        unsigned fill = 0;
+        if (battery && reading.percent > 0 && reading.percent <= 100) {
+            fill = (unsigned)reading.percent * 8 / 100;
+            if (!fill) fill = 1;
+        }
+        for (unsigned y = 3; y < 9; ++y) {
+            unsigned body = y == 3 || y == 8 ? 0x3ff : (0x201 | (((1u << fill) - 1) << 1));
+            if (y == 5 || y == 6) body |= 0x400;
+            p->rows[y] = body << 2;
+        }
+    }
+    unsigned x = 15 + (4 - strlen(label)) * 3;
+    for (; *label; ++label, x += 6) {
+        int glyph = glyph_index((unsigned char)*label);
+        for (unsigned y = 0; y < 12; ++y) p->rows[y] |= (uint64_t)font[glyph].rows[y] << x;
+    }
+}
+
+void baji_power_indicator_paint(const baji_power_indicator_t *p, const baji_rect_t *band, uint8_t *pixels)
+{
+    if (p->reading.source == BAJI_POWER_HIDDEN) return;
+    int left = band->x > power_rect.x ? band->x : power_rect.x;
+    int right = band->x + band->width, bottom = band->y + band->height;
+    if (right > power_rect.x + power_rect.width) right = power_rect.x + power_rect.width;
+    if (bottom > power_rect.y + power_rect.height) bottom = power_rect.y + power_rect.height;
+    if (left >= right) return;
+    for (int y = band->y > power_rect.y ? band->y : power_rect.y; y < bottom; ++y) {
+        int row = y - power_rect.y, pad = inset(row, power_rect.height);
+        int start = power_rect.x + pad, end = power_rect.x + power_rect.width - pad;
+        int x = left > start ? left : start;
+        if (x >= right || x >= end) continue;
+        uint8_t *out = pixels + 2 * ((y - band->y) * band->width + x - band->x);
+        uint64_t bits = p->rows[row / 2] >> ((x - power_rect.x) / 2);
+        for (; x < right && x < end; ++x) {
+            bool edge = row < 2 || row >= power_rect.height - 2 || x < start + 2 || x >= end - 2;
+            uint16_t color = (bits & 1) ? (x < power_rect.x + 30 ? p->accent : PAPER) : edge ? EDGE : INK;
+            *out++ = (uint8_t)(color >> 8);
+            *out++ = (uint8_t)color;
+            if ((x - power_rect.x) & 1) bits >>= 1;
+        }
+    }
 }

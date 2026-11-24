@@ -27,12 +27,14 @@ python tools/agent_sync.py pair --port COM21 --show-ap
 
 | 链路 | 操作 |
 | --- | --- |
+| USB 数据线 | 保持配对所用数据线连接，关闭串口监视器，发送时指定 `--usb COM21`。固件共用同一份签名校验、快照序号、租约和显示状态。 |
 | 设备 Wi-Fi 热点 | 在电脑系统设置中连接配对命令显示的 `BAJI-xxxxxx` 和口令。默认地址为 `http://192.168.4.1`。 |
 | 同一路由器 | 通过 USB 执行 `python tools/agent_sync.py network --port COM21 --ssid "你的 2.4 GHz 网络"`，按提示输入密码，重启吧唧。使用串口启动日志中 `Agent endpoint at` 打印的地址。回到设备热点可执行 `python tools/agent_sync.py network --port COM21 --ap` 后重启。 |
 | 蓝牙 BLE | 通过下方扫描命令查找 `BAJI-S3`，把扫描结果中的地址或设备 UUID 传给 `--ble`。多台设备同名时，使用目标设备的地址及其配对配置。 |
 
 ```powershell
 python tools/agent_sync.py scan --seconds 5
+python tools/agent_sync.py send --usb COM21 --input host/examples/agent-state.jsonl --interval 1.5
 python tools/agent_sync.py send --wifi http://192.168.4.1 --input host/examples/agent-state.jsonl --interval 1.5
 # 将地址换成实际扫描结果
 python tools/agent_sync.py send --ble AA:BB:CC:DD:EE:FF --input host/examples/agent-state.jsonl --interval 1.5
@@ -75,9 +77,9 @@ Codex 事件若省略模型名，可在 `send` 增加 `--model` 并填入该次�
 | `baji_pet_app`、`baji_deepseek` | 各自定义状态到角色表演的映射，由原来的显示任务处理触摸、面板时序、合成和 DMA 提交。 |
 | `baji_connectivity`、`main` | 管理组件生命周期、USB 配对、NVS 和降级。板卡先申请显示 DMA 缓冲。无线构建把显示主任务固定在 CPU1，Wi-Fi 驱动、NimBLE 主机和 HTTP 收包在 CPU0 运行。 |
 
-Wi-Fi 提供 `GET /v1/hello` 与 `POST /v1/state`，成功提交返回 HTTP 204。BLE 服务为 `95a10000-79bb-4bc9-97b7-b1468fc445a7`，第一段为 `95a10001` 的特征用于读取握手值，`95a10002` 用于带响应写入。默认 ATT MTU 下每次写入 2 字节分片头和至多 18 字节数据。最后一片通过整帧验证后才确认。
+Wi-Fi 提供 `GET /v1/hello` 与 `POST /v1/state`，成功提交返回 HTTP 204。BLE 服务为 `95a10000-79bb-4bc9-97b7-b1468fc445a7`，第一段为 `95a10001` 的特征用于读取握手值，`95a10002` 用于带响应写入。主机按协商出的 ATT MTU 分片，预留 3 字节 ATT 开销和 2 字节分片头。最小 MTU 或无法取得 MTU 时，每片承载 18 字节数据。最后一片通过整帧验证后才确认。
 
-两种链路共享同一会话绑定。每个 BAS1 快照含设备的 16 字节挑战值、8 字节发送流标识、递增序号、状态和 HMAC-SHA256。超时换发挑战值，避免旧快照在重连后重新生效。同一时刻只有一个活跃发送流，从另一个进程接管需等待旧流超时。HMAC 验证来源与完整性。Wi-Fi HTTP 和普通 GATT 承载的显示字段本身没有端到端加密，配对密钥通过物理 USB 取回。
+三种链路共享同一会话绑定。每个 BAS1 快照含设备的 16 字节挑战值、8 字节发送流标识、递增序号、状态和 HMAC-SHA256。超时换发挑战值，避免旧快照在重连后重新生效。同一时刻只有一个活跃发送流，从另一个进程接管需等待旧流超时。HMAC 验证来源与完整性。Wi-Fi HTTP 和普通 GATT 承载的显示字段本身没有端到端加密，配对密钥通过物理 USB 取回。
 
 ## 验证入口
 

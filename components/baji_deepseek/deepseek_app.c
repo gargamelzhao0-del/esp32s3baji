@@ -1,6 +1,7 @@
 #include "baji_deepseek_app.h"
 #include "baji_runtime.h"
 #include "baji_agent_ui.h"
+#include "baji_power_indicator.h"
 #include "baji_scene_damage.h"
 #include "deepseek_controls.h"
 #include "esp_timer.h"
@@ -23,6 +24,7 @@ struct deepseek_app {
     baji_damage_t pending;
     baji_board_t *board;
     baji_agent_ui_t *agent;
+    baji_power_indicator_t power;
 };
 
 static void mark(void *context, baji_rect_t area)
@@ -108,12 +110,15 @@ static int projected_item(baji_agent_cue_t cue)
     }
 }
 
-static void paint_connected(const baji_rect_t *band, uint8_t *pixels, void *context)
+static void paint_overlays(const baji_rect_t *band, uint8_t *pixels, void *context)
 {
     deepseek_app_t *app = context;
-    if (app->ui.hd_mode) dsh_paint(band, pixels, &app->hd_canvas);
-    else dsk_paint(band, pixels, &app->canvas);
+    baji_paint_fn base = app->ui.hd_mode ? dsh_paint : dsk_paint;
+    void *canvas = app->ui.hd_mode ? (void *)&app->hd_canvas : (void *)&app->canvas;
+    base(band, pixels, canvas);
+    dsk_pillow_paint(app->ui.pillow, band, pixels, base, canvas);
     baji_agent_ui_paint(app->agent, band, pixels);
+    baji_power_indicator_paint(&app->power, band, pixels);
 }
 
 esp_err_t deepseek_app_tick(void *context, const baji_input_t *input, int64_t now, int64_t *next)
@@ -122,16 +127,27 @@ esp_err_t deepseek_app_tick(void *context, const baji_input_t *input, int64_t no
     deepseek_app_t *app = context;
     bool gallery = app->ui.hd_mode && app->ui.hd.gallery;
     baji_agent_cue_t cue = baji_agent_ui_update(app->agent, now, gallery ? NULL : &app->pending);
+    app->ui.agent_footer = baji_agent_ui_visible(app->agent);
+    dsk_pillow_t previous = app->ui.pillow;
     *next = dsk_controls_tick(&app->ui, input, projected_item(cue), now);
+    dsk_pillow_t pillow = app->ui.pillow;
+    if (previous.depth != pillow.depth || previous.x != pillow.x || previous.y != pillow.y ||
+        previous.cloth.y != pillow.cloth.y || previous.cloth.bottom != pillow.cloth.bottom) {
+        if (previous.depth) baji_damage_add(&app->pending, dsk_pillow_bounds(previous));
+        if (pillow.depth) baji_damage_add(&app->pending, dsk_pillow_bounds(pillow));
+    }
     *next = baji_agent_ui_deadline(app->agent, now, *next);
     bool hd = app->ui.hd_mode;
-    bool overlay = baji_agent_ui_visible(app->agent) && !(hd && app->ui.hd.gallery);
+    gallery = hd && app->ui.hd.gallery;
+    baji_power_indicator_update(&app->power, input->power, gallery ? NULL : &app->pending);
+    bool overlay = !gallery && (pillow.depth || app->ui.agent_footer ||
+                                app->power.reading.source != BAJI_POWER_HIDDEN);
     esp_err_t err = hd ? prepare_hd(app) : prepare_pixel(app);
     if (err != ESP_OK || !app->pending.count) return err;
     baji_paint_fn painter = hd ? dsh_paint : dsk_paint;
     void *canvas = hd ? (void *)&app->hd_canvas : (void *)&app->canvas;
     err = baji_board_paint_round_regions(app->board, app->pending.regions, app->pending.count,
-                                         overlay ? paint_connected : painter, overlay ? app : canvas);
+                                         overlay ? paint_overlays : painter, overlay ? app : canvas);
     /* Keep damage across partial failures, then also add changes from the
      * latest selection. The next successful submission restores both. */
     if (err == ESP_OK) baji_damage_clear(&app->pending);
@@ -203,7 +219,7 @@ esp_err_t deepseek_app_run_motion(baji_board_t *board, const baji_board_info_t *
     esp_err_t err = deepseek_app_open_motion(&app, board, info, pixel, bytes, hd, hd_bytes,
                                              motion, motion_bytes, -1);
     if (err == ESP_OK) {
-        const baji_runtime_config_t config = {.brightness = 45};
+        const baji_runtime_config_t config = {.brightness = 45, .watch_power = true};
         err = baji_runtime_run(board, info, &config, deepseek_app_tick, app);
     }
     deepseek_app_close(app);
@@ -251,7 +267,9 @@ esp_err_t deepseek_app_run_connected(baji_board_t *board, const baji_board_info_
         ESP_LOGI("deepseek", "pixel + HD ready: %u breathing frames, %u bytes, default feed-rice/day/full",
                  motion.count, (unsigned)motion.length);
 #endif
-        const baji_runtime_config_t config = {.brightness = 45, .changed = feed ? feed->changed : NULL};
+        const baji_runtime_config_t config = {
+            .brightness = 45, .watch_power = true, .changed = feed ? feed->changed : NULL,
+        };
         err = baji_runtime_run(board, info, &config, deepseek_app_tick, app);
     }
     deepseek_app_close(app);

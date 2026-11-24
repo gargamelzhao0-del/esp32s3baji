@@ -3,6 +3,56 @@
 #include <stdlib.h>
 
 enum { HOLD_US = 650000, HOLD_SLOP = 16, SWIPE = 38, BREATH_HALF_US = 1400000 };
+enum { NAP_CLIP = 5, PILLOW_STEP_US = 26000 };
+static const int8_t rebound[] = {8,6,3,1,-2,-1};
+
+static dsk_cloth_t exposed_pillow(const dsk_controls_t *ui)
+{
+    if (ui->visible_item != NAP_CLIP || (ui->hd_mode && ui->hd.gallery)) return (dsk_cloth_t){0};
+    int bottom = ui->agent_footer ? 374 : 390;
+    if (ui->hd_mode) {
+        int breath = ui->hd.breath * 8 + ui->breath_mix;
+        return (dsk_cloth_t){174, 299 - (3*breath + 64)/128, 29, 26, bottom};
+    }
+    /* Centres measured at the eight nap keys of the two review crops.
+     * Interpolate only the centre; the fingers and cheek remain outside. */
+    static const int8_t offsets[2][8] = {{0,-2,-3,-2,0,2,3,2}, {0,-3,-5,-3,0,3,5,3}};
+    bool close = ui->pixel.shown.close;
+    int key = ui->pixel.shown.frame % 8;
+    const int8_t *dy = offsets[close];
+    int steps = ui->pixel.motion_steps ? ui->pixel.motion_steps : 1;
+    int offset = dy[key] + (dy[(key+1)%8]-dy[key]) * ui->pixel.subframe / steps;
+    return close ? (dsk_cloth_t){156, 369+offset, 29, 13, bottom} : (dsk_cloth_t){178, 298+offset, 32, 26, bottom};
+}
+
+static int press_depth(int64_t elapsed)
+{
+    static const uint8_t depth[] = {2,4,6,7,8};
+    if (elapsed <= 0) return depth[0];
+    if (elapsed >= 4*PILLOW_STEP_US) return 8;
+    return depth[elapsed/PILLOW_STEP_US];
+}
+
+static int64_t advance_pillow(dsk_controls_t *ui, int64_t now)
+{
+    int depth = 0;
+    int64_t next = INT64_MAX;
+    if (ui->pillow_held) {
+        depth = press_depth(now-ui->press_time);
+        if (depth < 8) next = ui->press_time + ((now-ui->press_time)/PILLOW_STEP_US+1)*PILLOW_STEP_US;
+    } else if (ui->release_depth) {
+        int64_t elapsed = now-ui->pillow_release;
+        int step = elapsed / PILLOW_STEP_US;
+        depth = rebound[step] * ui->release_depth / 8;
+        next = ui->pillow_release + (step+1)*PILLOW_STEP_US;
+    }
+    ui->pillow = (dsk_pillow_t){0};
+    if (depth) {
+        dsk_cloth_t c = exposed_pillow(ui);
+        ui->pillow = (dsk_pillow_t){c, c.x+ui->pillow_dx, c.y+ui->pillow_dy, depth};
+    }
+    return next;
+}
 
 void dsk_controls_init(dsk_controls_t *ui, unsigned steps, bool hd_available, int64_t now)
 {
@@ -81,8 +131,14 @@ int64_t dsk_controls_tick(dsk_controls_t *ui, const baji_input_t *input, unsigne
 {
     dsk_gesture_t *g = &ui->touch;
     bool down = input->touch.pressed;
-    dsk_advance(&ui->pixel, now);
     if (g->presses != input->presses) {
+        dsk_cloth_t cloth = exposed_pillow(ui);
+        ui->pillow_held = dsk_pillow_contains(cloth, input->press_x, input->press_y);
+        ui->release_depth = 0;
+        if (ui->pillow_held) {
+            ui->pillow_dx = (int)input->press_x - cloth.x;
+            ui->pillow_dy = (int)input->press_y - cloth.y;
+        }
         *g = (dsk_gesture_t){.presses = input->presses, .start_x = input->press_x, .start_y = input->press_y,
                              .start_item = ui->visible_item, .active = true};
         ui->press_time = input->press_us ? input->press_us : now;
@@ -90,12 +146,21 @@ int64_t dsk_controls_tick(dsk_controls_t *ui, const baji_input_t *input, unsigne
         ui->start_pan_x = ui->hd.pan_x;
         ui->start_pan_y = ui->hd.pan_y;
     }
+    dsk_advance(&ui->pixel, now);
     if (g->active) {
         int dx = (int)input->touch.x - g->start_x, dy = (int)input->touch.y - g->start_y;
         if (input->travel >= HOLD_SLOP || abs(dx) >= HOLD_SLOP || abs(dy) >= HOLD_SLOP)
             ui->hold_cancelled = true;
         int64_t held_until = !down && input->touch_us ? input->touch_us : now;
-        if (ui->hd_available && !ui->hold_cancelled && held_until - ui->press_time >= HOLD_US) {
+        if (ui->pillow_held) {
+            if (!down || ui->hold_cancelled) {
+                ui->pillow_held = false;
+                ui->release_depth = press_depth(held_until-ui->press_time);
+                if (ui->release_depth < 4) ui->release_depth = 4;
+                ui->pillow_release = now;
+                g->active = false; /* A drag that started on the pillow cannot page on release. */
+            }
+        } else if (ui->hd_available && !ui->hold_cancelled && held_until - ui->press_time >= HOLD_US) {
             ui->hd_mode = !ui->hd_mode;
             g->active = false; /* Swallow the release of the mode-switching press. */
         } else {
@@ -115,7 +180,9 @@ int64_t dsk_controls_tick(dsk_controls_t *ui, const baji_input_t *input, unsigne
             }
         }
     }
-    bool show_agent = agent_item && now >= ui->local_until;
+    if (ui->release_depth && now-ui->pillow_release >= (int)sizeof(rebound)*PILLOW_STEP_US) ui->release_depth = 0;
+    bool pillow_active = ui->pillow_held || ui->release_depth;
+    bool show_agent = agent_item && now >= ui->local_until && !pillow_active;
     ui->visible_item = show_agent ? agent_item : ui->pixel.shown.item;
     int64_t next = INT64_MAX;
     if (!ui->hd_mode) next = show_agent ? dsk_next_bubble_update(&ui->pixel, now) : dsk_next_update(&ui->pixel, now);
@@ -128,8 +195,10 @@ int64_t dsk_controls_tick(dsk_controls_t *ui, const baji_input_t *input, unsigne
         ui->breath_mix = phase % 8;
         if (ui->breathing) next = now + delta;
     }
-    if (g->active && ui->hd_available && !ui->hold_cancelled && ui->press_time + HOLD_US < next)
+    int64_t pillow_next = advance_pillow(ui, now);
+    if (pillow_next < next) next = pillow_next;
+    if (g->active && !ui->pillow_held && ui->hd_available && !ui->hold_cancelled && ui->press_time + HOLD_US < next)
         next = ui->press_time + HOLD_US;
-    if (agent_item && !show_agent && ui->local_until < next) next = ui->local_until;
+    if (agent_item && !show_agent && ui->local_until > now && ui->local_until < next) next = ui->local_until;
     return next;
 }

@@ -1,0 +1,8 @@
+/* BPR1 uses 32-bit loads directly from memory-mapped flash. */
+.section .rodata.baji_pet_reactions,"a"
+.balign 4
+.global _binary_reactions_bpr_start
+_binary_reactions_bpr_start:
+.incbin "@reactions_asset@"
+.global _binary_reactions_bpr_end
+_binary_reactions_bpr_end:

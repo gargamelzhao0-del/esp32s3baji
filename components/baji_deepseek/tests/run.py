@@ -47,7 +47,8 @@ def main():
                       ("baji_board", "baji_peripherals", "baji_runtime", "baji_scene_damage", "baji_deepseek_hd",
                        "baji_agent_port", "baji_core", "baji_agent_ui"))]
         include_flags = ["-I" + str(path) for path in includes]
-        subprocess.run(flags + include_flags + [
+        pillow = str(COMPONENT / "deepseek_pillow.c")
+        subprocess.run(flags + include_flags + [pillow,
                        str(COMPONENT / "deepseek_controls.c"), str(HERE / "controls_test.c"),
                        "-o", str(controls)], check=True)
         subprocess.run([str(controls)], check=True)
@@ -58,7 +59,7 @@ def main():
         app_object = Path(tmp) / "app.o"
         subprocess.run(compiler + include_flags + ["-DESP_PLATFORM", "-DESP_ERR_NOT_SUPPORTED=0x106",
                        "-c", str(COMPONENT / "deepseek_app.c"), "-o", str(app_object)], check=True)
-        subprocess.run(flags + include_flags + [str(app_object), str(Path(tmp) / "scene.o"),
+        subprocess.run(flags + include_flags + [str(app_object), str(Path(tmp) / "scene.o"), pillow,
                        str(COMPONENT / "deepseek_controls.c"),
                        str(COMPONENT.parent / "baji_scene_damage/baji_scene_damage.c"),
                        str(COMPONENT.parent / "baji_agent_ui/agent_ui.c"),

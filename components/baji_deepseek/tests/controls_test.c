@@ -48,6 +48,64 @@ static void hold(bool expect)
     assert(ui.pixel.shown.item == item && ui.hd_mode == expect);
 }
 
+static void pillow_gestures(void)
+{
+    for (unsigned view = 0; view < 3; view++) {
+        unsigned x = view == 0 ? 176 : view == 1 ? 156 : 172;
+        unsigned y = view == 0 ? 299 : view == 1 ? 367 : 301;
+        agent_item = presses = 0;
+        dsk_controls_init(&ui, 1, true, now);
+        ui.hd_mode = view == 2;
+        dsk_command(&ui.pixel, DSK_SELECT_CLIP, 5);
+        dsk_command(&ui.pixel, DSK_SET_VIEW, view == 1);
+        ui.pixel.motion_steps = 8;
+        contact(false, 0, 0, 0);
+        start(x, y);
+        assert(ui.pillow_held && ui.pillow.depth == 2);
+        assert(ui.pillow.x == (int)x && ui.pillow.y == (int)y);
+        agent_item = DSK_CLIPS + 4;
+        int64_t deadline = contact(true, x, y, 750000);
+        assert(deadline > now && ui.pillow.depth == 8 && ui.visible_item == 5 && ui.hd_mode == (view == 2));
+        assert(ui.pillow.y != (int)y);
+        contact(false, x, y, 1000);
+        assert(!ui.pillow_held && ui.pillow.depth == 8);
+        contact(false, x, y, 104000);
+        assert(ui.pillow.depth < 0 && ui.visible_item == 5);
+        contact(false, x, y, 52000);
+        assert(ui.pillow.depth == 0 && ui.visible_item == agent_item);
+        start(x, y); /* Incoming Agent art has no exposed nap pillow. */
+        assert(!ui.pillow_held);
+        contact(false, x, y, 1000);
+        agent_item = 0;
+        dsk_command(&ui.pixel, DSK_SELECT_CLIP, 5);
+        contact(false, x, y, 0);
+        swipe(x, y, x+60, y);
+        assert(ui.visible_item == 5 && ui.pillow.depth && !ui.pillow_held);
+        contact(false, x+60, y, 200000);
+        /* A complete tap coalesced between TE wakes still paints the dimple. */
+        baji_input_t tap_sample = {.presses=++presses, .press_x=x, .press_y=y, .touch={false,x,y},
+                                   .press_us=now-4000, .touch_us=now-1000};
+        dsk_controls_tick(&ui, &tap_sample, 0, now);
+        assert(ui.pillow.depth == 4 && ui.visible_item == 5);
+        start(223, 303); /* Hand in the two full views, cheek in close-up. */
+        assert(!ui.pillow_held && !ui.release_depth);
+        contact(false, 223, 303, 1000);
+    }
+    agent_item = presses = 0;
+    dsk_controls_init(&ui, 1, true, now);
+    dsk_command(&ui.pixel, DSK_SELECT_CLIP, 5);
+    dsk_command(&ui.pixel, DSK_SET_VIEW, 1);
+    contact(false, 0, 0, 0);
+    ui.agent_footer = true;
+    start(156, 377);
+    assert(!ui.pillow_held);
+    contact(false, 156, 377, 1000);
+    ui.agent_footer = false;
+    start(156, 377);
+    assert(ui.pillow_held);
+    contact(false, 156, 377, 1000);
+}
+
 int main(void)
 {
     dsk_controls_init(&ui, 7, true, now);
@@ -139,6 +197,7 @@ int main(void)
     assert(contact(false, 125, 220, 1600000) == INT64_MAX && ui.visible_item == agent_item);
     tap(230, 400); /* bottom tap on a remote pose doesn't resume the hidden clip */
     assert(ui.visible_item == agent_item && !ui.pixel.playing);
-    puts("Dual-mode long press, 129 breathing positions, all linked poses, guides, four sheets and zoom/pan passed");
+    pillow_gestures();
+    puts("Dual-mode controls, galleries, nap pillow hit areas, coalesced taps, agent priority and rebound passed");
     return 0;
 }

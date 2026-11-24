@@ -12,9 +12,14 @@ typedef struct {
     void *paint_context;
     int8_t rest_gaze_x, rest_gaze_y;
     baji_pet_state_t shown;
-    bool have_frame, patting;
+    int (*cheek_at)(const baji_pet_t *, baji_pet_state_t, uint16_t, uint16_t);
+    baji_pet_clip_t action;
+    bool have_frame, cheek_held, cheek_moved;
+    uint8_t tap_count, turns;
+    int8_t direction;
+    int extreme_x;
     uint32_t last_press;
-    int64_t idle_since, pat_since;
+    int64_t idle_since, action_since, tap_times[2];
 } pet_player_t;
 
 void pet_player_init(pet_player_t *player, baji_pet_t *art,

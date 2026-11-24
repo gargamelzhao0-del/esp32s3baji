@@ -15,6 +15,7 @@ static bool usb_installed, console_uses_driver, entropy_on;
 static int closed, wifi_stops, ble_stops;
 static char wifi_name[33], usb_tx[192];
 static const char *usb_rx;
+static size_t usb_rx_size;
 static uint8_t pair_record[44], station_record[98];
 static size_t pair_len, station_len;
 static void (*usb_reader)(void *);
@@ -71,8 +72,17 @@ esp_err_t baji_agent_sync_open(baji_agent_sync_t **s,const uint8_t key[32]) {
     assert(!sync_live && !entropy_on && !memcmp(key,pair_record,32));
     sync_live = true; *s = (void*)&sync_live; return ESP_OK;
 }
+static void link_hello(void *context, uint8_t out[16]) {
+    assert(context == &sync_live && sync_live);
+    for (unsigned i=0; i<16; i++) out[i] = (uint8_t)i;
+}
+static esp_err_t link_receive(void *context, const uint8_t *data, size_t size) {
+    assert(context == &sync_live && sync_live);
+    if (size == 192 && data[0] == 0 && data[191] == 0xab) return ESP_OK;
+    return data[0] ? ESP_ERR_INVALID_CRC : ESP_ERR_INVALID_STATE;
+}
 baji_link_endpoint_t baji_agent_endpoint(baji_agent_sync_t *s) {
-    assert(sync_live && s); return (baji_link_endpoint_t){.context=s};
+    assert(sync_live && s); return (baji_link_endpoint_t){s, link_hello, link_receive};
 }
 baji_agent_feed_t baji_agent_feed(baji_agent_sync_t *s) {
     assert(sync_live && s); return (baji_agent_feed_t){.context=s};
@@ -103,7 +113,8 @@ esp_err_t baji_wifi_stop(void) {
 }
 
 esp_err_t usb_serial_jtag_driver_install(usb_serial_jtag_driver_config_t *cfg) {
-    assert(!usb_installed && cfg->rx_buffer_size > 64); usb_installed = true; return ESP_OK;
+    assert(!usb_installed && cfg->rx_buffer_size >= 10 + 16 + 1 + 2 * 192 + 2);
+    usb_installed = true; return ESP_OK;
 }
 esp_err_t usb_serial_jtag_driver_uninstall(void) {
     assert(usb_installed && !usb_irq && !console_uses_driver); usb_installed = false; return ESP_OK;
@@ -142,9 +153,9 @@ void vTaskDelete(void *task) { assert(task == &usb_thread); assert(!pthread_join
 int usb_serial_jtag_read_bytes(void *dest,uint32_t limit,unsigned wait) {
     assert(wait == 0);
     pthread_mutex_lock(&io_lock);
-    size_t n = usb_rx ? strlen(usb_rx) : 0;
+    size_t n = usb_rx_size;
     if (n > limit) n = limit;
-    if (n) { memcpy(dest,usb_rx,n); usb_rx += n; }
+    if (n) { memcpy(dest,usb_rx,n); usb_rx += n; usb_rx_size -= n; }
     pthread_mutex_unlock(&io_lock);
     return (int)n;
 }
@@ -156,7 +167,7 @@ int usb_serial_jtag_write_bytes(const void *data,size_t n,unsigned wait) {
     pthread_mutex_unlock(&io_lock);
     return (int)n;
 }
-static void setup_command(const char *command) {
+static void setup_bytes(const char *command, size_t size) {
     assert(usb_irq);
     BaseType_t woken = 0;
     usb_irq(USJ_SELECT_WRITE_NOTIF, &woken);
@@ -164,6 +175,7 @@ static void setup_command(const char *command) {
     pthread_mutex_lock(&io_lock);
     usb_tx[0] = 0;
     usb_rx = command;
+    usb_rx_size = size;
     pthread_mutex_unlock(&io_lock);
     usb_irq(USJ_SELECT_READ_NOTIF, &woken);
     assert(woken);
@@ -172,10 +184,30 @@ static void setup_command(const char *command) {
     pthread_mutex_unlock(&io_lock);
 }
 
+static void setup_command(const char *command) { setup_bytes(command, strlen(command)); }
+
 int main(void) {
     wifi_fail_start = wifi_fail_stop = true;
     assert(baji_connectivity_start() == ESP_OK && baji_connectivity_feed());
     assert(!*wifi_name && pair_len == 44);
+    const char *prefix = "BAJI_LINK 0123456789abcdef ";
+    const char recover[] = "BAJI_WIFI :\0\nBAJI_LINK 0123456789abcdef HELLO\n";
+    setup_bytes(recover, sizeof(recover)-1);
+    assert(!strcmp(usb_tx,"BAJI_LINK1 0123456789abcdef 000102030405060708090a0b0c0d0e0f\n"));
+    assert(station_len == 0);
+    char frame[440];
+    size_t head = strlen(prefix);
+    memcpy(frame,prefix,head);
+    memset(frame+head,'0',382);
+    strcpy(frame+head+382,"ab\n");
+    setup_command(frame);
+    assert(!strcmp(usb_tx,"BAJI_LINK1 0123456789abcdef OK\n"));
+    setup_command("BAJI_LINK 0123456789abcdef 00\n");
+    assert(strstr(usb_tx," BUSY\n"));
+    setup_command("BAJI_LINK 0123456789abcdef ff\n");
+    assert(strstr(usb_tx," AUTH\n"));
+    setup_command("BAJI_LINK 0123456789abcdef 0g\n");
+    assert(strstr(usb_tx," INVALID\n"));
     assert(baji_connectivity_start() == ESP_ERR_INVALID_STATE);
     setup_command("BAJI_WIFI 736369656e6365:3132333435363738\n");
     assert(baji_connectivity_stop() == ESP_FAIL);

@@ -29,6 +29,7 @@ def main():
     radio = sender.add_mutually_exclusive_group(required=True)
     radio.add_argument("--wifi",metavar="URL")
     radio.add_argument("--ble",metavar="ADDRESS")
+    radio.add_argument("--usb",metavar="PORT")
     sender.add_argument("--input",type=Path)
     sender.add_argument("--interval",type=float,default=0.,help="seconds between replay records")
     sender.add_argument("--model",help="model label for CLI events that omit it")
@@ -51,12 +52,17 @@ def main():
         configure_station(args.port,args.ssid or "",getpass.getpass("Wi-Fi passphrase: ") if args.ssid else "")
         print("Settings saved. Reboot the badge to use the new network.")
     else:
-        from baji_bridge.transports import WifiTransport, BleTransport
+        from baji_bridge.transports import WifiTransport, BleTransport, UsbTransport
         profile = json.loads(args.profile.expanduser().read_text(encoding="utf8"))
         key = bytes.fromhex(profile["key"])
         if len(key)!=32 or not 0 <= args.interval <= 60:
             raise ValueError("invalid profile key length or replay interval")
-        transport = (lambda: WifiTransport(args.wifi)) if args.wifi else (lambda: BleTransport(args.ble))
+        if args.usb:
+            transport = lambda: UsbTransport(args.usb)
+        elif args.wifi:
+            transport = lambda: WifiTransport(args.wifi)
+        else:
+            transport = lambda: BleTransport(args.ble)
         state = DeviceState(model=args.model)
         if args.input:
             with args.input.open("rb") as source:

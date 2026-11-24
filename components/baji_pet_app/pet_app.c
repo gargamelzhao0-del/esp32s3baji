@@ -1,6 +1,7 @@
 #include "pet_app.h"
 #include "pet_player.h"
 #include "baji_agent_ui.h"
+#include "baji_power_indicator.h"
 #include "baji_runtime.h"
 #include "esp_timer.h"
 
@@ -8,13 +9,15 @@ typedef struct {
     pet_player_t player;
     baji_board_t *board;
     baji_agent_ui_t *agent;
+    baji_power_indicator_t power;
 } pet_app_t;
 
-static void paint_connected(const baji_rect_t *band, uint8_t *pixels, void *context)
+static void paint_overlays(const baji_rect_t *band, uint8_t *pixels, void *context)
 {
     pet_app_t *app = context;
     baji_pet_paint(band, pixels, app->player.art);
     baji_agent_ui_paint(app->agent, band, pixels);
+    baji_power_indicator_paint(&app->power, band, pixels);
 }
 
 /* Gaze follows the task's prop; contact still takes precedence in the player. */
@@ -43,10 +46,11 @@ static esp_err_t draw(void *context, const baji_input_t *input, int64_t now, int
     if (app->agent) {
         baji_agent_cue_t cue = baji_agent_ui_update(app->agent, now, &app->player.damage);
         agent_attention(&app->player, cue, now);
-        bool visible = baji_agent_ui_visible(app->agent);
-        app->player.paint = visible ? paint_connected : baji_pet_paint;
-        app->player.paint_context = visible ? (void *)app : (void *)app->player.art;
     }
+    baji_power_indicator_update(&app->power, input->power, &app->player.damage);
+    bool visible = baji_agent_ui_visible(app->agent) || app->power.reading.source != BAJI_POWER_HIDDEN;
+    app->player.paint = visible ? paint_overlays : baji_pet_paint;
+    app->player.paint_context = visible ? (void *)app : (void *)app->player.art;
     bool submitted;
     esp_err_t err = pet_player_tick(&app->player, app->board, input, now, &submitted);
     if (err == ESP_OK) {
@@ -63,7 +67,10 @@ esp_err_t pet_app_run_loaded_connected(baji_board_t *board, const baji_board_inf
     pet_app_t app = {.board = board};
     if (feed && !(app.agent = baji_agent_ui_open(feed))) return ESP_ERR_NO_MEM;
     pet_player_init(&app.player, art, info, esp_timer_get_time());
-    const baji_runtime_config_t config = {.brightness = 45, .changed = feed ? feed->changed : NULL};
+    app.player.cheek_at = baji_pet_cheek;
+    const baji_runtime_config_t config = {
+        .brightness = 45, .watch_power = true, .changed = feed ? feed->changed : NULL,
+    };
     esp_err_t err = baji_runtime_run(board, info, &config, draw, &app);
     baji_agent_ui_close(app.agent);
     return err;

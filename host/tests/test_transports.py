@@ -108,18 +108,27 @@ class BleTests(unittest.IsolatedAsyncioTestCase):
         self.fail_seq = None
         self.write_error = RuntimeError("ATT rejected packet")
         self.disconnected = 0
+        self.options = None
+        self.mtu = None
+        self.max_write = 20
         case = self
 
         class Peer:
             is_connected = False
 
-            def __init__(self, address, services, timeout):
+            def __init__(self, address, timeout, **options):
                 case.assertEqual(address, "demo")
-                case.assertEqual(services, [SERVICE_UUID])
+                case.options = options
                 case.assertGreater(timeout, 0)
 
             async def connect(self):
                 self.is_connected = True
+
+            @property
+            def mtu_size(self):
+                if isinstance(case.mtu, Exception):
+                    raise case.mtu
+                return case.mtu
 
             async def disconnect(self):
                 self.is_connected = False
@@ -132,7 +141,7 @@ class BleTests(unittest.IsolatedAsyncioTestCase):
             async def write_gatt_char(self, uuid, fragment, *, response):
                 case.assertEqual(uuid, STATE_UUID)
                 case.assertIs(response, True)
-                case.assertLessEqual(len(fragment), 20)
+                case.assertLessEqual(len(fragment), case.max_write)
                 await asyncio.sleep(0)
                 case.writes.append(fragment)
                 if fragment[1] == case.fail_seq:
@@ -142,6 +151,13 @@ class BleTests(unittest.IsolatedAsyncioTestCase):
         bleak_module = patch.dict(sys.modules, {"bleak": fake})
         bleak_module.start()
         self.addCleanup(bleak_module.stop)
+
+    async def test_service_discovery_strategy(self):
+        for platform, options in (("win32", {"winrt": {"use_cached_services": False}}),
+                                  ("linux", {"services": [SERVICE_UUID]})):
+            with patch.object(sys, "platform", platform):
+                async with BleTransport("demo"):
+                    self.assertEqual(self.options, options)
 
     async def test_default_mtu_and_serialization(self):
         payload = bytes(range(192))
@@ -167,6 +183,29 @@ class BleTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError):
                 await transport.send(bytes(193))
         self.assertEqual(self.disconnected, 1)
+
+    async def test_negotiated_mtu_and_unavailable_backend_values(self):
+        data = bytes(range(192))
+        async with BleTransport("demo") as transport:
+            for mtu, expected in ((23,18), (64,59), (196,191), (197,192), (517,192),
+                                  (0,18), (518,18), (None,18), ("247",18),
+                                  (AttributeError("missing"),18), (OSError("unavailable"),18)):
+                self.mtu, self.max_write = mtu, expected + 2
+                self.writes.clear()
+                await transport.send(data)
+                self.assertEqual(b"".join(frame[2:] for frame in self.writes), data)
+                self.assertEqual(len(self.writes), (len(data)+expected-1)//expected)
+                for i, frame in enumerate(self.writes):
+                    flags = int(i == 0) | (int(i+1 == len(self.writes)) << 1)
+                    self.assertEqual(frame[:2], bytes((flags,i)))
+
+            self.mtu, self.max_write, self.fail_seq = 247, 194, 0
+            self.write_error = OSError("ATT error: 0x80")
+            self.writes.clear()
+            with self.assertRaises(OSError) as rejected:
+                await transport.send(data)
+            self.assertTrue(rejected.exception.pairing_rejected)
+            self.assertEqual(self.writes, [b"\x03\x00" + data])
 
     async def test_only_final_firmware_auth_error_rejects_pairing(self):
         class BleakGATTProtocolError(Exception):

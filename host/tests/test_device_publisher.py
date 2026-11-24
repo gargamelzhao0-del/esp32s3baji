@@ -24,7 +24,7 @@ sys.path.insert(0, str(ROOT / "host"))
 from baji_bridge import pairing
 from baji_bridge.device import DeviceState
 from baji_bridge.publisher import MAX_LINE, publish, stream_events
-from baji_bridge.transports import WifiResponseError
+from baji_bridge.transports import UsbTransport, WifiResponseError
 
 KEY = bytes(range(32))
 NONCE = bytes(range(16))
@@ -299,13 +299,13 @@ class PairTests(unittest.TestCase):
             self.assertEqual(json.loads(profile.read_text()),
                              {"key": KEY.hex(), "ap_ssid": "BAJI-AABBCC", "ap_password": password})
         wire.open.assert_called_once()
-        wire.write.assert_called_once_with(b"BAJI_PAIR?\n")
+        wire.write.assert_called_once_with(b"\x00\nBAJI_PAIR?\n")
         wire.__exit__.assert_called_once()
 
     def test_usb_network_bytes_ack_and_rejected_or_incomplete_write(self):
         wire = self.fake_usb([b"BAJI_WIFI_SAVED reboot\n", b"BAJI_WIFI_INVALID\n"])
         pairing.configure_station("mock-port", "测试", "12345678")
-        wire.write.assert_called_once_with(b"BAJI_WIFI " + "测试".encode().hex().encode() + b":3132333435363738\n")
+        wire.write.assert_called_once_with(b"\x00\nBAJI_WIFI " + "测试".encode().hex().encode() + b":3132333435363738\n")
         with self.assertRaisesRegex(ValueError, "did not save"):
             pairing.configure_station("mock-port", "", "")
         with self.assertRaisesRegex(ValueError, "byte length"):
@@ -314,6 +314,28 @@ class PairTests(unittest.TestCase):
         with self.assertRaisesRegex(OSError, "incomplete"):
             pairing.pair("mock-port", "unused")
         self.assertEqual(wire.__exit__.call_count, 3)
+
+    def test_usb_signed_link_correlates_replies_and_keeps_one_handle(self):
+        cookie = "0123456789abcdef"
+        header = f"BAJI_LINK1 {cookie} ".encode()
+        wire = self.fake_usb([b"BAJI_LINK1 deadbeefabcd1234 OK\n", header + NONCE.hex().encode() + b"\n",
+                              header+b"OK\n", header+b"AUTH\n", header+b"BUSY\n"])
+
+        async def session():
+            async with UsbTransport("mock-port") as link:
+                self.assertEqual(await link.hello(), NONCE)
+                await link.send(b"\x00\xff")
+                with self.assertRaises(OSError) as rejected:
+                    await link.send(b"bad-key")
+                self.assertTrue(rejected.exception.pairing_rejected)
+                with self.assertRaisesRegex(OSError, "BUSY"):
+                    await link.send(b"competing")
+
+        with patch("baji_bridge.transports.secrets.token_hex", return_value=cookie):
+            asyncio.run(session())
+        self.assertEqual(wire.write.call_args_list[1].args[0], b"\x00\nBAJI_LINK 0123456789abcdef 00ff\n")
+        wire.open.assert_called_once()
+        wire.__exit__.assert_called_once()
 
     def test_timed_out_partial_reply_preserves_prior_profile(self):
         wire = self.fake_usb([b"BAJI_PAIR1 half a reply"])
@@ -325,6 +347,71 @@ class PairTests(unittest.TestCase):
                     pairing.pair("mock-port", profile)
             self.assertEqual(profile.read_bytes(), b"old profile")
         wire.__exit__.assert_called_once()
+
+    def test_matching_usb_line_completed_after_deadline_is_expired(self):
+        self.fake_usb([b"BAJI_LINK1 abc OK\n"])
+        with patch.object(pairing.time, "monotonic", side_effect=[10,14.99,15.01]):
+            with self.assertRaisesRegex(TimeoutError, "did not reply"):
+                pairing.request("mock-port", b"example", b"BAJI_LINK1 abc ")
+
+    def test_usb_cancel_and_close_wait_for_reader_then_port_reopens(self):
+        entered, finish_read = threading.Event(), threading.Event()
+        wire = self.fake_usb([])
+        def read(*args):
+            entered.set()
+            self.assertTrue(finish_read.wait(2))
+            return b""
+        wire.read_until.side_effect = read
+
+        async def session():
+            link = UsbTransport("mock-port")
+            with self.assertRaisesRegex(OSError, "closed"):
+                await link.hello()
+            async with link:
+                with self.assertRaisesRegex(OSError, "already open"):
+                    await link.__aenter__()
+                request = asyncio.create_task(link.hello())
+                self.assertTrue(await asyncio.to_thread(entered.wait, 2))
+                request.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await request
+                close = asyncio.create_task(link.__aexit__(None, None, None))
+                await asyncio.sleep(.02)
+                self.assertFalse(close.done())
+                self.assertFalse(wire.__exit__.called)
+                finish_read.set()
+                await close
+            async with link:
+                pass
+
+        asyncio.run(session())
+        self.assertEqual((wire.open.call_count, wire.__exit__.call_count), (2, 2))
+
+    def test_concurrent_usb_requests_each_receive_their_own_split_reply(self):
+        wire = self.fake_usb([])
+        barrier, first_read = threading.Event(), threading.Event()
+        fragments = []
+        def write(frame):
+            header = b"BAJI_LINK1 " + frame[2:].split()[1] + b" "
+            fragments.extend((header + b"corrupt\xff\n", header[:17], header[17:] + b"OK\n"))
+            return len(frame)
+        def read(*args):
+            first_read.set()
+            self.assertTrue(barrier.wait(2))
+            return fragments.pop(0)
+        wire.write.side_effect, wire.read_until.side_effect = write, read
+
+        async def session():
+            async with UsbTransport("mock-port") as link:
+                first = asyncio.create_task(link.send(b"A"))
+                self.assertTrue(await asyncio.to_thread(first_read.wait, 2))
+                second = asyncio.create_task(link.send(b"B"))
+                await asyncio.sleep(.02)
+                self.assertEqual(wire.write.call_count, 1)
+                barrier.set()
+                await asyncio.gather(first, second)
+
+        asyncio.run(session())
 
 
 if __name__ == "__main__":

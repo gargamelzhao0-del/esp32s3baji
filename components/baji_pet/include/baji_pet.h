@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 typedef struct baji_pet baji_pet_t;
-typedef enum { BAJI_PET_IDLE, BAJI_PET_PAT } baji_pet_clip_t;
+typedef enum { BAJI_PET_IDLE, BAJI_PET_PAT, BAJI_PET_CHEEK_LEFT, BAJI_PET_CHEEK_RIGHT, BAJI_PET_TICKLE } baji_pet_clip_t;
 typedef struct {
     baji_pet_clip_t clip;
     uint8_t frame;
@@ -23,6 +23,10 @@ typedef struct {
  * open_data owns a decoded copy and releases all references to packed on return. */
 esp_err_t baji_pet_open(baji_pet_t **out);
 esp_err_t baji_pet_open_data(baji_pet_t **out, const void *packed, size_t size);
+/* Attach a 4-byte aligned BPR1 companion to BPH5. Retain its bytes until close. */
+esp_err_t baji_pet_attach_reactions(baji_pet_t *pet, const void *data, size_t size);
+/* Physical display coordinates. Returns -1 for the left cheek, +1 for right. */
+int baji_pet_cheek(const baji_pet_t *pet, baji_pet_state_t state, uint16_t x, uint16_t y);
 void baji_pet_close(baji_pet_t *pet);
 unsigned baji_pet_frame_count(baji_pet_clip_t clip);
 unsigned baji_pet_fps(baji_pet_clip_t clip);

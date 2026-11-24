@@ -12,7 +12,10 @@ with tempfile.TemporaryDirectory() as directory:
                    "freertos/semphr.h", "freertos/task.h"):
         src = build / header
         src.parent.mkdir(exist_ok=True)
-        src.write_text('#include "sim.h"\n', encoding="ascii")
+        contents = '#include "sim.h"\n'
+        if header == "esp_log.h":
+            contents += '#define ESP_LOGI test_info_log\n'
+        src.write_text(contents, encoding="ascii")
     includes = [here, here.parent / "display", build,
                 *(components / name / "include" for name in
                   ("baji_board", "baji_graphics", "baji_peripherals", "baji_runtime", "baji_vsync"))]

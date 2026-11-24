@@ -6,18 +6,27 @@ BPH5 资源包占 2,372,976 字节，解压后的表占 4,899,596 字节。它�
 
 角色绘制器依赖公共像素矩形和 RGB565 条带约定。由一个显示任务依次选择姿势、渲染条带，将已经提交的状态保留到整次绘制成功。角色公共头可由 C 或 C++ 应用直接引用。[角色接口](include/baji_pet.h) · [像素矩形与条带约定](../baji_graphics/include/baji_graphics.h)
 
+## 戳脸与挠痒
+
+离线及无线版 GPT 使用同一套触控映射。点左右脸颊各有独立的压脸、眯眼和回弹动画。按住会停在脸颊压紧的位置，抬手从该帧继续。每次轻点短于 420 ms、1.1 秒内点三次，或按住脸颊小幅横向揉动、改变方向两次，均触发挠痒笑。向外大幅拖动会解除压脸。脸颊热点跟随动作的鼻尖和脸部方向，排除鼻尖中央。
+
+三段动作来自提交 `00d3931037c9cf88642134c3271c8b9aa9c540dd` 中的近景图集。左右脸各 22 张原画，挠痒笑 30 张，16 Hz 原画扩展至 222 个 48 Hz 样本。每个样本保存角色的原画眼神。额头与待机仍支持实时二维凝视。独立的 `assets/reactions.bpr` 占 3,996,040 字节，直接从 flash 读取变化像素和局部刷新窗口，复用 BPH5 的帧缓冲与工作区。跨动作切换可从每 12 个样本保存的关键帧重建。
+
 ## 构建与复核
 
-正常固件直接嵌入已生成的 `assets/motion.bpz`，编译仅需 ESP-IDF。将 CMake 变量 `BAJI_PET_EXTERNAL_ASSET` 设为 `ON` 时，调用方可通过 `baji_pet_open_data` 提供同一份压缩资源，函数返回后调用方即可释放输入。
+正常固件直接嵌入已生成的 `assets/motion.bpz` 和 `assets/reactions.bpr`，编译仅需 ESP-IDF。将 CMake 变量 `BAJI_PET_EXTERNAL_ASSET` 设为 `ON` 时，调用方可通过 `baji_pet_open_data` 提供同一份压缩资源，函数返回后调用方即可释放输入。如需外部加载戳脸与挠痒，使用 `baji_pet_attach_reactions` 绑定一份四字节对齐、在播放器整个生命周期内有效的 BPR1 数据。只加载 BPH5 时仍可使用待机与摸头。
+
+生产固件把戳脸与挠痒资源放在四字节对齐的只读 flash 区段。成功绑定时打印 `reactions.bpr active`。若该资源校验失败，会记录一条 `reactions.bpr rejected` 警告，继续播放已经加载的待机、凝视和摸头。基础动作资源校验失败时，启动入口返回错误。显式调用 `baji_pet_attach_reactions` 的外部播放器可直接读取该次绑定的错误码。
 
 如需重新生成素材，安装 Python、Pillow、NumPy、opencv-python-headless、Playwright 和 Chromium，在仓库根目录运行以下命令。
 
 ```sh
 python components/baji_pet/authoring/bake_motion.py
+python components/baji_pet/authoring/bake_reactions.py
 python components/baji_pet/tests/run.py
 ```
 
-导出器默认为 `authoring/reference.zip` 中锁定的两段动作。归档保留网页绘制脚本、近景图块、待机与摸头的锚点以及原作者声明。不参与这两个动作的全身取景在图集中为透明。参考输出使用 Chrome 157.0.8103.39、Playwright 1.65.2、Pillow 12.2.0 和 NumPy 2.4.4。两个导出器都支持 `--browser` 指定 Chromium 路径。
+导出器默认为 `authoring/reference.zip` 中锁定的两段动作。归档保留网页绘制脚本、近景图块、待机与摸头的锚点以及原作者声明。不参与这两个动作的全身取景在图集中为透明。参考输出使用 Chrome 157.0.8103.39、Playwright 1.65.2、Pillow 12.2.0 和 NumPy 2.4.4。`bake.py` 与 `bake_motion.py` 支持 `--browser` 指定 Chromium 路径。
 
 原版锚点导出器 `authoring/bake.py` 的 `--web design/pixel-badge` 选项改用当前工作区的网页与角色图集。对于原始网页渲染器，导出器在图集写入画布后插入跟随面部锚点的凝视层；带有 FaceFX 的版本调用网页自有的眼部绘制。更新锁定参考时显式加上 `--freeze-reference`。脚本检查每个睁眼姿势的目光确实变化、闭眼期间没有新增瞳孔。
 
